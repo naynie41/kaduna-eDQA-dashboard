@@ -60,3 +60,81 @@ None are written yet. Planned, in the order they should run:
 | `submission_profile.py` | Pages the OData `Submissions` feed (throttled) and reports counts per form version and per submission quarter, plus facility-field shapes (free text vs code). Writes `out/submission_profile.md` | Backfill estimate (§5.6), Q-10 |
 
 Run a script from inside `discovery/` with the venv active, e.g. `python probe.py`.
+
+### `facility_reconcile.py` (written)
+
+Matches every facility seen in the submissions to the national health facility registry and
+produces the workbook the client signs off. The signed-off workbook becomes the Phase 1 seed
+master list. It reads local files only and makes no ODK calls.
+
+```bash
+python facility_reconcile.py --registry data/hfr_export.xlsx --submissions data/submissions/
+```
+
+| Option | Meaning |
+|---|---|
+| `--registry` | Registry export, `.csv` or `.xlsx` (title rows above the header are skipped) |
+| `--registry-sheet` | Sheet to read when the workbook has several |
+| `--map FIELD=COLUMN` | Registry column for `code`, `name`, `lga`, `ward`, `ownership`, `level`, `state`. Needed only when the headers aren't recognised; the script stops and lists the columns if so |
+| `--submissions` | OData JSON pages (`{"value": [...]}`) or ODK CSV/XLSX exports; a file or a directory. Default `data/submissions/` |
+| `--sub-map FIELD=PATH` | Question path for `lga`, `ward`, `code`, `name`, `ownership`, `level`, e.g. `name=grp_fac/fac_name`. Otherwise it's found by common question names, per record, so drifting form versions still resolve |
+| `--lga-alias VALUE=LGA` | Map an unrecognised LGA value (e.g. an ODK choice code `kd_north`) to one of the 23 |
+| `--deadline YYYY-MM-DD` | Client decision deadline. Default: 10 working days from the run |
+
+Only facility fields and the submission date are read; assessor names and other answers are ignored.
+
+**Method.**
+1. Names are normalised: case, punctuation, and abbreviations such as PHC/PHCC, HC, HP, MCH,
+   Comp., Health Centre/Center and Clinic.
+2. Submissions are grouped into distinct facilities by LGA plus registry code. When the code is
+   missing or isn't in the registry (e.g. `2019.00`), they are grouped by LGA plus normalised
+   name instead.
+3. Each facility is matched within its own LGA only: exact code, then exact normalised name,
+   then rapidfuzz `token_set_ratio`.
+4. Results are sorted by score: 95 or more goes to Matched, 60–94 to Review (with the top 3
+   candidates), below 60 to Unmatched.
+5. A score of 95+ still goes to Review when two candidates score within 3 points of each other,
+   or when the names agree only on facility-type words. `token_set_ratio` scores "PHC" against
+   "PHC Kawo" as 100.
+
+**Output.**
+- `out/facility_reconciliation.xlsx`, with sheets Read me, Matched, Review, Unmatched,
+  Registry never assessed, and Summary. Decision dropdowns (MAP/ADD/REJECT) are on Review and
+  Unmatched, and header rows are frozen.
+- `out/facility_reconciliation.md`, covering method, counts and the client decisions needed.
+
+### `hosting_check.sh` (written)
+
+Bash script to run **on a candidate server**. It checks that the server can host the Docker
+stack (`DEPLOY.md` §2.3, §4, §13) and prints a markdown report to stdout. It needs no Python.
+
+```bash
+scp discovery/hosting_check.sh admin@<server>:
+ssh admin@<server> 'sudo bash hosting_check.sh --odk-url https://<odk-host> \
+    --smtp <smtp-host>:587 --backup-endpoint https://<s3-endpoint> --name <name>' \
+    > discovery/out/hosting_<name>.md
+```
+
+- **Read-only by default.** It only inspects the host and makes outbound test connections: an
+  HTTPS GET to each endpoint, including ODK Central's public `/version.txt`, and an SMTP
+  STARTTLS handshake. It never logs in anywhere.
+- **What it reports.** PASS/WARN/FAIL for:
+  - OS, CPU, RAM and disk against the sizing table;
+  - virtualisation (OpenVZ/LXC is a FAIL);
+  - kernel ≥ 5.15, cgroups v2 and overlay;
+  - Docker Engine and Compose;
+  - cPanel/WHM (a FAIL);
+  - outbound connectivity;
+  - ports 80/443, with all listeners;
+  - firewall state.
+- **`--with-docker-test`** needs Docker installed. It is the only mode that changes anything,
+  and it cleans up afterwards. It:
+  - runs `postgres:16-bookworm` with no network and a tmpfs data directory, and tests CHECK,
+    jsonb GIN, pg_trgm, and a materialised view with a unique index and REFRESH CONCURRENTLY;
+  - runs `debian:bookworm-slim`, installs Chromium and renders a PDF with `--no-sandbox` and a
+    256 MB `/dev/shm`;
+  - removes the containers and their volumes, and only the images it pulled itself.
+- **sudo** is optional, but without it firewall rules and port owners are hidden.
+- **Exit status:** 0 when there is no FAIL, 1 on any FAIL, 2 on a usage error.
+
+Record the outcome in [`HOSTING_DECISION.md`](HOSTING_DECISION.md) for client sign-off.
