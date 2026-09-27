@@ -869,3 +869,8 @@ real month names for single-quarter views, LGA tile grid, Data issues "why it ex
 | Q-10 | Round assessment windows for historical quarters — exact dates? | Backfill |
 | Q-11 | Webhooks available on their ODK Central host? | Optional latency |
 | Q-12 | Standard action texts and default owners for the plan — confirm wording | Phase 6 |
+| Q-13 | The portal reports ownership as Public or Private only. Where do faith-based, mission and NGO facilities belong? (Registry values that are neither are left unclassified by `facility_reconcile.py`) | Facility seed, owner filters |
+| Q-14 | Who issues codes for facilities the client marks ADD in the reconciliation: the national registry, or the portal? Every master-list facility needs a unique code (`facilities.code` UQ) | Facility seed (step 4) |
+| Q-15 | Which LGA and ward code lists are authoritative? The form's choice lists, the registry and the seed must use the same codes (§3 "confirm codes against the registry") | Cascade file, `LGA_UNKNOWN` |
+| Q-16 | If a historical form version recorded typed scores instead of per-item answers, those submissions cannot be scored under hard rule 2. Leave them quarantined and report the gap, or exclude those rounds from the backfill? (Arises only if `field_diff.py` finds such a version) | Backfill (step 14) |
+| Q-17 | Which SMTP relay sends the digest and password-reset mail, and does the hosting provider allow outbound SMTP? (Several block it by default) | Password reset (step 5), digest (step 13), hosting |

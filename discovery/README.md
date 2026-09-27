@@ -50,16 +50,45 @@ cp .env.example .env               # then fill in the credentials
 
 ## Tools
 
-None are written yet. Planned, in the order they should run:
+Run them in this order, from inside `discovery/` with the venv active. The first four call ODK
+Central through [`odk.py`](odk.py); the rest read local files only.
 
-| Script | What it does | Answers |
-|---|---|---|
-| `probe.py` | Logs in, prints the Central version and the project's forms with submission counts | Q-01 (Central vs Aggregate) |
-| `form_versions.py` | Lists every form version (`GET /v1/projects/{p}/forms/{f}/versions`) and downloads each version's XLSForm and XML into `data/forms/` | Q-05 (how many versions) |
-| `field_diff.py` | Parses each version's XForm XML with lxml and diffs question names and types across versions. Uses rapidfuzz to suggest likely renames. Checks names against the §5.1 contract (`^(avail\|consist\|valid)_m[1-3]_…$`, `select_one` yes/no/na, cascading facility select). Writes `out/field_diff.md` | Q-02, Q-05. The diff is the draft `config/edqa_field_maps.php` |
-| `submission_profile.py` | Pages the OData `Submissions` feed (throttled) and reports counts per form version and per submission quarter, plus facility-field shapes (free text vs code). Writes `out/submission_profile.md` | Backfill estimate (§5.6), Q-10 |
+| # | Script | What it does | Writes | Answers |
+|---|---|---|---|---|
+| 1 | `probe.py` | Central version (`/version.txt`), project, forms with submission counts, and whether the account has any write permission | `out/probe.md` | Q-01; SECURITY.md §6 check |
+| 2 | `form_versions.py` | Lists every published form version and downloads each one's XForm (and XLSForm when Central has it) | `data/forms/`, `out/form_versions.md` | Q-05 (how many versions) |
+| 3 | `field_diff.py` | Parses each XForm with lxml (no entity resolution, no network); checks it against the §5.1 form contract; diffs question names between versions and suggests renames; drafts the field map | `out/field_diff.md`, `out/edqa_field_maps.draft.php`, `out/field_map.draft.json` | Q-02, Q-05, drift effort |
+| 4 | `submission_profile.py` | Downloads every submission (OData, 500 per page, throttled, resumable, fixed cut-off) and profiles volume per year, quarter and form version | `data/submissions/`, `out/submission_profile.md` | Backfill size (§5.6) |
+| 5 | `facility_reconcile.py` | Matches submitted facilities to the national registry | `out/facility_reconciliation.{xlsx,md}` | Q-06 input |
+| 6 | `rule_preview.py` | Runs the §6 validation rules over the downloaded submissions: how many would be quarantined or flagged, by rule and year | `out/rule_preview.md` | Defect evidence, backfill effort |
 
-Run a script from inside `discovery/` with the venv active, e.g. `python probe.py`.
+`odk.py` enforces the rules above in code: every request passes a guard that allows GET plus
+`POST /v1/sessions` and raises before anything else is sent; there is no logout call; errors
+show Central's message, never the request.
+
+Everything `field_diff.py` infers from question names is marked **CONFIRM** in the draft map.
+Only `start`/`end` (from their preload) and `meta/instanceID` are taken as certain.
+
+### `rule_preview.py`
+
+```bash
+python rule_preview.py --registry data/hfr_export.xlsx --calendar-rounds
+python rule_preview.py --registry data/hfr_export.xlsx --rounds data/rounds.csv
+```
+
+A preview, not the pipeline. Rules whose inputs are missing are reported as "not evaluated",
+never guessed:
+
+| Rule | Needs |
+|---|---|
+| `FACILITY_UNKNOWN`, `FACILITY_LGA_MISMATCH` | `--registry`, which stands in for the master list until it is signed off |
+| `ROUND_WINDOW`, `DUPLICATE_ASSESSMENT`, `SCORE_JUMP` | `--rounds` (a CSV of `year,quarter,window_start,window_end`; Q-10), or `--calendar-rounds` as a labelled proxy |
+| `ASSESSOR_VOLUME` | An `assessor` path in the field map |
+
+Submissions replaced by a later ODK edit (`deprecatedID`) are excluded, as the pipeline would.
+`ITEMS_INCOMPLETE` treats every scored question in the version's form as required. The report
+also counts typed score fields outside 0–100 in the old data. `--lga-alias` and `--map` work as
+in `facility_reconcile.py`.
 
 ### `facility_reconcile.py` (written)
 
