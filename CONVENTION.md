@@ -262,10 +262,10 @@ reopen round, publish rule version, deactivate facility.
 
 ## 8. Testing
 
-Pest 3 against PostgreSQL (never SQLite).
+Pest 4 against PostgreSQL (never SQLite).
 
 
-Pest 3. Postgres for tests too (never SQLite — CHECK constraints, jsonb and materialised views
+Pest 4. Postgres for tests too (never SQLite — CHECK constraints, jsonb and materialised views
 must behave exactly as in production). Use `RefreshDatabase` against a dedicated `edqa_test` DB,
 `--parallel` with per-process databases.
 

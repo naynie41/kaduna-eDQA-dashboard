@@ -4,7 +4,8 @@ Laravel + PostgreSQL replacement for the Kaduna State eDQA Looker Studio report.
 quarterly Data Quality Assessment submissions from ODK Central, validates them, computes
 every score server-side, and presents the results on dashboard and administration pages.
 
-**Status:** Phase 0 (Discovery). There is no Laravel app yet; see [`discovery/`](discovery/).
+**Status:** Phase 1, build step 1 (scaffold). Laravel 13 + Inertia 3 + React 19 + TypeScript;
+no domain code yet. Docker (`make up`) arrives in the next step.
 
 ## Project documents
 
@@ -22,5 +23,11 @@ Read [`CLAUDE.md`](CLAUDE.md) first. It says which of the others to read before 
 ## Layout
 
 ```
-discovery/   Phase 0 throwaway Python tools for investigating the ODK Central data (read-only)
+app/ config/ database/ routes/   Laravel application
+resources/js/                    Inertia + React + TypeScript front end
+tests/                           Pest (Arch, Unit, Feature) against PostgreSQL
+discovery/                       Phase 0 Python tools for the ODK Central data (read-only)
 ```
+
+Checks (CONVENTION.md §11): `composer lint`, `composer test`, `composer check`;
+`npm run typecheck`, `npm run lint`, `npm run test`.

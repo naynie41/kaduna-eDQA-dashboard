@@ -43,10 +43,10 @@ aggregate, chart or export — stop and flag it.
 
 ## 2. Stack
 
-Laravel 12 · PHP 8.3 · PostgreSQL 16 (14 min) · Inertia 2 + React 18 + TypeScript (strict) ·
+Laravel 13 · PHP 8.3 · PostgreSQL 16 (14 min) · Inertia 3 + React 19 + TypeScript (strict) ·
 Tailwind CSS 4 · Recharts + hand-built SVG · TanStack Table (server-driven) · Redis queue/cache
 (database fallback) · Fortify with mandatory 2FA · maatwebsite/excel · spatie/laravel-pdf
-(Browsershot) · spatie/laravel-activitylog · Pest 3 · Larastan level 6 · Pint · Pulse.
+(Browsershot) · spatie/laravel-activitylog · Pest 4 · Larastan level 6 · Pint · Pulse.
 
 **Runtime:** Docker. One multi-stage `Dockerfile` (targets `app`, `worker`, `web`, `ci`, `dev`),
 `compose.dev.yml` for local work, Caddy as the web tier, Docker Compose on a single host in
