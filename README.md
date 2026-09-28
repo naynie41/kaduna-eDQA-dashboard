@@ -4,8 +4,14 @@ Laravel + PostgreSQL replacement for the Kaduna State eDQA Looker Studio report.
 quarterly Data Quality Assessment submissions from ODK Central, validates them, computes
 every score server-side, and presents the results on dashboard and administration pages.
 
-**Status:** Phase 1, build step 1 (scaffold). Laravel 13 + Inertia 3 + React 19 + TypeScript;
-no domain code yet. Docker (`make up`) arrives in the next step.
+**Status:** Phase 1, build step 1 (scaffold + containers). Laravel 13 + Inertia 3 + React 19 +
+TypeScript; no domain code yet.
+
+## Local development
+
+Needs Docker and GNU make. `make up` starts the stack (first run creates `.env`, installs
+dependencies, migrates): app on http://localhost:8080, Mailpit on http://localhost:8025,
+Vite on :5173. `make help` lists every target; `make check` must be green before a commit.
 
 ## Project documents
 

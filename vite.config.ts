@@ -6,6 +6,12 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
 import { defineConfig } from 'vite';
+import { compression } from 'vite-plugin-compression2';
+
+// Wayfinder's plugin runs `php artisan wayfinder:generate`. Where there is no PHP (the Docker
+// assets stage, the dev `vite` container) the files are generated elsewhere and this is set
+// (ARCHITECTURE.md D-19).
+const skipWayfinder = process.env.WAYFINDER_SKIP === '1';
 
 export default defineConfig({
     plugins: [
@@ -26,15 +32,21 @@ export default defineConfig({
             presets: [reactCompilerPreset()],
         }),
         tailwindcss(),
-        // Runs `php artisan wayfinder:generate` on every build; see ARCHITECTURE.md D-19
-        // for the Docker assets stage, which has no PHP.
-        wayfinder({
-            formVariants: true,
-        }),
+        ...(skipWayfinder ? [] : [wayfinder({ formVariants: true })]),
+        // Precompressed .br/.gz next to each asset; Caddy serves them (`precompressed br gzip`).
+        compression({ algorithms: ['brotliCompress', 'gzip'] }),
     ],
     server: {
+        // Reachable from the host when running in the dev container; HMR back to localhost.
+        host: '0.0.0.0',
+        port: 5173,
+        strictPort: true,
+        hmr: {
+            host: 'localhost',
+        },
         watch: {
-            ignored: ['**/vendor/**', '**/discovery/**', '**/.claude/**'],
+            usePolling: process.env.VITE_USE_POLLING === '1',
+            ignored: ['**/vendor/**', '**/discovery/**', '**/storage/**', '**/.claude/**'],
         },
     },
 });

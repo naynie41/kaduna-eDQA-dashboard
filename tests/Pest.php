@@ -9,3 +9,8 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
+
+// Permission checks as the runtime role (`make grants-check`): the schema is migrated
+// beforehand by the migrator, so no RefreshDatabase here.
+pest()->extend(TestCase::class)
+    ->in('Grants');

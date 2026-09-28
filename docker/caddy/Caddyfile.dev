@@ -1,0 +1,25 @@
+# Local development: plain HTTP on :80 (published as localhost:8080), no TLS.
+# Assets come from the Vite dev server (:5173) while it runs; public/ is bind-mounted.
+{
+    admin off
+    auto_https off
+}
+
+http://:80 {
+    root * /srv/public
+    encode zstd gzip
+
+    @blocked path /.env* /storage/* /vendor/* /.git/*
+    respond @blocked 404
+
+    php_fastcgi app:9000 {
+        root /var/www/html/public
+        lb_try_duration 15s
+        lb_try_interval 250ms
+    }
+    file_server
+    log {
+        output stdout
+        format console
+    }
+}

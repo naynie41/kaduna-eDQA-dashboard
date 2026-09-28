@@ -1,0 +1,54 @@
+# Strict build context (CONVENTION.md §12.2, DEPLOY.md §6.2). Anything not needed to build
+# an image stays out, and nothing secret or machine-specific ever gets in.
+
+# VCS, editors, OS
+.git
+.gitignore
+.gitattributes
+.github
+.idea
+.vscode
+.editorconfig
+**/.DS_Store
+**/Thumbs.db
+
+# Secrets and local config
+.env
+.env.*
+auth.json
+
+# Dependencies and build output (rebuilt inside the image)
+node_modules
+vendor
+public/build
+public/hot
+public/fonts-manifest.dev.json
+public/storage
+bootstrap/ssr
+bootstrap/cache/*.php
+resources/js/actions
+resources/js/routes
+resources/js/wayfinder
+
+# Runtime state
+storage/app/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/logs/*
+storage/pail
+!storage/**/.gitignore
+.phpunit.cache
+.phpunit.result.cache
+npm-debug.log
+
+# Not part of the application
+discovery
+tests/Fixtures/odk/private
+*.md
+Makefile
+compose*.yml
+Dockerfile
+.dockerignore
+.claude
