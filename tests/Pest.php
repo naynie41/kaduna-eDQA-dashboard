@@ -21,6 +21,37 @@ pest()->extend(TestCase::class)
 pest()->extend(TestCase::class)
     ->in('Grants');
 
+// Migration round-trips run real DDL outside a test transaction, so no RefreshDatabase.
+pest()->extend(TestCase::class)
+    ->in('Migrations');
+
+/**
+ * Postgres data type of a column in the public schema, e.g. "jsonb", or null if absent.
+ */
+function columnType(string $table, string $column): ?string
+{
+    $type = DB::table('information_schema.columns')
+        ->where('table_schema', 'public')
+        ->where('table_name', $table)
+        ->where('column_name', $column)
+        ->value('data_type');
+
+    return is_string($type) ? $type : null;
+}
+
+/**
+ * CREATE INDEX statement for an index, or '' if it doesn't exist.
+ */
+function indexDefinition(string $index): string
+{
+    $definition = DB::table('pg_indexes')
+        ->where('schemaname', 'public')
+        ->where('indexname', $index)
+        ->value('indexdef');
+
+    return is_string($definition) ? $definition : '';
+}
+
 /**
  * Assert that the query is rejected by the named CHECK constraint (SQLSTATE 23514).
  */
