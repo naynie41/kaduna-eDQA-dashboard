@@ -239,7 +239,7 @@ All timestamps `timestamptz`. All raw payloads `jsonb`. Every migration reversib
 | `item_responses` | id, assessment_id FK cascade, dimension, month_slot smallint, item_code, value, is_applicable bool | CHECK month_slot 1–3; dimension CHECK |
 | `assessment_scores` | id, assessment_id FK cascade, dimension, month_slot smallint, score numeric(5,2) NULL, rule_version_id FK, computed_at | CHECK score 0–100; UQ (assessment_id, dimension, month_slot, rule_version_id) |
 | `quarantined_records` | id, submission_id FK, instance_id, round_id?, facility_ref?, lga_ref?, payload jsonb, failures jsonb, status, resolution, resolved_by?, resolved_at?, resolution_note?, timestamps | `failures` = `[{code, severity, detail}]` |
-| `scoring_rule_versions` | id, version int UQ, config jsonb, created_by, published_at?, published_reason?, timestamps | Exactly one "current" = max published version |
+| `scoring_rule_versions` | id, version int UQ, config jsonb, created_by?, published_at?, published_reason?, timestamps | Exactly one "current" = max published version. `created_by` is null only for version 1, seeded before any administrator exists |
 | `plan_actions` | id, round_id, lga_id, dimension, action_text, assigned_to, due_date, status, notes?, timestamps | UQ (round_id, lga_id, dimension) |
 | `odk_form_syncs` | id, project_id, form_id, last_pulled_at?, last_instance_id?, backfill_skip int, last_error?, submission_count, timestamps | The pull cursor |
 | `odk_pull_runs` | id, triggered_by?, trigger_type, started_at, finished_at?, fetched, accepted, quarantined, duplicates, error?, outcome | Powers pull history |

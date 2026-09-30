@@ -4,24 +4,30 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * Chooses seeders by environment.
+ *   production        the 23 LGAs and scoring rule version 1 only; real facilities come from
+ *                     the signed-off master list, rounds and accounts from administrators
+ *   local, staging    + synthetic wards and facilities, four rounds, demo assessments
+ *   anything else     + synthetic wards, facilities and rounds (no demo assessments)
+ * No accounts are seeded anywhere: administrators are created by `edqa:admin:create`.
+ */
 final class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call([LgaSeeder::class, ScoringRuleVersionSeeder::class]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        if (app()->environment('production')) {
+            return;
+        }
+
+        $this->call([WardSeeder::class, FacilitySeeder::class, RoundSeeder::class]);
+
+        if (app()->environment(['local', 'staging'])) {
+            $this->call(DemoAssessmentSeeder::class);
+        }
     }
 }

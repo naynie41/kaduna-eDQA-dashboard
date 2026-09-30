@@ -16,7 +16,8 @@ return new class extends Migration
             $table->id();
             $table->integer('version')->unique();
             $table->jsonb('config');
-            $table->foreignId('created_by')->constrained('users');
+            // Null only for version 1, seeded before any administrator exists.
+            $table->foreignId('created_by')->nullable()->constrained('users');
             $table->timestampTz('published_at')->nullable();
             $table->text('published_reason')->nullable();
             $table->timestampsTz();
