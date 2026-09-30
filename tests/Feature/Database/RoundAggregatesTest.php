@@ -133,8 +133,13 @@ it('picks up new scores on the next refresh', function (): void {
 });
 
 it('does not let every role execute the SECURITY DEFINER function', function (): void {
-    // An ACL entry for PUBLIC starts with "=" (e.g. "=X/owner"); the migration revokes it.
-    $acl = (string) DB::table('pg_proc')->where('proname', 'refresh_round_aggregates')->value(DB::raw('proacl::text'));
+    $function = DB::table('pg_proc')->where('proname', 'refresh_round_aggregates')
+        ->first([DB::raw('prosecdef as security_definer'), DB::raw('proacl::text as acl')]);
 
-    expect($acl)->not->toContain('{=X')->not->toContain(',=X');
+    expect($function)->not->toBeNull()
+        ->and($function->security_definer)->toBeTrue()
+        // A NULL ACL means the defaults, which let PUBLIC execute: the migration must set one.
+        ->and($function->acl)->not->toBeNull()
+        // An entry for PUBLIC starts with "=" (e.g. "=X/owner").
+        ->and($function->acl)->not->toContain('{=X')->not->toContain(',=X');
 });

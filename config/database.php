@@ -4,6 +4,21 @@ declare(strict_types=1);
 
 use Illuminate\Support\Str;
 
+$pgsql = [
+    'driver' => 'pgsql',
+    'url' => env('DB_URL'),
+    'host' => env('DB_HOST', 'postgres'),
+    'port' => env('DB_PORT', '5432'),
+    'database' => env('DB_DATABASE', 'edqa'),
+    'username' => env('DB_USERNAME', 'edqa_app'),
+    'password' => env('DB_PASSWORD', ''),
+    'charset' => env('DB_CHARSET', 'utf8'),
+    'prefix' => '',
+    'prefix_indexes' => true,
+    'search_path' => 'public',
+    'sslmode' => env('DB_SSLMODE', 'prefer'),
+];
+
 return [
 
     /*
@@ -22,19 +37,15 @@ return [
 
     'connections' => [
 
-        'pgsql' => [
-            'driver' => 'pgsql',
-            'url' => env('DB_URL'),
-            'host' => env('DB_HOST', 'postgres'),
-            'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'edqa'),
-            'username' => env('DB_USERNAME', 'edqa_app'),
-            'password' => env('DB_PASSWORD', ''),
-            'charset' => env('DB_CHARSET', 'utf8'),
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'search_path' => 'public',
-            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        'pgsql' => $pgsql,
+
+        // Used only by tests/Grants (`make grants-check`): the same database, connected as the
+        // runtime role, to prove the least-privilege grants. Never used by the application.
+        'pgsql_app_test' => [
+            ...$pgsql,
+            'url' => null,
+            'username' => env('DB_APP_TEST_USERNAME', 'edqa_app'),
+            'password' => env('DB_APP_TEST_PASSWORD', ''),
         ],
 
     ],

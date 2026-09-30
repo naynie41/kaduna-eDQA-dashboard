@@ -65,8 +65,8 @@ prod-build: ## Build the production app, worker and web images locally
 	docker build --target worker -t edqa-worker:local .
 	docker build --target web -t edqa-web:local .
 
-grants-check: ## Run tests/Grants as edqa_app, the runtime role, on a migrated edqa_test
+grants-check: ## Prove the least-privilege grants: tests/Grants act as edqa_app on a migrated edqa_test
 	$(COMPOSE) exec -T -e DB_DATABASE=edqa_test app php artisan migrate:fresh --force --no-interaction
-	@test ! -f database/sql/post-migrate-grants.sql || \
-		$(COMPOSE) exec -T -e DB_DATABASE=edqa_test app php artisan db:execute-sql database/sql/post-migrate-grants.sql
-	$(COMPOSE) exec -T -e DB_USERNAME=$(APP_DB_USER) -e DB_PASSWORD=$(APP_DB_PASSWORD) app vendor/bin/pest tests/Grants
+	$(COMPOSE) exec -T -e DB_DATABASE=edqa_test app php artisan edqa:db:apply-grants --no-interaction
+	$(COMPOSE) exec -T -e DB_APP_TEST_USERNAME=$(APP_DB_USER) -e DB_APP_TEST_PASSWORD=$(APP_DB_PASSWORD) \
+		app vendor/bin/pest tests/Grants

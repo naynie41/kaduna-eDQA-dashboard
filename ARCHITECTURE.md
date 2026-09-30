@@ -81,7 +81,8 @@ app/
     Resources/   Inertia/JSON shapes (no arithmetic)
     Middleware/  EnsureTwoFactorConfirmed, SecurityHeaders, VerifyOdkWebhookSignature
   Console/Commands/  edqa:pull, edqa:backfill, edqa:backfill-report, edqa:rescore,
-                     edqa:refresh-aggregates, edqa:admin:create, edqa:admin:disable
+                     edqa:refresh-aggregates, edqa:admin:create, edqa:admin:disable,
+                     edqa:db:apply-grants (post-migrate-grants.sql; the migrate role runs it)
 config/edqa.php, config/edqa_field_maps.php
 database/sql/round_aggregates.sql
 resources/js/Pages/{Dashboard,Admin}/*, Components/*, lib/*, types/*
@@ -277,7 +278,7 @@ A test inserts `347.66` directly via `DB::table('assessment_scores')->insert(...
 | `quarantined_records USING gin (failures)` | Group Data issues by rule code |
 | `quarantined_records (status, round_id)` | Open-issues badge |
 | `facilities (lga_id) WHERE is_active` | Cascade export |
-| `round_aggregates (round_id, scope_type, scope_id, owner_type)` UNIQUE | Required for `REFRESH ... CONCURRENTLY` |
+| `round_aggregates (round_id, scope_type, scope_id, owner_type, level)` UNIQUE | Required for `REFRESH ... CONCURRENTLY` |
 
 ### `round_aggregates` materialised view
 
@@ -303,10 +304,21 @@ The app runs as `edqa_app`, which does not own the view, so the migration also c
 `SECURITY DEFINER` function owned by the migrator role:
 
 ```sql
-CREATE FUNCTION refresh_round_aggregates() RETURNS void
-LANGUAGE sql SECURITY DEFINER SET search_path = public AS
-$$ REFRESH MATERIALIZED VIEW CONCURRENTLY round_aggregates $$;
+CREATE OR REPLACE FUNCTION refresh_round_aggregates() RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+    -- The view is created WITH NO DATA, and CONCURRENTLY can't refresh an unpopulated view.
+    IF (SELECT ispopulated FROM pg_matviews WHERE matviewname = 'round_aggregates') THEN
+        REFRESH MATERIALIZED VIEW CONCURRENTLY round_aggregates;
+    ELSE
+        REFRESH MATERIALIZED VIEW round_aggregates;
+    END IF;
+END $$;
+REVOKE ALL ON FUNCTION refresh_round_aggregates() FROM PUBLIC;  -- EXECUTE is granted to edqa_app only
 ```
+
+The view's definition and its assumptions (A1–A6, to confirm against a real round in Phase 3)
+are in `database/sql/round_aggregates.sql`.
 
 The app calls `SELECT refresh_round_aggregates()` — never the raw statement. Migrations run in
 the one-off `migrate` container, which receives `DB_USERNAME=edqa_migrator`; the app containers

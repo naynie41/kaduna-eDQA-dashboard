@@ -21,7 +21,7 @@ case "$role" in
                --timeout="${WORKER_TIMEOUT:-120}" --max-time=3600 --memory="${WORKER_MEMORY:-256}" "$@" ;;
   scheduler) prepare; exec php artisan schedule:work ;;
   migrate)   php artisan migrate --force --no-interaction
-             php artisan db:execute-sql database/sql/post-migrate-grants.sql  # app-repo command (build step 2)
+             php artisan edqa:db:apply-grants --no-interaction   # runs database/sql/post-migrate-grants.sql
              ;;
   artisan)   prepare; exec php artisan "$@" ;;
   *)         exec "$role" "$@" ;;
