@@ -47,7 +47,10 @@
             "pint --test",
             "phpstan analyse --memory-limit=1G"
         ],
-        "test": "pest --parallel",
+        "test": [
+            "Composer\\Config::disableProcessTimeout",
+            "pest --parallel"
+        ],
         "check": [
             "@lint",
             "@test"

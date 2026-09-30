@@ -46,6 +46,9 @@ export default defineConfig({
         },
         watch: {
             usePolling: process.env.VITE_USE_POLLING === '1',
+            // Chokidar's default 100 ms poll keeps a bind-mounted repo busy; 1 s is plenty for HMR.
+            interval: 1000,
+            binaryInterval: 3000,
             ignored: ['**/vendor/**', '**/discovery/**', '**/storage/**', '**/.claude/**'],
         },
     },
