@@ -20,9 +20,18 @@ it('rolls back every migration one step at a time, then migrates again', functio
         expect(DB::table('migrations')->count())->toBe($remaining - 1, "rolling back {$migration}");
     }
 
-    $leftover = collect(DB::select(
-        "select tablename from pg_tables where schemaname = 'public' and tablename <> 'migrations'",
-    ))->pluck('tablename')->all();
+    $leftover = collect(DB::select(<<<'SQL'
+        select 'table ' || tablename as object from pg_tables
+        where schemaname = 'public' and tablename <> 'migrations'
+        union all
+        select 'materialized view ' || matviewname from pg_matviews where schemaname = 'public'
+        union all
+        -- our functions only: extension functions (pg_trgm) are excluded
+        select 'function ' || p.proname from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+        SQL))->pluck('object')->all();
     expect($leftover)->toBe([]);
 
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
