@@ -23,10 +23,11 @@
             <directory>app</directory>
         </include>
     </source>
-    <!-- Every value is forced: the containers receive .env as real environment variables
-         (Compose env_file), which would otherwise win over these and run the tests with the
-         development settings. DB_DATABASE in particular must never point RefreshDatabase at
-         the development database. Postgres only, never SQLite (CLAUDE.md hard rule 4). -->
+    <!-- Every value is forced. In the containers .env also arrives as real environment
+         variables (Compose env_file), which Laravel reads from $_SERVER first; force="true"
+         alone doesn't reach $_SERVER, so tests/bootstrap.php copies these values there and
+         refuses to run unless DB_DATABASE is edqa_test. RefreshDatabase must never touch the
+         development database. Postgres only, never SQLite (CLAUDE.md hard rule 4). -->
     <php>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>

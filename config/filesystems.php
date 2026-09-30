@@ -35,7 +35,9 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Off: files are served only through authenticated app routes (SECURITY.md §3, §7),
+            // never Laravel's unauthenticated signed storage/{path} route.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

@@ -4,8 +4,9 @@ Laravel + PostgreSQL replacement for the Kaduna State eDQA Looker Studio report.
 quarterly Data Quality Assessment submissions from ODK Central, validates them, computes
 every score server-side, and presents the results on dashboard and administration pages.
 
-**Status:** Phase 1, build step 1 (scaffold + containers). Laravel 13 + Inertia 3 + React 19 +
-TypeScript; no domain code yet.
+**Status:** Phase 1, build steps 1–3 done: scaffold and containers, the full schema with
+enforced constraints and the `round_aggregates` view, and domain models with factories and
+audit logging. Laravel 13 + Inertia 3 + React 19 + TypeScript. Next: seeders (step 4).
 
 ## Local development
 

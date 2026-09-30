@@ -42,6 +42,12 @@ function aggregateRow(int $roundId, string $scope, int $scopeId, string $owner =
         ->all();
 }
 
+it('has the unique index REFRESH CONCURRENTLY needs', function (): void {
+    expect(indexDefinition('round_aggregates_key'))
+        ->toContain('CREATE UNIQUE INDEX')
+        ->toContain('(round_id, scope_type, scope_id, owner_type, level)');
+});
+
 it('is created without data and refreshes concurrently once populated', function (): void {
     $populated = fn (): bool => (bool) DB::table('pg_matviews')->where('matviewname', 'round_aggregates')->value('ispopulated');
 

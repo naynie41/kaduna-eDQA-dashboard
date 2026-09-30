@@ -17,6 +17,7 @@ use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -51,6 +52,21 @@ it('records who made the change', function (): void {
 
     $entry = Activity::query()->forSubject($round)->where('event', 'updated')->sole();
     expect($entry->causer?->is($admin))->toBeTrue();
+});
+
+it('records the request IP and user agent with each entry', function (): void {
+    $facility = Facility::factory()->create();
+
+    // Simulate the change happening inside an HTTP request.
+    $this->app->instance('request', Request::create('/admin/facilities', 'PATCH', server: [
+        'REMOTE_ADDR' => '203.0.113.7',
+        'HTTP_USER_AGENT' => 'Mozilla/5.0 (Audit test)',
+    ]));
+    $facility->update(['name' => 'Renamed facility']);
+
+    $entry = Activity::query()->forSubject($facility)->where('event', 'updated')->sole();
+    expect($entry->properties['ip'])->toBe('203.0.113.7')
+        ->and($entry->properties['user_agent'])->toBe('Mozilla/5.0 (Audit test)');
 });
 
 it('never logs passwords or two-factor secrets', function (): void {
