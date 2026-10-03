@@ -4,59 +4,79 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Actions\Fortify\ConfirmTwoFactorAuthentication;
+use App\Actions\Fortify\EnableTwoFactorAuthentication;
+use App\Actions\Fortify\GenerateNewRecoveryCodes;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Requests\Auth\TwoFactorLoginRequest;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
-use Laravel\Fortify\Features;
+use Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication as FortifyConfirmTwoFactorAuthentication;
+use Laravel\Fortify\Actions\EnableTwoFactorAuthentication as FortifyEnableTwoFactorAuthentication;
+use Laravel\Fortify\Actions\GenerateNewRecoveryCodes as FortifyGenerateNewRecoveryCodes;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Requests\TwoFactorLoginRequest as FortifyTwoFactorLoginRequest;
 
+/**
+ * Authentication (SECURITY.md §2): email + password, mandatory TOTP 2FA with recovery codes
+ * stored hashed, password reset, password confirmation. No registration: accounts are created
+ * by `edqa:admin:create` only.
+ */
 final class FortifyServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
-        //
+        // Recovery codes stored as hashes and shown once, instead of Fortify's encrypted codes.
+        $this->app->bind(FortifyEnableTwoFactorAuthentication::class, EnableTwoFactorAuthentication::class);
+        $this->app->bind(FortifyConfirmTwoFactorAuthentication::class, ConfirmTwoFactorAuthentication::class);
+        $this->app->bind(FortifyGenerateNewRecoveryCodes::class, GenerateNewRecoveryCodes::class);
+        $this->app->bind(FortifyTwoFactorLoginRequest::class, TwoFactorLoginRequest::class);
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
+        $this->configureAuthentication();
         $this->configureActions();
         $this->configureViews();
         $this->configureRateLimiting();
     }
 
     /**
-     * Configure Fortify actions.
+     * Only active administrators can sign in. A disabled account gets the same message as a
+     * wrong password, so the login form doesn't reveal which accounts exist.
      */
+    private function configureAuthentication(): void
+    {
+        Fortify::authenticateUsing(function (Request $request): ?User {
+            $user = User::query()->where('email', (string) $request->input(Fortify::username()))->first();
+
+            return $user !== null && $user->is_active && Hash::check((string) $request->input('password'), $user->password)
+                ? $user
+                : null;
+        });
+    }
+
     private function configureActions(): void
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
     }
 
-    /**
-     * Configure Fortify views.
-     */
     private function configureViews(): void
     {
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/login', [
-            'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'status' => $request->session()->get('status'),
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [
             'email' => $request->email,
             'token' => $request->route('token'),
-            'passwordRules' => Password::defaults()->toPasswordRulesString(),
         ]));
 
         Fortify::requestPasswordResetLinkView(fn (Request $request) => Inertia::render('auth/forgot-password', [
@@ -73,7 +93,7 @@ final class FortifyServiceProvider extends ServiceProvider
     }
 
     /**
-     * Configure rate limiting.
+     * 5 attempts a minute: login per email and IP, the 2FA challenge per pending login.
      */
     private function configureRateLimiting(): void
     {
@@ -82,10 +102,9 @@ final class FortifyServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('login', function (Request $request) {
-            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
+            $throttleKey = Str::transliterate(Str::lower((string) $request->input(Fortify::username())).'|'.$request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
         });
-
     }
 }

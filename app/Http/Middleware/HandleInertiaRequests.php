@@ -37,13 +37,22 @@ final class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            // Only what the shell displays; never the whole model.
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user === null ? null : ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
             ],
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            // UI strings, read in React with t() (CONVENTION.md §7, CLAUDE.md hard rule 10).
+            'translations' => fn (): array => collect(self::TRANSLATION_GROUPS)
+                ->mapWithKeys(fn (string $group): array => [$group => __($group)])
+                ->all(),
         ];
     }
+
+    /** Language groups shared with every page. */
+    private const TRANSLATION_GROUPS = ['common', 'auth', 'dashboard'];
 }

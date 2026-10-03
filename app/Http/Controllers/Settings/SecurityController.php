@@ -6,46 +6,32 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
-use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Laravel\Fortify\Features;
 
+/**
+ * Password change and recovery codes. 2FA itself is mandatory and set up on first sign-in
+ * (TwoFactorSetupController); there is no switch to turn it off here.
+ */
 final class SecurityController extends Controller
 {
-    /**
-     * Show the user's security settings page.
-     */
-    public function edit(TwoFactorAuthenticationRequest $request): Response
+    public function edit(Request $request): Response
     {
-        $props = [
-            'canManageTwoFactor' => Features::canManageTwoFactorAuthentication(),
-            'passwordRules' => Password::defaults()->toPasswordRulesString(),
-        ];
+        $codes = $request->session()->get('recovery_codes');
 
-        if (Features::canManageTwoFactorAuthentication()) {
-            $request->ensureStateIsValid();
-
-            $props['twoFactorEnabled'] = $request->user()->hasEnabledTwoFactorAuthentication();
-            $props['requiresConfirmation'] = Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm');
-        }
-
-        return Inertia::render('settings/security', $props);
+        return Inertia::render('settings/security', [
+            'status' => $request->session()->get('status'),
+            // Flashed once by GenerateNewRecoveryCodes, never re-displayed.
+            'recoveryCodes' => is_array($codes) ? array_values($codes) : null,
+        ]);
     }
 
-    /**
-     * Update the user's password.
-     */
     public function update(PasswordUpdateRequest $request): RedirectResponse
     {
-        $request->user()->update([
-            'password' => $request->password,
-        ]);
+        $request->user()?->update(['password' => $request->password]);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Password updated.')]);
-
-        return back();
+        return back()->with('status', __('auth.settings.password_saved'));
     }
 }

@@ -1,46 +1,43 @@
-// Components
-import { Form, Head } from '@inertiajs/react';
-import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
+import { Form, Head, Link } from '@inertiajs/react';
+import { useTranslate } from '@/lib/i18n';
 import { logout } from '@/routes';
 import { send } from '@/routes/verification';
 
-export default function VerifyEmail({ status }: { status?: string }) {
+export type VerifyEmailProps = {
+    status?: string | null | undefined;
+};
+
+export default function VerifyEmail({ status }: VerifyEmailProps) {
+    const t = useTranslate();
+
     return (
         <>
-            <Head title="Email verification" />
+            <Head title={t('auth.verify_email.title')} />
+            <h1 className="text-2xl font-semibold">{t('auth.verify_email.title')}</h1>
+            <p className="mt-1 mb-6 text-ink-2">{t('auth.verify_email.intro')}</p>
 
             {status === 'verification-link-sent' && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
-                    A new verification link has been sent to the email address
-                    you provided during registration.
-                </div>
+                <p role="status" className="mb-6 rounded-md bg-ok-bg p-3 text-ok">
+                    {t('auth.verify_email.sent')}
+                </p>
             )}
 
-            <Form {...send.form()} className="space-y-6 text-center">
+            <Form {...send.form()} className="flex flex-wrap items-center justify-between gap-4">
                 {({ processing }) => (
                     <>
-                        <Button disabled={processing} variant="secondary">
-                            {processing && <Spinner />}
-                            Resend verification email
-                        </Button>
-
-                        <TextLink
-                            href={logout()}
-                            className="mx-auto block text-sm"
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="rounded-md bg-deep px-4 py-2.5 font-semibold text-panel hover:bg-deep-2"
                         >
-                            Log out
-                        </TextLink>
+                            {t('auth.verify_email.resend')}
+                        </button>
+                        <Link href={logout()} as="button" className="text-deep underline underline-offset-2">
+                            {t('common.user_menu.log_out')}
+                        </Link>
                     </>
                 )}
             </Form>
         </>
     );
 }
-
-VerifyEmail.layout = {
-    title: 'Email verification',
-    description:
-        'Please verify your email address by clicking on the link we just emailed to you.',
-};

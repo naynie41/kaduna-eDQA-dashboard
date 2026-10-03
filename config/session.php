@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\Config\EnvFlag;
 use Illuminate\Support\Str;
 
 return [
@@ -171,7 +172,8 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // Secure unless explicitly false: only local http development (compose.dev.yml) sets that.
+    'secure' => EnvFlag::enabledUnlessFalse(env('SESSION_SECURE_COOKIE')),
 
     /*
     |--------------------------------------------------------------------------

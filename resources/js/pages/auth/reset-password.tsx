@@ -1,95 +1,57 @@
 import { Form, Head } from '@inertiajs/react';
-import InputError from '@/components/input-error';
-import PasswordInput from '@/components/password-input';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
+import ErrorSummary from '@/components/ErrorSummary';
+import SubmitButton from '@/components/SubmitButton';
+import TextField from '@/components/TextField';
+import { useTranslate } from '@/lib/i18n';
 import { update } from '@/routes/password';
 
-type Props = {
+export type ResetPasswordProps = {
     token: string;
     email: string;
-    passwordRules: string;
 };
 
-export default function ResetPassword({ token, email, passwordRules }: Props) {
+export default function ResetPassword({ token, email }: ResetPasswordProps) {
+    const t = useTranslate();
+
     return (
         <>
-            <Head title="Reset password" />
+            <Head title={t('auth.reset.title')} />
+            <h1 className="mb-6 text-2xl font-semibold">{t('auth.reset.title')}</h1>
 
-            <Form
-                {...update.form()}
-                transform={(data) => ({ ...data, token, email })}
-                resetOnSuccess={['password', 'password_confirmation']}
-            >
+            <Form {...update.form()} transform={(data) => ({ ...data, token })} resetOnSuccess={['password', 'password_confirmation']} className="space-y-5">
                 {({ processing, errors }) => (
-                    <div className="grid gap-6">
-                        <div className="grid gap-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input
-                                id="email"
-                                type="email"
-                                name="email"
-                                autoComplete="email"
-                                value={email}
-                                className="mt-1 block w-full"
-                                readOnly
-                            />
-                            <InputError
-                                message={errors.email}
-                                className="mt-2"
-                            />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="password">Password</Label>
-                            <PasswordInput
-                                id="password"
-                                name="password"
-                                autoComplete="new-password"
-                                className="mt-1 block w-full"
-                                placeholder="Password"
-                                passwordrules={passwordRules}
-                            />
-                            <InputError message={errors.password} />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="password_confirmation">
-                                Confirm password
-                            </Label>
-                            <PasswordInput
-                                id="password_confirmation"
-                                name="password_confirmation"
-                                autoComplete="new-password"
-                                className="mt-1 block w-full"
-                                placeholder="Confirm password"
-                                passwordrules={passwordRules}
-                            />
-                            <InputError
-                                message={errors.password_confirmation}
-                                className="mt-2"
-                            />
-                        </div>
-
-                        <Button
-                            type="submit"
-                            className="mt-4 w-full"
-                            disabled={processing}
-                            data-test="reset-password-button"
-                        >
-                            {processing && <Spinner />}
-                            Reset password
-                        </Button>
-                    </div>
+                    <>
+                        <ErrorSummary errors={errors} />
+                        <TextField
+                            name="email"
+                            type="email"
+                            label={t('auth.fields.email')}
+                            autoComplete="username"
+                            defaultValue={email}
+                            readOnly
+                            error={errors.email}
+                        />
+                        <TextField
+                            name="password"
+                            type="password"
+                            label={t('auth.fields.new_password')}
+                            hint={t('auth.reset.rules')}
+                            autoComplete="new-password"
+                            required
+                            error={errors.password}
+                        />
+                        <TextField
+                            name="password_confirmation"
+                            type="password"
+                            label={t('auth.fields.confirm_password')}
+                            autoComplete="new-password"
+                            required
+                            error={errors.password_confirmation}
+                        />
+                        <SubmitButton processing={processing}>{t('auth.reset.submit')}</SubmitButton>
+                    </>
                 )}
             </Form>
         </>
     );
 }
-
-ResetPassword.layout = {
-    title: 'Reset password',
-    description: 'Please enter your new password below',
-};

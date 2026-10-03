@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Fortify\Events\RecoveryCodeReplaced;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
 /**
@@ -64,5 +65,32 @@ final class User extends Authenticatable implements MustVerifyEmail
     protected function auditedAttributes(): array
     {
         return ['name', 'email', 'is_active'];
+    }
+
+    /**
+     * Stored recovery-code hashes (SECURITY.md §2), replacing Fortify's encrypted plain codes.
+     *
+     * @return list<string>
+     */
+    public function recoveryCodes(): array
+    {
+        $codes = json_decode((string) $this->two_factor_recovery_codes, true);
+
+        return is_array($codes) ? array_values(array_filter($codes, is_string(...))) : [];
+    }
+
+    /**
+     * Consumes a used recovery code: its hash is removed, so it can never be used again. No
+     * replacement is issued, because a new code could not be shown; regenerate to get more.
+     *
+     * @param  string  $code  the matched hash (see App\Http\Requests\Auth\TwoFactorLoginRequest)
+     */
+    public function replaceRecoveryCode($code): void
+    {
+        $this->forceFill([
+            'two_factor_recovery_codes' => json_encode(array_values(array_diff($this->recoveryCodes(), [$code])), JSON_THROW_ON_ERROR),
+        ])->save();
+
+        RecoveryCodeReplaced::dispatch($this, $code);
     }
 }

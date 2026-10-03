@@ -34,14 +34,14 @@ trait Audited
 
     /**
      * Adds properties.ip and properties.user_agent (SECURITY.md §4). A change made from an
-     * artisan command has no real request, so it is marked source = console instead of being
-     * stamped with a meaningless 127.0.0.1.
+     * artisan command has no real request (Laravel's synthetic console request has no route,
+     * IP 127.0.0.1 and user agent "Symfony"), so it is marked source = console instead.
      */
     public function tapActivity(Activity $activity, string $eventName): void
     {
         $request = request();
 
-        $context = app()->runningInConsole() && $request->userAgent() === null
+        $context = app()->runningInConsole() && $request->route() === null
             ? ['source' => 'console']
             : ['ip' => $request->ip(), 'user_agent' => $request->userAgent()];
 

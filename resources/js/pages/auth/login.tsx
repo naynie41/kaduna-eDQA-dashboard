@@ -1,102 +1,63 @@
-import { Form, Head } from '@inertiajs/react';
-import InputError from '@/components/input-error';
-import PasswordInput from '@/components/password-input';
-import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
+import { Form, Head, Link } from '@inertiajs/react';
+import ErrorSummary from '@/components/ErrorSummary';
+import SubmitButton from '@/components/SubmitButton';
+import TextField from '@/components/TextField';
+import { useTranslate } from '@/lib/i18n';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 
-type Props = {
-    status?: string;
-    canResetPassword: boolean;
+export type LoginProps = {
+    status?: string | null | undefined;
 };
 
-export default function Login({ status, canResetPassword }: Props) {
+export default function Login({ status }: LoginProps) {
+    const t = useTranslate();
+
     return (
         <>
-            <Head title="Log in" />
+            <Head title={t('auth.login.title')} />
+            <h1 className="text-2xl font-semibold">{t('auth.login.title')}</h1>
+            <p className="mt-1 mb-6 text-ink-2">{t('auth.login.intro')}</p>
 
+            {status && (
+                <p role="status" className="mb-6 rounded-md bg-ok-bg p-3 text-ok">
+                    {status}
+                </p>
+            )}
 
-            <Form
-                {...store.form()}
-                resetOnSuccess={['password']}
-                className="flex flex-col gap-6"
-            >
+            <Form {...store.form()} resetOnSuccess={['password']} className="space-y-5">
                 {({ processing, errors }) => (
                     <>
-                        <div className="grid gap-6">
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    required
-                                    autoComplete="email"
-                                    placeholder="email@example.com"
-                                />
-                                <InputError message={errors.email} />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <div className="flex items-center">
-                                    <Label htmlFor="password">Password</Label>
-                                    {canResetPassword && (
-                                        <TextLink
-                                            href={request()}
-                                            className="ml-auto text-sm"
-                                        >
-                                            Forgot your password?
-                                        </TextLink>
-                                    )}
-                                </div>
-                                <PasswordInput
-                                    id="password"
-                                    name="password"
-                                    required
-                                    autoComplete="current-password"
-                                    placeholder="Password"
-                                />
-                                <InputError message={errors.password} />
-                            </div>
-
-                            <div className="flex items-center space-x-3">
-                                <Checkbox
-                                    id="remember"
-                                    name="remember"
-                                />
-                                <Label htmlFor="remember">Remember me</Label>
-                            </div>
-
-                            <Button
-                                type="submit"
-                                className="mt-4 w-full"
-                                disabled={processing}
-                                data-test="login-button"
-                            >
-                                {processing && <Spinner />}
-                                Log in
-                            </Button>
+                        <ErrorSummary errors={errors} />
+                        <TextField
+                            name="email"
+                            type="email"
+                            label={t('auth.fields.email')}
+                            autoComplete="username"
+                            required
+                            error={errors.email}
+                        />
+                        <TextField
+                            name="password"
+                            type="password"
+                            label={t('auth.fields.password')}
+                            autoComplete="current-password"
+                            required
+                            error={errors.password}
+                        />
+                        <div className="flex items-center gap-2">
+                            <input id="remember" name="remember" type="checkbox" className="size-4 accent-deep" />
+                            <label htmlFor="remember">{t('auth.fields.remember')}</label>
                         </div>
-
+                        <SubmitButton processing={processing}>{t('auth.login.submit')}</SubmitButton>
+                        <p className="text-center">
+                            <Link href={request()} className="text-deep underline underline-offset-2">
+                                {t('auth.login.forgot')}
+                            </Link>
+                        </p>
                     </>
                 )}
             </Form>
-
-            {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
-                    {status}
-                </div>
-            )}
         </>
     );
 }
-
-Login.layout = {
-    title: 'Log in to your account',
-    description: 'Enter your email and password below to log in',
-};

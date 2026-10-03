@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
+use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
 // Feature tests boot the app and run against the edqa_test Postgres database (never SQLite).
@@ -24,6 +27,29 @@ pest()->extend(TestCase::class)
 // Migration round-trips run real DDL outside a test transaction, so no RefreshDatabase.
 pest()->extend(TestCase::class)
     ->in('Migrations');
+
+/**
+ * Enables and confirms TOTP 2FA for the user through Fortify's own routes, as the setup page
+ * does. Returns the confirmation response and the TOTP secret.
+ *
+ * @return array{0: TestResponse, 1: string}
+ */
+function confirmTwoFactor(User $user): array
+{
+    test()->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->post(route('two-factor.enable'))
+        ->assertRedirect();
+
+    $secret = decrypt((string) $user->refresh()->two_factor_secret);
+    $code = app(Google2FA::class)->getCurrentOtp($secret);
+
+    $response = test()->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->post(route('two-factor.confirm'), ['code' => $code]);
+
+    return [$response, $secret];
+}
 
 /**
  * Postgres data type of a column in the public schema, e.g. "jsonb", or null if absent.

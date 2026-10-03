@@ -69,8 +69,9 @@ final class PasswordResetTest extends TestCase
             $response = $this->post(route('password.update'), [
                 'token' => $notification->token,
                 'email' => $user->email,
-                'password' => 'password',
-                'password_confirmation' => 'password',
+                // Must meet the SECURITY.md §2 policy: 12+ characters, mixed case, a number.
+                'password' => 'Correct-Horse-12',
+                'password_confirmation' => 'Correct-Horse-12',
             ]);
 
             $response

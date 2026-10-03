@@ -1,135 +1,71 @@
 @import 'tailwindcss';
 
-@import 'tw-animate-css';
+/* Self-hosted fonts (SECURITY.md §8, CONVENTION.md §6): no external host in the CSP. */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/archivo/500.css';
+@import '@fontsource/archivo/600.css';
+@import '@fontsource/archivo/700.css';
 
 @source '../views';
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
-@custom-variant dark (&:is(.dark *));
-
+/*
+ * Design tokens (CONVENTION.md §6), taken from the prototype with contrast fixes.
+ * Components use Tailwind utilities that reference these, never hex values inline.
+ */
 @theme {
-    --font-sans:
-        'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
-        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-        'Noto Color Emoji';
+    --color-paper: #f1f3ef;
+    --color-panel: #ffffff;
+    --color-ink: #17302b;
+    --color-ink-2: #5a6f68;
+    --color-ink-3: #8b9c96; /* decorative only, never text */
+    --color-rule: #dce2dc;
+    --color-deep: #0d4b44;
+    --color-deep-2: #12645b;
+    --color-wash: #dce9e5;
+    --color-rail: #0b3d37;
+    --color-ok: #2d7753;
+    --color-ok-bg: #e4f0e7;
+    --color-warn: #8a6408;
+    --color-warn-bg: #f6edd8;
+    --color-warn-fill: #a2760a; /* bars, lines, borders only */
+    --color-bad: #9e3b2f;
+    --color-bad-bg: #f6e2de;
+    --color-pub: #0d4b44;
+    --color-pub-bg: #dce9e5;
+    --color-priv: #8a5a12;
+    --color-priv-bg: #f5e9d4;
 
-    --radius-lg: var(--radius);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-sm: calc(var(--radius) - 4px);
+    --font-sans: 'IBM Plex Sans', 'Segoe UI', Roboto, system-ui, sans-serif;
+    --font-display: 'Archivo', 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
 
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
+    --shadow-panel: 0 1px 2px rgba(23, 48, 43, 0.06), 0 8px 24px -16px rgba(23, 48, 43, 0.28);
+    --radius-panel: 10px;
 
-    --color-card: var(--card);
-    --color-card-foreground: var(--card-foreground);
-
-    --color-popover: var(--popover);
-    --color-popover-foreground: var(--popover-foreground);
-
-    --color-primary: var(--primary);
-    --color-primary-foreground: var(--primary-foreground);
-
-    --color-secondary: var(--secondary);
-    --color-secondary-foreground: var(--secondary-foreground);
-
-    --color-muted: var(--muted);
-    --color-muted-foreground: var(--muted-foreground);
-
-    --color-accent: var(--accent);
-    --color-accent-foreground: var(--accent-foreground);
-
-    --color-destructive: var(--destructive);
-    --color-destructive-foreground: var(--destructive-foreground);
-
-    --color-border: var(--border);
-    --color-input: var(--input);
-    --color-ring: var(--ring);
-
-    --color-chart-1: var(--chart-1);
-    --color-chart-2: var(--chart-2);
-    --color-chart-3: var(--chart-3);
-    --color-chart-4: var(--chart-4);
-    --color-chart-5: var(--chart-5);
-
-    --color-sidebar: var(--sidebar);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-ring: var(--sidebar-ring);
-}
-
-:root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.87 0 0);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.87 0 0);
-}
-
-.dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.145 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.145 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.396 0.141 25.723);
-    --destructive-foreground: oklch(0.637 0.237 25.331);
-    --border: oklch(0.269 0 0);
-    --input: oklch(0.269 0 0);
-    --ring: oklch(0.439 0 0);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.985 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.269 0 0);
-    --sidebar-ring: oklch(0.439 0 0);
+    /* The starter kit's UI primitives (components/ui), mapped onto the tokens above. */
+    --radius-lg: var(--radius-panel);
+    --radius-md: calc(var(--radius-panel) - 2px);
+    --radius-sm: calc(var(--radius-panel) - 4px);
+    --color-background: var(--color-paper);
+    --color-foreground: var(--color-ink);
+    --color-card: var(--color-panel);
+    --color-card-foreground: var(--color-ink);
+    --color-popover: var(--color-panel);
+    --color-popover-foreground: var(--color-ink);
+    --color-primary: var(--color-deep);
+    --color-primary-foreground: var(--color-panel);
+    --color-secondary: var(--color-wash);
+    --color-secondary-foreground: var(--color-deep);
+    --color-muted: var(--color-paper);
+    --color-muted-foreground: var(--color-ink-2);
+    --color-accent: var(--color-wash);
+    --color-accent-foreground: var(--color-deep);
+    --color-destructive: var(--color-bad);
+    --color-destructive-foreground: var(--color-panel);
+    --color-border: var(--color-rule);
+    --color-input: var(--color-rule);
+    --color-ring: var(--color-deep-2);
 }
 
 @layer base {
@@ -137,7 +73,37 @@
         @apply border-border;
     }
 
+    html {
+        font-size: 15px;
+    }
+
     body {
-        @apply bg-background text-foreground;
+        @apply bg-paper font-sans text-ink antialiased;
+        line-height: 1.5;
+        font-variant-numeric: tabular-nums;
+    }
+
+    h1,
+    h2,
+    h3 {
+        @apply font-display;
+        letter-spacing: -0.012em;
+    }
+
+    /* Visible focus everywhere, never removed (CONVENTION.md §6). */
+    :focus-visible {
+        outline: 2px solid var(--color-deep-2);
+        outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
     }
 }

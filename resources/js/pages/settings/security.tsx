@@ -1,142 +1,96 @@
 import { Form, Head } from '@inertiajs/react';
-import { useRef } from 'react';
-import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
-import Heading from '@/components/heading';
-import InputError from '@/components/input-error';
-import PasswordInput from '@/components/password-input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { edit } from '@/routes/security';
-import type { Props as ManageTwoFactorProps } from '@/components/manage-two-factor';
-import ManageTwoFactor from '@/components/manage-two-factor';
+import ErrorSummary from '@/components/ErrorSummary';
+import RecoveryCodeList from '@/components/RecoveryCodeList';
+import SubmitButton from '@/components/SubmitButton';
+import TextField from '@/components/TextField';
+import { useTranslate } from '@/lib/i18n';
+import { regenerateRecoveryCodes } from '@/routes/two-factor';
+import { update } from '@/routes/user-password';
 
-// oxfmt-ignore
-type Props = {
-    passwordRules: string;
-} &
-    ManageTwoFactorProps;
+export type SecurityProps = {
+    status?: string | null | undefined;
+    recoveryCodes: string[] | null;
+};
 
-export default function Security(props: Props) {
-    const passwordInput = useRef<HTMLInputElement>(null);
-    const currentPasswordInput = useRef<HTMLInputElement>(null);
+export default function Security({ status, recoveryCodes }: SecurityProps) {
+    const t = useTranslate();
 
     return (
         <>
-            <Head title="Security settings" />
+            <Head title={t('auth.settings.title')} />
+            <h1 className="mb-6 text-2xl font-semibold">{t('auth.settings.title')}</h1>
 
-            <h1 className="sr-only">Security settings</h1>
-
-            <div className="space-y-6">
-                <Heading
-                    variant="small"
-                    title="Update password"
-                    description="Ensure your account is using a long, random password to stay secure"
-                />
-
-                <Form
-                    {...SecurityController.update.form()}
-                    options={{
-                        preserveScroll: true,
-                    }}
-                    resetOnError={[
-                        'password',
-                        'password_confirmation',
-                        'current_password',
-                    ]}
-                    resetOnSuccess
-                    onError={(errors) => {
-                        if (errors.password) {
-                            passwordInput.current?.focus();
-                        }
-
-                        if (errors.current_password) {
-                            currentPasswordInput.current?.focus();
-                        }
-                    }}
-                    className="space-y-6"
-                >
-                    {({ errors, processing }) => (
-                        <>
-                            <div className="grid gap-2">
-                                <Label htmlFor="current_password">
-                                    Current password
-                                </Label>
-
-                                <PasswordInput
-                                    id="current_password"
-                                    ref={currentPasswordInput}
+            <div className="grid max-w-xl gap-8">
+                <section aria-labelledby="password-title" className="rounded-[var(--radius-panel)] bg-panel p-6 shadow-[var(--shadow-panel)]">
+                    <h2 id="password-title" className="mb-4 text-lg font-semibold">
+                        {t('auth.settings.password_title')}
+                    </h2>
+                    {status && (
+                        <p role="status" className="mb-4 rounded-md bg-ok-bg p-3 text-ok">
+                            {status}
+                        </p>
+                    )}
+                    <Form
+                        {...update.form()}
+                        options={{ preserveScroll: true }}
+                        resetOnSuccess
+                        resetOnError={['password', 'password_confirmation', 'current_password']}
+                        className="space-y-5"
+                    >
+                        {({ processing, errors }) => (
+                            <>
+                                <ErrorSummary errors={errors} />
+                                <TextField
                                     name="current_password"
-                                    className="mt-1 block w-full"
+                                    type="password"
+                                    label={t('auth.fields.current_password')}
                                     autoComplete="current-password"
-                                    placeholder="Current password"
+                                    required
+                                    error={errors.current_password}
                                 />
-
-                                <InputError message={errors.current_password} />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="password">New password</Label>
-
-                                <PasswordInput
-                                    id="password"
-                                    ref={passwordInput}
+                                <TextField
                                     name="password"
-                                    className="mt-1 block w-full"
+                                    type="password"
+                                    label={t('auth.fields.new_password')}
+                                    hint={t('auth.reset.rules')}
                                     autoComplete="new-password"
-                                    placeholder="New password"
-                                    passwordrules={props.passwordRules}
+                                    required
+                                    error={errors.password}
                                 />
-
-                                <InputError message={errors.password} />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="password_confirmation">
-                                    Confirm password
-                                </Label>
-
-                                <PasswordInput
-                                    id="password_confirmation"
+                                <TextField
                                     name="password_confirmation"
-                                    className="mt-1 block w-full"
+                                    type="password"
+                                    label={t('auth.fields.confirm_password')}
                                     autoComplete="new-password"
-                                    placeholder="Confirm password"
-                                    passwordrules={props.passwordRules}
+                                    required
+                                    error={errors.password_confirmation}
                                 />
+                                <SubmitButton processing={processing}>{t('auth.settings.password_submit')}</SubmitButton>
+                            </>
+                        )}
+                    </Form>
+                </section>
 
-                                <InputError
-                                    message={errors.password_confirmation}
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    disabled={processing}
-                                    data-test="update-password-button"
-                                >
-                                    Save
-                                </Button>
-                            </div>
+                <section aria-labelledby="two-factor-title" className="rounded-[var(--radius-panel)] bg-panel p-6 shadow-[var(--shadow-panel)]">
+                    <h2 id="two-factor-title" className="mb-2 text-lg font-semibold">
+                        {t('auth.settings.two_factor_title')}
+                    </h2>
+                    <p className="mb-4 text-ink-2">{t('auth.settings.two_factor_on')}</p>
+                    {recoveryCodes ? (
+                        <>
+                            <p className="mb-3 font-medium">{t('auth.two_factor.setup.codes_intro')}</p>
+                            <RecoveryCodeList codes={recoveryCodes} />
+                        </>
+                    ) : (
+                        <>
+                            <p className="mb-4 text-sm text-ink-2">{t('auth.settings.regenerate_intro')}</p>
+                            <Form {...regenerateRecoveryCodes.form()} options={{ preserveScroll: true }}>
+                                {({ processing }) => <SubmitButton processing={processing}>{t('auth.settings.regenerate')}</SubmitButton>}
+                            </Form>
                         </>
                     )}
-                </Form>
+                </section>
             </div>
-
-            <ManageTwoFactor
-                canManageTwoFactor={props.canManageTwoFactor}
-                requiresConfirmation={props.requiresConfirmation}
-                twoFactorEnabled={props.twoFactorEnabled}
-            />
-
         </>
     );
 }
-
-Security.layout = {
-    breadcrumbs: [
-        {
-            title: 'Security settings',
-            href: edit(),
-        },
-    ],
-};

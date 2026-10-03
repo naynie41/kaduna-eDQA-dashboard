@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\User;
+use App\Support\Auth\RecoveryCodes;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -53,9 +54,10 @@ final class UserFactory extends Factory
      */
     public function withTwoFactor(): static
     {
+        // Recovery codes are stored hashed (SECURITY.md §2); "recovery-code-1" is the plain code.
         return $this->state(fn (array $attributes) => [
-            'two_factor_secret' => encrypt('secret'),
-            'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
+            'two_factor_secret' => encrypt('JBSWY3DPEHPK3PXP'),
+            'two_factor_recovery_codes' => RecoveryCodes::store(['recovery-code-1']),
             'two_factor_confirmed_at' => now(),
         ]);
     }
