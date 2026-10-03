@@ -12,8 +12,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Password change and recovery codes. 2FA itself is mandatory and set up on first sign-in
- * (TwoFactorSetupController); there is no switch to turn it off here.
+ * Password change and recovery codes. 2FA is set up through TwoFactorSetupController: on first
+ * sign-in when required, otherwise from this page. There is no switch to turn it off here.
  */
 final class SecurityController extends Controller
 {
@@ -23,6 +23,7 @@ final class SecurityController extends Controller
 
         return Inertia::render('settings/security', [
             'status' => $request->session()->get('status'),
+            'twoFactorEnabled' => $request->user()?->two_factor_confirmed_at !== null,
             // Flashed once by GenerateNewRecoveryCodes, never re-displayed.
             'recoveryCodes' => is_array($codes) ? array_values($codes) : null,
         ]);

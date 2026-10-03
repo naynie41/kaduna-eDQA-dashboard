@@ -64,7 +64,7 @@ return [
         ],
         'setup' => [
             'title' => 'Set up two-factor authentication',
-            'intro' => 'Every administrator account must use two-factor authentication. You will need an authenticator app on your phone, such as Google Authenticator or Microsoft Authenticator.',
+            'intro' => 'Two-factor authentication adds a 6-digit code to every sign-in. You will need an authenticator app on your phone, such as Google Authenticator or Microsoft Authenticator.',
             'start' => 'Start setup',
             'scan' => 'Scan this QR code with your authenticator app.',
             'qr_alt' => 'QR code for your authenticator app',
@@ -85,6 +85,8 @@ return [
         'password_saved' => 'Password changed.',
         'two_factor_title' => 'Two-factor authentication',
         'two_factor_on' => 'Two-factor authentication is on.',
+        'two_factor_off' => 'Two-factor authentication is off. Turning it on adds a 6-digit code from an authenticator app to every sign-in.',
+        'two_factor_set_up' => 'Set up two-factor authentication',
         'regenerate' => 'Replace my recovery codes',
         'regenerate_intro' => 'This makes your old recovery codes stop working and shows new ones once.',
     ],

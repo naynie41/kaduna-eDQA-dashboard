@@ -64,3 +64,15 @@ it('refuses a new password that breaks the policy', function (): void {
 
     expect(Hash::check('password', $user->refresh()->password))->toBeTrue();
 });
+
+it('tells the page whether 2FA is on for the user', function (bool $withTwoFactor): void {
+    config(['edqa.auth.require_two_factor' => false]);
+    $factory = User::factory();
+    $user = ($withTwoFactor ? $factory->withTwoFactor() : $factory)->create();
+
+    $this->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->get(route('security.edit'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('twoFactorEnabled', $withTwoFactor));
+})->with(['2FA on' => [true], '2FA off' => [false]]);

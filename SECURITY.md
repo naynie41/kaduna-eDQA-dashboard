@@ -40,7 +40,7 @@ administrator accounts.
 | Control | Setting |
 |---|---|
 | Method | Email + password via Laravel Fortify |
-| Two-factor | **Mandatory** for every account (TOTP). An account without confirmed 2FA can reach only the 2FA setup screen |
+| Two-factor | **Mandatory** for every account (TOTP) unless `EDQA_REQUIRE_2FA=false` (D-26). When required, an account without confirmed 2FA can reach only the 2FA setup screen. When switched off, 2FA is optional (set up from Security settings) and an account that has it is still challenged at sign-in. Unset means required |
 | Recovery codes | Generated at 2FA setup, shown once, stored hashed |
 | Password policy | `Password::min(12)->mixedCase()->numbers()->uncompromised()` |
 | Hashing | bcrypt (Laravel default) or argon2id |
@@ -256,7 +256,7 @@ Expect acknowledgement within 3 working days.
 
 ## 15. Security checklist before go-live
 
-- [ ] Every admin has 2FA confirmed; ≤ 3 accounts
+- [ ] `EDQA_REQUIRE_2FA` unset or true on the server; every admin has 2FA confirmed; ≤ 3 accounts
 - [ ] `APP_DEBUG=false`, `APP_ENV=production`
 - [ ] HTTPS + HSTS live; security headers verified (securityheaders.com or curl)
 - [ ] Route-guard test passing; only login/2FA/reset, webhook and `/up` are unauthenticated

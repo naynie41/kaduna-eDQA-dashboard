@@ -663,7 +663,7 @@ Triggered by: rule version publish, quarantine resolution, assessment correction
 ## 8. Internal API surface
 
 Dashboard pages are Inertia; these JSON endpoints serve admin interactivity and exports only.
-All require an authenticated, 2FA-confirmed administrator session (session cookie + CSRF).
+All require an authenticated administrator session (session cookie + CSRF), 2FA-confirmed unless `EDQA_REQUIRE_2FA=false` (D-26).
 No public API, no API tokens in v1.
 
 | Method | Path | Purpose |
@@ -844,6 +844,7 @@ blocks use Inertia deferred props; charts are `React.lazy`; fonts self-hosted wi
 | D-23 | Fonts from `@fontsource/archivo` (500/600/700) and `@fontsource/ibm-plex-sans` (400/500/600), bundled by Vite | CONVENTION.md §6 and D-09: self-hosted, so the CSP has no external host (SECURITY.md §8). Replaces the kit's build-time Bunny Fonts download. New npm dependencies |
 | D-24 | 2FA recovery codes stored as SHA-256 hashes and shown once, overriding Fortify's encrypted, re-displayable codes | SECURITY.md §2. Custom Fortify actions (enable, confirm, regenerate) and challenge request; Fortify's "show codes" endpoint returns 404. A fast hash suffices: each code carries ~119 bits of randomness. A used code is consumed, not replaced |
 | D-25 | The starter kit's UI primitives (shadcn/Radix) and sidebar shell removed | Replaced by our own tokens and components (AppShell, Rail, TopBar, TextField, ErrorSummary). Removed npm packages: 13 `@radix-ui/*`, `class-variance-authority`, `clsx`, `tailwind-merge`, `input-otp`, `lucide-react`, `sonner`, `tw-animate-css`. Re-add a primitive only when a page needs it |
+| D-26 | 2FA requirement made switchable: `EDQA_REQUIRE_2FA` (config `edqa.auth.require_two_factor`) | Owner decision, 2026-10-03: no 2FA wanted for now. Amends D-02. Unset or empty means required (fail-safe, as `SESSION_SECURE_COOKIE`); the local `.env` sets false. When off, the `two-factor.confirmed` middleware passes everyone, 2FA can still be set up from Security settings, and an account that has it is still challenged. Tests force it on. New env key for `edqa-infra` (DEPLOY.md §1.3) |
 
 Add new decisions here with the next ID. Any new Composer/npm package needs a line.
 

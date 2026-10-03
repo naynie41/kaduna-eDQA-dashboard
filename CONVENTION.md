@@ -322,7 +322,7 @@ pair (`deprecatedID`), one with all-N/A slot.
 - **Lock:** manual pull during a running pull does not double-process.
 - **LGA count (G4):** after ingesting all fixtures, every aggregate reports ≤ 23 LGAs.
 - **Route guard:** every route except login/2FA/reset/webhook redirects unauthenticated users.
-- **2FA:** a user without confirmed 2FA cannot reach any dashboard route.
+- **2FA:** a user without confirmed 2FA cannot reach any dashboard route, unless `EDQA_REQUIRE_2FA=false` (D-26); both settings are tested.
 - **Audit (G7):** each write Action → activity entry with causer, old, new, reason.
 - **Webhook:** bad/missing signature → 401; valid → pull job dispatched, no data written.
 - **Performance smoke:** seeded 5-year dataset, each dashboard page < 1.5 s (tagged `@slow`).

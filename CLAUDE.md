@@ -45,7 +45,7 @@ aggregate, chart or export — stop and flag it.
 
 Laravel 13 · PHP 8.3 · PostgreSQL 16 (14 min) · Inertia 3 + React 19 + TypeScript (strict) ·
 Tailwind CSS 4 · Recharts + hand-built SVG · TanStack Table (server-driven) · Redis queue/cache
-(database fallback) · Fortify with mandatory 2FA · maatwebsite/excel · spatie/laravel-pdf
+(database fallback) · Fortify with 2FA (mandatory unless `EDQA_REQUIRE_2FA=false`, D-26) · maatwebsite/excel · spatie/laravel-pdf
 (Browsershot) · spatie/laravel-activitylog · Pest 4 · Larastan level 6 · Pint · Pulse.
 
 **Runtime:** Docker. One multi-stage `Dockerfile` (targets `app`, `worker`, `web`, `ci`, `dev`),

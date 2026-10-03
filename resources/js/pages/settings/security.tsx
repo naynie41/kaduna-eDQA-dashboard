@@ -1,18 +1,19 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import ErrorSummary from '@/components/ErrorSummary';
 import RecoveryCodeList from '@/components/RecoveryCodeList';
 import SubmitButton from '@/components/SubmitButton';
 import TextField from '@/components/TextField';
 import { useTranslate } from '@/lib/i18n';
-import { regenerateRecoveryCodes } from '@/routes/two-factor';
+import { regenerateRecoveryCodes, setup } from '@/routes/two-factor';
 import { update } from '@/routes/user-password';
 
 export type SecurityProps = {
     status?: string | null | undefined;
+    twoFactorEnabled: boolean;
     recoveryCodes: string[] | null;
 };
 
-export default function Security({ status, recoveryCodes }: SecurityProps) {
+export default function Security({ status, twoFactorEnabled, recoveryCodes }: SecurityProps) {
     const t = useTranslate();
 
     return (
@@ -75,14 +76,21 @@ export default function Security({ status, recoveryCodes }: SecurityProps) {
                     <h2 id="two-factor-title" className="mb-2 text-lg font-semibold">
                         {t('auth.settings.two_factor_title')}
                     </h2>
-                    <p className="mb-4 text-ink-2">{t('auth.settings.two_factor_on')}</p>
-                    {recoveryCodes ? (
+                    {!twoFactorEnabled ? (
+                        <>
+                            <p className="mb-4 text-ink-2">{t('auth.settings.two_factor_off')}</p>
+                            <Link href={setup()} className="text-deep underline underline-offset-2">
+                                {t('auth.settings.two_factor_set_up')}
+                            </Link>
+                        </>
+                    ) : recoveryCodes ? (
                         <>
                             <p className="mb-3 font-medium">{t('auth.two_factor.setup.codes_intro')}</p>
                             <RecoveryCodeList codes={recoveryCodes} />
                         </>
                     ) : (
                         <>
+                            <p className="mb-4 text-ink-2">{t('auth.settings.two_factor_on')}</p>
                             <p className="mb-4 text-sm text-ink-2">{t('auth.settings.regenerate_intro')}</p>
                             <Form {...regenerateRecoveryCodes.form()} options={{ preserveScroll: true }}>
                                 {({ processing }) => <SubmitButton processing={processing}>{t('auth.settings.regenerate')}</SubmitButton>}
