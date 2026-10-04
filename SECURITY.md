@@ -42,18 +42,19 @@ administrator accounts.
 | Method | Email + password via Laravel Fortify |
 | Two-factor | **Mandatory** for every account (TOTP) unless `EDQA_REQUIRE_2FA=false` (D-26). When required, an account without confirmed 2FA can reach only the 2FA setup screen. When switched off, 2FA is optional (set up from Security settings) and an account that has it is still challenged at sign-in. Unset means required |
 | Recovery codes | Generated at 2FA setup, shown once, stored hashed |
-| Password policy | `Password::min(12)->mixedCase()->numbers()->uncompromised()` |
+| Password policy | `Password::min(12)->mixedCase()->numbers()->uncompromised()` (`uncompromised()` skipped in the test environment only; needs outbound HTTPS, Q-22) |
 | Hashing | bcrypt (Laravel default) or argon2id |
 | Login throttle | 5 attempts / minute per email + IP (`RateLimiter::for('login')`) |
 | 2FA throttle | 5 attempts / minute per session |
 | Session idle timeout | 8 hours (`SESSION_LIFETIME=480`) |
-| Session cookie | `Secure`, `HttpOnly`, `SameSite=Lax`; `SESSION_ENCRYPT=true` |
+| Session cookie | `Secure` (unless `SESSION_SECURE_COOKIE=false`, local HTTP only), `HttpOnly`, `SameSite=Lax`; `SESSION_ENCRYPT=true` |
 | Session fixation | Regenerate session ID on login and on 2FA confirmation |
 | Password reset | Emailed signed link, 60-minute expiry, throttled |
 | Registration | **Disabled.** Accounts are created by an artisan command only: `php artisan edqa:admin:create` |
 
-There is no self-service sign-up and no in-app user management page. Creating, disabling and
-deleting administrators is a console action and is audited.
+There is no self-service sign-up and no in-app user management page. Creating and disabling
+administrators is a console action and is audited. Accounts are disabled, never deleted, so audit
+entries keep a named actor (Q-23).
 
 **Account count:** keep it at three or fewer for v1. Above three or four, revisit roles before
 launch (PRD open question 8).
@@ -68,11 +69,15 @@ A single middleware group guards everything:
 Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function () { ... });
 ```
 
-Only three routes sit outside it:
+Only three routes are reachable without signing in:
 
 1. The login / 2FA challenge / password reset screens (Fortify)
 2. `POST /webhooks/odk` — protected by HMAC signature verification instead (§6)
 3. `GET /up` — Laravel's health route, used by uptime monitoring; returns status only, no data
+
+A fourth set needs a signed-in session but sits outside the 2FA check, because a user without 2FA
+must reach it: logout, password confirmation, Fortify's 2FA management routes, email verification
+and `GET /two-factor/setup`.
 
 Rules:
 - Do not add policies, gates, `can()` checks or role columns. Their presence implies granularity
@@ -206,7 +211,8 @@ Plus:
 
 ## 10. Secrets management
 
-- `.env` is never committed. `.env.example` lists every key with an empty value.
+- `.env` is never committed. `.env.example` lists every key. Secrets are empty, except the
+  dev-only Postgres passwords and local switches the `compose.dev.yml` stack needs.
 - `APP_KEY` generated per environment; rotating it invalidates sessions and encrypted cache.
 - CI secrets live in the CI provider's secret store.
 - Grep check in CI fails the build if anything matching common secret patterns is committed.

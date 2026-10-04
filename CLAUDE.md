@@ -11,7 +11,7 @@ Anything stated here or in the files it points to does not need repeating in pro
 | `ARCHITECTURE.md` | touching domain models, schema, ingestion, validation, scoring, API or page structure |
 | `CONVENTION.md` | writing any code, test, migration, component or commit |
 | `SECURITY.md` | touching auth, routes, audit, file serving, ODK credentials, webhooks |
-| `ACCESSIBILITY.md` | touching any UI |
+| `ACCESSIBILITY.md` | touching any UI. *Not yet in the repo; until supplied, apply WCAG 2.2 AA and CONVENTION.md §6* |
 | `DEPLOY.md` | touching the `Dockerfile`, `docker/`, `compose.dev.yml`, or anything the servers depend on (env keys, queues, schedule, volumes, DB roles, health route). Lives in the separate `edqa-infra` DevOps project; a copy is kept here for reference |
 
 Source material: the PRD (*Kaduna eDQA Portal — Product Requirements Document*) and the visual
@@ -113,11 +113,11 @@ Strictly in sequence. Each step green (Pint, Larastan, Pest) before the next.
 
 | # | Step | Acceptance |
 |---|---|---|
-| 1 | Scaffold: Laravel, Inertia + React + TS, Pint, Larastan, Pest; **Dockerfile (all targets), `docker/`, `compose.dev.yml`, Makefile**; CI running tests in the `ci` image and building `app`/`worker`/`web` | `make up` serves the app; CI green; images build and pass Trivy |
+| 1 | Scaffold: Laravel, Inertia + React + TS, Pint, Larastan, Pest; **Dockerfile (all targets), `docker/`, `compose.dev.yml`, Makefile**; CI running tests in the `ci` image and building `app`/`worker`/`web` | `make up` serves the app; images build. CI and Trivy deferred (ARCHITECTURE.md §11.5) |
 | 2 | Migrations for every table incl. CHECKs, GIN indexes, `refresh_round_aggregates()` — **constraint tests first, watch them fail** | A 347.66 score is rejected by the database |
 | 3 | Models, enums, relationships, factories | |
-| 4 | Seeders: 23 LGAs, wards, synthetic facilities, one round | |
-| 5 | Fortify + mandatory 2FA, `edqa:admin:create`, route-guard test | Only login/2FA/reset, webhook, `/up` unauthenticated |
+| 4 | Seeders: 23 LGAs, wards, synthetic facilities, four demo rounds | |
+| 5 | Fortify + 2FA (mandatory unless `EDQA_REQUIRE_2FA=false`, D-26), `edqa:admin:create`, route-guard test | Only login/2FA/reset, webhook, `/up` unauthenticated |
 | 6 | `ValidationRule` contract, all **14** rules, pipeline, quarantine, broken-submission fixtures | Each fixture quarantines with the right code |
 | 7 | `ScoreCalculator` + rule versions | Reproduces the published figures — **before anything visual** |
 | 8 | ODK client, field maps, pull job, lock, idempotency, edits, backfill, attachments, `odk_pull_runs` | Real submission lands end to end; old form version parses; broken one quarantines |
@@ -148,6 +148,10 @@ make up                                  # start the dev stack (app, web :8080, 
 make sh                                  # shell in the app container
 make check                               # pint --test, phpstan, pest
 make test                                # pest --parallel against edqa_test
+make fresh                               # drop, migrate and seed the dev database
+make grants-check                        # prove edqa_app's least-privilege grants
+make prod-build                          # build the app, worker and web images locally
+make routes                              # regenerate Wayfinder route helpers
 make artisan c="edqa:pull"               # one ODK pull, synchronous
 make artisan c="edqa:backfill"           # resumable historical backfill
 make artisan c="edqa:rescore"
