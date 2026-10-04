@@ -899,3 +899,22 @@ real month names for single-quarter views, LGA tile grid, Data issues "why it ex
 | Q-18 | Allowed values for `assessments.status`, `odk_pull_runs.outcome` and `odk_attachments.status`. No enum is documented, so these columns are plain strings with no CHECK yet (factories use `accepted`, none, `pending`). Proposed: assessment `accepted`/`flagged`; pull `running`/`succeeded`/`failed`; attachment `pending`/`fetched`/`failed` | CHECK constraints (CONVENTION.md §3), step 8 |
 | Q-19 | Confirm the inferred quarantine values: `QuarantineStatus` `open`/`resolved`; `QuarantineResolution` `reprocessed` / `rejected` / `superseded` ("fixed at source"). Derived from the §6 workflow, not listed anywhere | Data issues page (step 11) |
 | Q-20 | Should `assessment_scores` log every create (as SECURITY.md §4 reads) or corrections only, like `item_responses`? Every create means ~9 audit rows per assessment per rescore: several hundred thousand rows at backfill | Audit volume, backfill (step 14) |
+| Q-21 | Should production require 2FA? The project owner switched it off for now (D-26, `EDQA_REQUIRE_2FA`). D-02 relied on 2FA to protect a single all-powerful role, and `SECURITY.md` is the client-facing data protection statement, so the client should accept the choice in writing either way | Go-live (`SECURITY.md` §15) |
+| Q-22 | The password policy checks new passwords against Have I Been Pwned (`uncompromised()`), which needs outbound HTTPS from the server to `api.pwnedpasswords.com`. Does the hosting allow it? If not, creating an admin and changing a password fail | Hosting, `edqa:admin:create` on the server |
+| Q-23 | Does the client ever need an administrator account deleted (for example a data protection request), or is disabling enough? Disabling keeps the audit trail attributable; deleting would leave audit entries without a named actor. Only `edqa:admin:disable` exists | `SECURITY.md` §2 wording, data protection statement |
+
+### 11.5 Deferred until credentials
+
+Phase 1 (v0.1.0) was built and tested without access to the client's systems. These items wait
+for credentials or infrastructure. Each starts once its blocker is supplied:
+
+| Item | Waiting for | Step |
+|---|---|---|
+| Live ODK Central connection: client, pull job, webhook, attachments | ODK Central URL, a Project Viewer service account, project and form IDs (Q-01, Q-11) | 8 |
+| Real field maps for each form version | The form XML for every published version, run through `discovery/form_versions.py` and `field_diff.py` (Q-02, Q-05) | 8 |
+| Historical backfill and backfill report | The ODK connection above, and round windows for past quarters (Q-10, Q-16) | 14 |
+| DevOps: the CI pipeline (tests in the `ci` image, Trivy, image push), the `edqa-infra` project, server provisioning | Hosting decision and server access (Q-07), CI and registry accounts | 1 (CI part), go-live |
+| Deploys to staging and production, and the server-side checks in `SECURITY.md` §15 | The servers above | Go-live |
+
+Until then the local stack runs on synthetic seed data (`DemoAssessmentSeeder`), and nothing in
+the code assumes a live ODK host.
