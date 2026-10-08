@@ -91,10 +91,13 @@ return [
         'detail' => ':round already recorded for facility :code (instance :instance)',
     ],
 
+    // Soft rules: the why text takes its threshold from config (edqa.validation.soft_rules),
+    // filled in by whatever shows it, so changing a threshold never leaves stale wording.
+
     'SCORE_JUMP' => [
         'name' => 'Large score change',
-        'why' => 'A facility\'s overall score rarely moves by more than 30 points from one round to the next. A jump that large is usually an entry error worth checking.',
-        'detail' => "overall :score is :points points from last round's :previous",
+        'why' => 'A facility\'s overall score rarely moves by more than :points points from one round to the next. A jump that large is usually an entry error worth checking.',
+        'detail' => 'overall :score, previous round :previous (:change)',
     ],
 
     'ALL_PERFECT' => [
@@ -105,14 +108,14 @@ return [
 
     'VISIT_TOO_SHORT' => [
         'name' => 'Very short visit',
-        'why' => 'A real assessment takes time. A visit under 20 minutes may have been rushed or not happened.',
+        'why' => 'A real assessment takes time. A visit under :minutes minutes may have been rushed or not happened.',
         'detail' => 'visit lasted :minutes minutes (minimum :minimum)',
     ],
 
     'ASSESSOR_VOLUME' => [
         'name' => 'Many visits in one day',
-        'why' => 'One assessor visiting more than six facilities in a day needs a supervisor\'s attention.',
-        'detail' => ':assessor visited :count facilities on :date (more than :maximum)',
+        'why' => 'One assessor visiting more than :maximum facilities in a day needs a supervisor\'s attention.',
+        'detail' => 'assessor :assessor logged :count facilities on :date',
     ],
 
 ];

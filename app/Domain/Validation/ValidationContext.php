@@ -153,10 +153,19 @@ final class ValidationContext
     /**
      * Distinct facilities the assessor visited that local day: accepted assessments plus this
      * batch's accepted submissions. Only the batch's visit dates are loaded.
+     *
+     * An assessor is a name plus, when present, a device ID: two people with the same name on
+     * different phones are counted apart (D-29). Pass $includingFacilityId to count the visit
+     * being checked as well; a facility already counted is not counted twice.
      */
-    public function assessorVisitCount(string $assessorName, CarbonImmutable $day): int
+    public function assessorVisitCount(string $assessorName, ?string $deviceId, CarbonImmutable $day, ?int $includingFacilityId = null): int
     {
-        return count($this->assessorDays[self::assessorDayKey($assessorName, $day)] ?? []);
+        $facilities = $this->assessorDays[self::assessorDayKey($assessorName, $deviceId, $day)] ?? [];
+        if ($includingFacilityId !== null) {
+            $facilities[$includingFacilityId] = true;
+        }
+
+        return count($facilities);
     }
 
     public function isKnownFormVersion(string $version): bool
@@ -175,14 +184,18 @@ final class ValidationContext
         }
 
         $this->acceptedInstances["{$round->id}:{$facility->id}"][] = $submission->instanceId;
-        $this->assessorDays[self::assessorDayKey($submission->assessorName, $submission->visitDate())][$facility->id] = true;
+        $this->assessorDays[self::assessorDayKey($submission->assessorName, $submission->deviceId, $submission->visitDate())][$facility->id] = true;
     }
 
-    /** "assessor|Y-m-d": the name ignoring case and spacing, the local calendar day. */
-    public static function assessorDayKey(string $assessorName, CarbonImmutable|string $day): string
+    /**
+     * "name|device|Y-m-d": the name ignoring case and spacing, the device ID trimmed (empty when
+     * absent), the local calendar day.
+     */
+    public static function assessorDayKey(string $assessorName, ?string $deviceId, CarbonImmutable|string $day): string
     {
         $date = is_string($day) ? $day : $day->setTimezone((string) config('app.timezone'))->toDateString();
+        $device = Normalise::nullIfBlank($deviceId) ?? '';
 
-        return Normalise::name($assessorName)."|{$date}";
+        return Normalise::name($assessorName)."|{$device}|{$date}";
     }
 }

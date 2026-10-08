@@ -62,7 +62,7 @@ it('answers every lookup from memory, without further queries', function (): voi
         $round = $context->roundFor($submission);
         $context->duplicateOf($submission, $round->id, $facility->id);
         $context->priorOverallScore($facility->id, $round);
-        $context->assessorVisitCount($submission->assessorName, $submission->visitDate());
+        $context->assessorVisitCount($submission->assessorName, $submission->deviceId, $submission->visitDate());
         $context->isKnownFormVersion($submission->formVersion);
         $context->registerAccepted($submission);
     });
@@ -270,24 +270,51 @@ it("counts an assessor's facilities for the day across the database and the batc
     $round = Round::factory()->create(['year' => 2026, 'quarter' => 2]);
     $day = CarbonImmutable::parse('2026-04-14 08:00', 'Africa/Lagos');
     foreach (range(1, 3) as $i) {
-        Assessment::factory()->forRound($round)->create(['assessor_name' => ' hauwa  IBRAHIM', 'started_at' => $day->addHours($i)]);
+        Assessment::factory()->forRound($round)->create(['assessor_name' => ' hauwa  IBRAHIM', 'device_id' => 'collect:p1', 'started_at' => $day->addHours($i)]);
     }
-    Assessment::factory()->forRound($round)->create(['assessor_name' => 'Hauwa Ibrahim', 'started_at' => $day->addDay()]);
-    Assessment::factory()->forRound($round)->create(['assessor_name' => 'Musa Bello', 'started_at' => $day]);
+    Assessment::factory()->forRound($round)->create(['assessor_name' => 'Hauwa Ibrahim', 'device_id' => 'collect:p1', 'started_at' => $day->addDay()]);
+    Assessment::factory()->forRound($round)->create(['assessor_name' => 'Musa Bello', 'device_id' => 'collect:p2', 'started_at' => $day]);
     $facility = Facility::factory()->create();
-    $first = ParsedSubmissionBuilder::new()->forFacility($facility)->inRound($round)->build();
-    $again = ParsedSubmissionBuilder::new()->forFacility($facility)->inRound($round)->build();
+    $first = ParsedSubmissionBuilder::new()->forFacility($facility)->inRound($round)->withDeviceId('collect:p1')->build();
+    $again = ParsedSubmissionBuilder::new()->forFacility($facility)->inRound($round)->withDeviceId('collect:p1')->build();
 
     $context = contextFor([$first, $again]);
-    expect($context->assessorVisitCount('Hauwa Ibrahim', $day))->toBe(3);
+    expect($context->assessorVisitCount('Hauwa Ibrahim', 'collect:p1', $day))->toBe(3);
 
     $context->registerAccepted($first);
     $context->registerAccepted($again);
 
-    // The visit the next day and Musa's visit are not Hauwa's on the 14th.
-    expect($context->assessorVisitCount('Hauwa Ibrahim', $day))->toBe(4)
-        ->and($context->assessorVisitCount('Musa Bello', $day))->toBe(1)
-        ->and($context->assessorVisitCount('Nobody', $day))->toBe(0);
+    // The visit the next day and Musa's visit are not Hauwa's on the 14th; the same facility twice counts once.
+    expect($context->assessorVisitCount('Hauwa Ibrahim', 'collect:p1', $day))->toBe(4)
+        ->and($context->assessorVisitCount('Musa Bello', 'collect:p2', $day))->toBe(1)
+        ->and($context->assessorVisitCount('Nobody', null, $day))->toBe(0);
+});
+
+it('tells two assessors with the same name apart by device', function (): void {
+    $round = Round::factory()->create(['year' => 2026, 'quarter' => 2]);
+    $day = CarbonImmutable::parse('2026-04-14 09:00', 'Africa/Lagos');
+    Assessment::factory()->forRound($round)->count(2)->create(['assessor_name' => 'A. Bello', 'device_id' => 'collect:p1', 'started_at' => $day]);
+    Assessment::factory()->forRound($round)->create(['assessor_name' => 'A. Bello', 'device_id' => 'collect:p2', 'started_at' => $day]);
+    Assessment::factory()->forRound($round)->create(['assessor_name' => 'A. Bello', 'device_id' => null, 'started_at' => $day]);
+    $submission = ParsedSubmissionBuilder::new()->inRound($round)->build();
+
+    $context = contextFor([$submission]);
+
+    expect($context->assessorVisitCount('A. Bello', 'collect:p1', $day))->toBe(2)
+        ->and($context->assessorVisitCount('a.  bello', ' collect:p2 ', $day))->toBe(1)
+        ->and($context->assessorVisitCount('A. Bello', null, $day))->toBe(1);
+});
+
+it('counts the facility being checked once, on top of the day so far', function (): void {
+    $round = Round::factory()->create(['year' => 2026, 'quarter' => 2]);
+    $day = CarbonImmutable::parse('2026-04-14 09:00', 'Africa/Lagos');
+    $visited = Assessment::factory()->forRound($round)->create(['assessor_name' => 'A. Bello', 'device_id' => null, 'started_at' => $day]);
+    $submission = ParsedSubmissionBuilder::new()->inRound($round)->build();
+
+    $context = contextFor([$submission]);
+
+    expect($context->assessorVisitCount('A. Bello', null, $day, includingFacilityId: 999_999))->toBe(2)
+        ->and($context->assessorVisitCount('A. Bello', null, $day, includingFacilityId: $visited->facility_id))->toBe(1);
 });
 
 // ---- Form versions

@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Domain\Validation\Rules;
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
-use App\Domain\Scoring\Exceptions\IncompleteAssessmentException;
-use App\Domain\Scoring\ScoreCalculator;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\DTOs\RuleFailure;
 use App\Domain\Validation\Enums\Severity;
 use App\Domain\Validation\Rules\Concerns\BuildsFailures;
-use App\Domain\Validation\Support\ItemCoverage;
+use App\Domain\Validation\Support\SubmissionScorer;
 use App\Domain\Validation\ValidationContext;
 
 /**
@@ -29,7 +27,7 @@ final class ScoreRangeRule implements ValidationRule
     use BuildsFailures;
 
     public function __construct(
-        private readonly ScoreCalculator $calculator,
+        private readonly SubmissionScorer $scorer,
     ) {}
 
     public function code(): string
@@ -64,15 +62,9 @@ final class ScoreRangeRule implements ValidationRule
     /** @return array<string, float> "availability_m1", "availability", ..., "overall" */
     private function derivedValues(ParsedSubmission $submission, ValidationContext $context): array
     {
-        $rules = $context->ruleConfig();
-        if ($rules === null || ! ItemCoverage::isComplete($submission->items)) {
+        $card = $this->scorer->scoreCard($submission, $context);
+        if ($card === null) {
             return [];
-        }
-
-        try {
-            $card = $this->calculator->calculate($submission->items, $rules);
-        } catch (IncompleteAssessmentException) {
-            return []; // Unreachable after isComplete(); kept so no exception leaks.
         }
 
         $values = [];

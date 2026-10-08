@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Ingestion\DTOs\ItemResponseData;
 use App\Domain\Scoring\Enums\Dimension;
+use App\Domain\Scoring\Models\ScoringRuleVersion;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\ValidationContextFactory;
 use Tests\Support\ParsedSubmissionBuilder;
@@ -25,7 +26,7 @@ it('builds a submission that every lookup resolves', function (): void {
         ->and($submission->roundQuarter)->toBe($round?->quarter)
         ->and($context->duplicateOf($submission, $round->id, $facility->id))->toBeNull()
         ->and($context->priorOverallScore($facility->id, $round))->toBeNull()
-        ->and($context->assessorVisitCount($submission->assessorName, $submission->visitDate()))->toBe(0)
+        ->and($context->assessorVisitCount($submission->assessorName, $submission->deviceId, $submission->visitDate()))->toBe(0)
         ->and($submission->rawNumericScores)->toBeNull();
 });
 
@@ -46,19 +47,19 @@ it('makes a 45-minute visit whose raw dates match the parsed ones', function ():
         ->and($submission->submittedAt->greaterThan($submission->endedAt))->toBeTrue();
 });
 
-it('raises no failure from any rule that exists yet', function (): void {
+it('raises no failure from any of the 14 rules', function (): void {
+    ScoringRuleVersion::factory()->published()->create(); // so the score-based rules run
     $submission = ParsedSubmissionBuilder::new()->build();
     $context = app(ValidationContextFactory::class)->forBatch([$submission]);
-    $existing = array_filter(config('edqa.validation.rules'), class_exists(...));
 
     $failures = [];
-    foreach ($existing as $class) {
+    foreach (config('edqa.validation.rules') as $code => $class) {
         $rule = app($class);
-        expect($rule)->toBeInstanceOf(ValidationRule::class);
+        expect($rule)->toBeInstanceOf(ValidationRule::class)
+            ->and($rule->code())->toBe($code);
         $failures = [...$failures, ...$rule->check($submission, $context)];
     }
 
-    // No rule classes exist in step 2A.1; this grows with them in 2B.
     expect($failures)->toBe([]);
 });
 

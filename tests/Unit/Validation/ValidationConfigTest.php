@@ -55,6 +55,15 @@ it('names, explains and words a detail for every rule', function (string $code):
     }
 })->with(RULE_CODES);
 
+it('never writes a soft-rule threshold into its text', function (string $code, string $placeholder): void {
+    expect(__("validation_rules.{$code}.why"))->toContain($placeholder)
+        ->not->toMatch('/\b(30|20|6|six)\b/');
+})->with([
+    ['SCORE_JUMP', ':points'],
+    ['VISIT_TOO_SHORT', ':minutes'],
+    ['ASSESSOR_VOLUME', ':maximum'],
+]);
+
 it('fills the detail placeholders the way ARCHITECTURE.md §6 shows', function (): void {
     expect(__('validation_rules.SCORE_RANGE.detail', ['slot' => 'availability_m1', 'score' => '347.66']))
         ->toBe('availability_m1 value 347.66 exceeds 100')

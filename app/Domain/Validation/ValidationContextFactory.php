@@ -174,7 +174,8 @@ final class ValidationContextFactory
     }
 
     /**
-     * Distinct facilities per assessor per local day, for the days the batch's visits fall on.
+     * Distinct facilities per assessor (name + device) per local day, for the days the batch's
+     * visits fall on.
      *
      * @param  list<ParsedSubmission>  $submissions
      * @return array<string, array<int, true>>
@@ -187,14 +188,15 @@ final class ValidationContextFactory
         }
 
         $rows = DB::select(<<<'SQL'
-            SELECT DISTINCT assessor_name, (started_at AT TIME ZONE ?)::date::text AS day, facility_id
+            SELECT DISTINCT assessor_name, device_id, (started_at AT TIME ZONE ?)::date::text AS day, facility_id
             FROM assessments
             WHERE (started_at AT TIME ZONE ?)::date = ANY(?::date[])
             SQL, [config('app.timezone'), config('app.timezone'), '{'.implode(',', array_keys($dates)).'}']);
 
         $days = [];
         foreach ($rows as $row) {
-            $days[ValidationContext::assessorDayKey((string) $row->assessor_name, (string) $row->day)][(int) $row->facility_id] = true;
+            $key = ValidationContext::assessorDayKey((string) $row->assessor_name, $row->device_id === null ? null : (string) $row->device_id, (string) $row->day);
+            $days[$key][(int) $row->facility_id] = true;
         }
 
         return $days;
