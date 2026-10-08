@@ -53,12 +53,11 @@ it('names, explains and words a detail for every rule', function (string $code):
         $text = __("validation_rules.{$code}.{$part}");
         expect($text)->toBeString()->not->toBe("validation_rules.{$code}.{$part}")->not->toBeEmpty();
     }
-
-    expect(__("validation_rules.{$code}.detail"))->toContain(':');
 })->with(RULE_CODES);
 
 it('fills the detail placeholders the way ARCHITECTURE.md §6 shows', function (): void {
     expect(__('validation_rules.SCORE_RANGE.detail', ['slot' => 'availability_m1', 'score' => '347.66']))
         ->toBe('availability_m1 derived score 347.66 exceeds 100')
-        ->and(__('validation_rules.LGA_UNKNOWN.detail', ['value' => 'blank']))->toBe('lga was blank');
+        ->and(__('validation_rules.LGA_UNKNOWN.detail'))->toBe('lga was blank')
+        ->and(__('validation_rules.LGA_UNKNOWN.detail_unknown', ['value' => 'Kaduna Central']))->toBe("lga 'Kaduna Central' is not one of the 23");
 });

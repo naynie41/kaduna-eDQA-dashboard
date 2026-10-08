@@ -72,12 +72,15 @@ final class ParsedSubmissionBuilder
         return $this->set('deprecatedId', $deprecatedId);
     }
 
-    /** An unmapped version also sets formVersionKnown to false, as the parser would. */
-    public function withFormVersion(string $version): self
+    /**
+     * By default formVersionKnown follows the config, as the parser would set it; pass $known
+     * to make the parser's answer disagree with the config.
+     */
+    public function withFormVersion(string $version, ?bool $known = null): self
     {
         $this->set('formVersion', $version);
 
-        return $this->set('formVersionKnown', array_key_exists($version, self::knownVersions()));
+        return $this->set('formVersionKnown', $known ?? array_key_exists($version, self::knownVersions()));
     }
 
     public function withLga(?string $lgaRef): self

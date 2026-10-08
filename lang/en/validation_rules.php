@@ -15,25 +15,33 @@ return [
     'UNKNOWN_FORM_VERSION' => [
         'name' => 'Unknown form version',
         'why' => 'Each version of the ODK form names its questions differently. A version the portal has no field map for would be read with the wrong map, and its scores would be silently wrong, so it is held back until a map is added.',
-        'detail' => "form version ':version' has no field map",
+        'detail' => 'form version :version has no field map',
+        'blank' => '(blank)',
     ],
 
     'COLUMN_DRIFT' => [
         'name' => 'Shifted columns',
         'why' => 'In the old report, values landed in the wrong columns: a ward called "Quarterly", a start date of "FEBRUARY". Dates must be real dates, and a ward cannot be a month, a period word or a number.',
-        'detail' => 'columns look shifted: :values',
+        // One entry per shifted field, joined with ", ": "ward 'Quarterly', start 'FEBRUARY'".
+        'detail' => ':values',
+        'value' => ":field ':value'",
+        'fields' => ['ward' => 'ward', 'start' => 'start', 'end' => 'end'],
     ],
 
     'LGA_UNKNOWN' => [
         'name' => 'Unknown LGA',
         'why' => 'Kaduna State has exactly 23 LGAs. A blank or unrecognised LGA created a 24th one in the old report.',
-        'detail' => 'lga was :value',
+        'detail' => 'lga was blank',
+        'detail_unknown' => "lga ':value' is not one of the 23",
     ],
 
     'FACILITY_UNKNOWN' => [
         'name' => 'Unknown facility',
         'why' => 'Every assessment must belong to an active facility on the master list. The old report showed a facility named "2019.00".',
-        'detail' => "facility ':code' is not an active facility on the master list",
+        'detail' => "facility ':code' is not on the master list",
+        'detail_blank' => 'facility was blank',
+        'detail_numeric' => "facility ref ':code' looks like a year or number, not a facility code",
+        'detail_inactive' => 'facility :code is deactivated',
     ],
 
     'FACILITY_LGA_MISMATCH' => [

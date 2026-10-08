@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Validation\Contracts\ValidationRule;
+use App\Domain\Validation\DTOs\RuleFailure;
+use App\Domain\Validation\ValidationContextFactory;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,6 +53,20 @@ function confirmTwoFactor(User $user): array
         ->post(route('two-factor.confirm'), ['code' => $code]);
 
     return [$response, $secret];
+}
+
+/**
+ * Runs one validation rule (resolved from the container, so config is injected) against a
+ * submission, with a context built for that submission alone.
+ *
+ * @param  class-string<ValidationRule>  $rule
+ * @return list<RuleFailure>
+ */
+function checkRule(string $rule, ParsedSubmission $submission): array
+{
+    $context = app(ValidationContextFactory::class)->forBatch([$submission]);
+
+    return app($rule)->check($submission, $context);
 }
 
 /**

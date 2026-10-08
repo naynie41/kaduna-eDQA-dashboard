@@ -9,6 +9,7 @@ use App\Domain\Validation\DTOs\FacilitySnapshot;
 use App\Domain\Validation\DTOs\LgaSnapshot;
 use App\Domain\Validation\DTOs\RoundSnapshot;
 use App\Domain\Validation\Exceptions\SubmissionNotResolvable;
+use App\Support\Text\Normalise;
 use Carbon\CarbonImmutable;
 
 /**
@@ -43,15 +44,26 @@ final class ValidationContext
     /** By code first, then by name, ignoring case, spacing and punctuation. */
     public function lga(?string $ref): ?LgaSnapshot
     {
-        $key = self::normaliseLga($ref);
+        $key = Normalise::matchKey($ref);
 
         return $key === null ? null : ($this->lgas["code:{$key}"] ?? $this->lgas["name:{$key}"] ?? null);
+    }
+
+    public function lgaById(int $id): ?LgaSnapshot
+    {
+        foreach ($this->lgas as $lga) {
+            if ($lga->id === $id) {
+                return $lga;
+            }
+        }
+
+        return null;
     }
 
     /** By exact code (surrounding spaces ignored), active or not. */
     public function facility(?string $ref): ?FacilitySnapshot
     {
-        $code = self::trimmed($ref);
+        $code = Normalise::nullIfBlank($ref);
 
         return $code === null ? null : ($this->facilities[$code] ?? null);
     }
@@ -153,26 +165,11 @@ final class ValidationContext
         $this->assessorDays[self::assessorDayKey($submission->assessorName, $day)][$facility->id] = true;
     }
 
-    public static function normaliseLga(?string $value): ?string
-    {
-        $key = trim((string) preg_replace('/[^a-z0-9]+/', ' ', mb_strtolower((string) $value)));
-
-        return $key === '' ? null : $key;
-    }
-
     /** "assessor|Y-m-d": the name ignoring case and spacing, the local calendar day. */
     public static function assessorDayKey(string $assessorName, CarbonImmutable|string $day): string
     {
-        $name = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $assessorName)));
         $date = is_string($day) ? $day : $day->setTimezone((string) config('app.timezone'))->toDateString();
 
-        return "{$name}|{$date}";
-    }
-
-    private static function trimmed(?string $value): ?string
-    {
-        $value = trim((string) $value);
-
-        return $value === '' ? null : $value;
+        return Normalise::name($assessorName)."|{$date}";
     }
 }

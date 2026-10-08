@@ -9,6 +9,7 @@ use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Validation\DTOs\FacilitySnapshot;
 use App\Domain\Validation\DTOs\LgaSnapshot;
 use App\Domain\Validation\DTOs\RoundSnapshot;
+use App\Support\Text\Normalise;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -45,8 +46,8 @@ final class ValidationContextFactory
         $lgas = [];
         foreach (DB::table('lgas')->get(['id', 'code', 'name']) as $row) {
             $lga = new LgaSnapshot((int) $row->id, (string) $row->code, (string) $row->name);
-            $lgas['code:'.ValidationContext::normaliseLga($lga->code)] = $lga;
-            $lgas['name:'.ValidationContext::normaliseLga($lga->name)] = $lga;
+            $lgas['code:'.Normalise::matchKey($lga->code)] = $lga;
+            $lgas['name:'.Normalise::matchKey($lga->name)] = $lga;
         }
 
         return $lgas;
