@@ -129,9 +129,45 @@ it('finds the round whose window holds the visit, open or closed', function (): 
         ->and($context->roundFor($inOpen)?->status)->toBe(RoundStatus::Open)
         ->and($context->roundFor($inOpen)?->isOpen())->toBeTrue()
         ->and($context->roundFor($outside))->toBeNull()
-        ->and($context->roundFor($unparsed))->toBeNull()
+        // No parsed start: the submission time (5 minutes after the visit) places it instead.
+        ->and($context->roundFor($unparsed)?->id)->toBe($open->id)
         ->and($context->round(2026, 2)?->id)->toBe($open->id)
         ->and($context->round(2026, 3))->toBeNull();
+});
+
+it('lists every round whose window holds a day, and picks none when windows overlap', function (): void {
+    $q2 = Round::factory()->create(['year' => 2026, 'quarter' => 2]);
+    // Overlapping windows are refused when rounds are created (§3); the context must not
+    // trust that and guess between them.
+    $overlap = Round::factory()->create(['year' => 2026, 'quarter' => 3, 'window_start' => '2026-06-20', 'window_end' => '2026-09-30']);
+    $inBoth = ParsedSubmissionBuilder::new()->inRound($q2)->withStartedAt(CarbonImmutable::parse('2026-06-25 09:00'))->build();
+
+    $context = contextFor([$inBoth]);
+
+    expect(array_map(fn ($r) => $r->id, $context->roundsContaining($inBoth->visitDate())))->toBe([$q2->id, $overlap->id])
+        ->and($context->roundFor($inBoth))->toBeNull();
+});
+
+// ---- Scoring rules (SCORE_RANGE)
+
+it('holds the highest published rule version, ignoring drafts', function (): void {
+    ScoringRuleVersion::factory()->published()->create();
+    ScoringRuleVersion::factory()->published()->create(['config' => [
+        'bands' => ['strong' => 95, 'acceptable' => 85, 'review' => 75], 'item_weights' => [],
+        'na_policy' => 'exclude', 'choice_map' => ['yes' => 'pass', 'no' => 'fail', 'na' => 'na'],
+    ]]);
+    ScoringRuleVersion::factory()->create(['config' => [
+        'bands' => ['strong' => 99, 'acceptable' => 98, 'review' => 97], 'item_weights' => [],
+        'na_policy' => 'exclude', 'choice_map' => ['yes' => 'pass'],
+    ]]);
+
+    expect(contextFor([])->ruleConfig()?->bands['strong'])->toBe(95.0);
+});
+
+it('holds no rule config when nothing is published', function (): void {
+    ScoringRuleVersion::factory()->create();
+
+    expect(contextFor([])->ruleConfig())->toBeNull();
 });
 
 it('counts a visit on the last day of the window, in local time', function (): void {

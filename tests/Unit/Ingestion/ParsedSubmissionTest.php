@@ -79,6 +79,11 @@ it('rejects a fixture missing a required field', function (): void {
 it('takes the visit date from the start time, in the app time zone', function (): void {
     $submission = parsedSubmission(['startedAt' => CarbonImmutable::parse('2026-04-14T23:30:00+00:00')]);
 
-    expect($submission->visitDate()?->toDateString())->toBe('2026-04-15')
-        ->and(parsedSubmission(['startedAt' => null])->visitDate())->toBeNull();
+    expect($submission->visitDate()->toDateString())->toBe('2026-04-15');
+});
+
+it('falls back to the submission time when the start did not parse', function (): void {
+    $submission = parsedSubmission(['startedAt' => null, 'submittedAt' => CarbonImmutable::parse('2026-04-16T10:00:00+01:00')]);
+
+    expect($submission->visitDate()->toDateString())->toBe('2026-04-16');
 });

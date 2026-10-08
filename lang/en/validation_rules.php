@@ -8,9 +8,13 @@ declare(strict_types=1);
  * name   — short label
  * why    — why the rule exists: the defect in the old Looker Studio report it prevents
  * detail — the specific finding for one submission; the rule fills the :placeholders
+ *          (detail_* are the variants a rule picks between)
  */
 
 return [
+
+    // How a round is named in any detail.
+    'round_label' => 'Q:quarter :year',
 
     'UNKNOWN_FORM_VERSION' => [
         'name' => 'Unknown form version',
@@ -53,13 +57,17 @@ return [
     'ITEMS_INCOMPLETE' => [
         'name' => 'Missing items',
         'why' => 'Every dimension needs answers for all three months. A missing dimension or month cannot be averaged fairly.',
-        'detail' => 'no items for :slots',
+        'detail' => 'missing :slots',
+        'detail_all_na' => ':dimension has no applicable item in any month',
+        'detail_typed_scores' => 'no item responses: this form recorded typed scores, which the portal never accepts as scores',
+        'separator' => '; ',
     ],
 
     'SCORE_RANGE' => [
         'name' => 'Score out of range',
         'why' => 'A score is a percentage and must be between 0 and 100. The old report showed scores of 347.66 and 392.42.',
-        'detail' => ':slot derived score :score exceeds 100',
+        'detail' => ':slot value :score exceeds 100',
+        'detail_below' => ':slot value :score is below 0',
     ],
 
     'END_BEFORE_START' => [
@@ -71,13 +79,16 @@ return [
     'ROUND_WINDOW' => [
         'name' => 'Outside the round window',
         'why' => 'A visit must fall inside an open round\'s assessment window. Otherwise a visit from one quarter is counted in another.',
-        'detail' => "visit date :date is not inside an open round's window",
+        'detail' => "visit date :date is not inside any round's window",
+        'detail_closed' => 'visit date :date falls in :round, which is closed',
+        'detail_declared' => 'the form says :declared, but visit date :date falls in :round',
+        'detail_ambiguous' => "visit date :date falls inside more than one round's window (:rounds)",
     ],
 
     'DUPLICATE_ASSESSMENT' => [
         'name' => 'Duplicate assessment',
         'why' => 'A facility is assessed once per round. A second assessment would count the facility twice.',
-        'detail' => "facility ':code' already has an accepted assessment in :round (submission :instance)",
+        'detail' => ':round already recorded for facility :code (instance :instance)',
     ],
 
     'SCORE_JUMP' => [

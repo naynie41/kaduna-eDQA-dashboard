@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Validation;
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Scoring\DTOs\RuleConfig;
 use App\Domain\Validation\DTOs\FacilitySnapshot;
 use App\Domain\Validation\DTOs\LgaSnapshot;
 use App\Domain\Validation\DTOs\RoundSnapshot;
@@ -39,6 +40,7 @@ final class ValidationContext
         private readonly array $priorScores,
         private array $assessorDays,
         private readonly array $knownFormVersions,
+        private readonly ?RuleConfig $ruleConfig,
     ) {}
 
     /** By code first, then by name, ignoring case, spacing and punctuation. */
@@ -87,20 +89,32 @@ final class ValidationContext
     }
 
     /**
-     * The round, open or closed, whose window holds the visit date. Null when the start did not
-     * parse, when no window holds it, or when more than one does: an ambiguous round is never
-     * guessed (CLAUDE.md hard rule 12).
+     * Every round, open or closed, whose window holds the local day, in time order. Windows
+     * should never overlap (§3), so more than one means bad round setup.
+     *
+     * @return list<RoundSnapshot>
+     */
+    public function roundsContaining(CarbonImmutable $day): array
+    {
+        return array_values(array_filter($this->rounds, fn (RoundSnapshot $r): bool => $r->contains($day)));
+    }
+
+    /**
+     * The round, open or closed, whose window holds the visit date (D-28). Null when no window
+     * holds it, or when more than one does: an ambiguous round is never guessed (CLAUDE.md hard
+     * rule 12).
      */
     public function roundFor(ParsedSubmission $submission): ?RoundSnapshot
     {
-        $day = $submission->visitDate();
-        if ($day === null) {
-            return null;
-        }
-
-        $matches = array_values(array_filter($this->rounds, fn (RoundSnapshot $r): bool => $r->contains($day)));
+        $matches = $this->roundsContaining($submission->visitDate());
 
         return count($matches) === 1 ? $matches[0] : null;
+    }
+
+    /** The highest published scoring rule version's config; null when none is published. */
+    public function ruleConfig(): ?RuleConfig
+    {
+        return $this->ruleConfig;
     }
 
     /**
@@ -155,14 +169,13 @@ final class ValidationContext
     {
         $facility = $this->facility($submission->facilityRef);
         $round = $this->roundFor($submission);
-        $day = $submission->visitDate();
 
-        if ($facility === null || $round === null || $day === null) {
+        if ($facility === null || $round === null) {
             throw SubmissionNotResolvable::forAcceptance($submission->instanceId);
         }
 
         $this->acceptedInstances["{$round->id}:{$facility->id}"][] = $submission->instanceId;
-        $this->assessorDays[self::assessorDayKey($submission->assessorName, $day)][$facility->id] = true;
+        $this->assessorDays[self::assessorDayKey($submission->assessorName, $submission->visitDate())][$facility->id] = true;
     }
 
     /** "assessor|Y-m-d": the name ignoring case and spacing, the local calendar day. */

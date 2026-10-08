@@ -6,6 +6,7 @@ namespace App\Domain\Validation;
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Round\Enums\RoundStatus;
+use App\Domain\Scoring\DTOs\RuleConfig;
 use App\Domain\Validation\DTOs\FacilitySnapshot;
 use App\Domain\Validation\DTOs\LgaSnapshot;
 use App\Domain\Validation\DTOs\RoundSnapshot;
@@ -19,8 +20,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class ValidationContextFactory
 {
-    /** LGAs, facilities, rounds, accepted assessments, prior scores, assessor-days. */
-    public const QUERY_COUNT = 6;
+    /** LGAs, facilities, rounds, accepted assessments, prior scores, assessor-days, rule config. */
+    public const QUERY_COUNT = 7;
 
     /** @param  list<ParsedSubmission>  $submissions */
     public function forBatch(array $submissions): ValidationContext
@@ -37,6 +38,7 @@ final class ValidationContextFactory
             priorScores: $this->priorScores($facilityIds, $rounds),
             assessorDays: $this->assessorDays($submissions),
             knownFormVersions: $this->knownFormVersions(),
+            ruleConfig: $this->ruleConfig(),
         );
     }
 
@@ -181,10 +183,7 @@ final class ValidationContextFactory
     {
         $dates = [];
         foreach ($submissions as $submission) {
-            $day = $submission->visitDate();
-            if ($day !== null) {
-                $dates[$day->toDateString()] = true;
-            }
+            $dates[$submission->visitDate()->toDateString()] = true;
         }
 
         $rows = DB::select(<<<'SQL'
@@ -199,6 +198,20 @@ final class ValidationContextFactory
         }
 
         return $days;
+    }
+
+    /**
+     * The highest published version, as round_aggregates picks it. A published config the
+     * calculator cannot apply throws here: that is a setup error, not a submission's fault.
+     */
+    private function ruleConfig(): ?RuleConfig
+    {
+        $config = DB::table('scoring_rule_versions')
+            ->whereNotNull('published_at')
+            ->orderByDesc('version')
+            ->value('config');
+
+        return is_string($config) ? RuleConfig::fromArray((array) json_decode($config, true, flags: JSON_THROW_ON_ERROR)) : null;
     }
 
     /** @return array<string, true> */

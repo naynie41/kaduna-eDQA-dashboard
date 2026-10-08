@@ -45,10 +45,13 @@ final readonly class ParsedSubmission
         public ?array $rawNumericScores,
     ) {}
 
-    /** The local calendar day the visit started, or null when the start did not parse. */
-    public function visitDate(): ?CarbonImmutable
+    /**
+     * The local calendar day of the visit: when it started, or when it was submitted if the
+     * start did not parse (COLUMN_DRIFT reports that separately).
+     */
+    public function visitDate(): CarbonImmutable
     {
-        return $this->startedAt?->setTimezone((string) config('app.timezone'))->startOfDay();
+        return ($this->startedAt ?? $this->submittedAt)->setTimezone((string) config('app.timezone'))->startOfDay();
     }
 
     /** @param  array<string, mixed>  $data  as produced by toArray() */
