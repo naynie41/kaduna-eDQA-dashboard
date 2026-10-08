@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Versioned scoring config: { bands, item_weights, na_policy, choice_map }. Draft until
  * published_at; the current version is the highest published one (ARCHITECTURE.md §7).
+ *
+ * @property array<string, mixed> $config
  */
 #[UseFactory(ScoringRuleVersionFactory::class)]
 final class ScoringRuleVersion extends Model
