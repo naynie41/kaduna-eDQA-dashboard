@@ -322,8 +322,11 @@ END $$;
 REVOKE ALL ON FUNCTION refresh_round_aggregates() FROM PUBLIC;  -- EXECUTE is granted to edqa_app only
 ```
 
-The view's definition and its assumptions (A1–A6, to confirm against a real round in Phase 3)
-are in `database/sql/round_aggregates.sql`.
+The view's definition and its assumptions (A1–A6) are in `database/sql/round_aggregates_v3.sql`
+(v1 `round_aggregates.sql`, v2 per-round versions D-32, v3 accepted/flagged assessments only;
+each migration's `down()` restores the previous file). **The aggregators are the specification:**
+`RoundAggregatesReconciliationTest` checks every view row against them to 1e-9 on seeded random
+datasets (D-33).
 
 The app calls `SELECT refresh_round_aggregates()` — never the raw statement. Migrations run in
 the one-off `migrate` container, which receives `DB_USERNAME=edqa_migrator`; the app containers
@@ -331,11 +334,18 @@ connect as `edqa_app`. After migrating, the same container executes
 `database/sql/post-migrate-grants.sql`. All of this is part of the contract with the DevOps
 project (`DEPLOY.md` §1.3, §8).
 
-Refresh with `SELECT refresh_round_aggregates();` on `AssessmentScored`
-(debounced via a unique queued job), `RoundClosed`, and after rescore.
+Refresh with `SELECT refresh_round_aggregates();` through `RefreshRoundAggregatesJob`
+(`ShouldBeUniqueUntilProcessing`, unique per round for 60 s, delayed 60 s, then flushes the round
+cache): dispatched by `RefreshAggregatesAfterScore` on `AssessmentScored`, by a round's status
+changing to closed, and (when it exists) by `RescoreRoundJob`.
 
-Filters not covered by the view (e.g. LGA + Level + Owner combined) are answered by Aggregator
-SQL over `assessment_scores` with the indexes above; keep the p95 under 1.5 s and cache by round tag.
+Aggregators read the view when the answer is one round and the filter maps onto a view row
+(scope state or the filtered LGA, owner type, level) and the view is populated and enabled
+(`edqa.aggregation.read_view`): Dimension, OwnerSplit, LgaTable, WeakestLgas, Coverage, and
+QuarterTrend (one row per round). Everything else (several rounds, state summary counts, month
+slots per dimension, facility lists, assessment window) is Aggregator SQL over
+`assessment_scores` with the indexes above; keep the p95 under 1.5 s and cache by round tag.
+`ViewPathTest` proves both paths return identical results.
 
 ### Laravel specifics
 
@@ -856,6 +866,7 @@ blocks use Inertia deferred props; charts are `React.lazy`; fonts self-hosted wi
 | D-30 | The Postgres session runs in the app time zone (`config/database.php` `timezone` = `APP_TIMEZONE`, Africa/Lagos), and `ProcessParsedSubmission` converts ODK's times to that zone before writing | Bug found in Phase 2A step 6: Laravel writes timestamps without an offset, and the session was UTC, so every stored time (every `now()`, every visit) was an hour off and a 23:30 visit landed on the next local day. Residual risk: any other code that writes a Carbon in a different zone through Eloquent or the query builder must convert it first. Dev data written before this fix is off by an hour: `make fresh` |
 | D-31 | Quarantine resolution: a rejected record is `status = resolved, resolution = rejected` (the schema's CHECK has no `rejected` status); soft flags are overridden on the assessment (`POST /api/assessments/{id}/flags/{code}/override`), not through `/api/quarantine/{id}/resolve`, which takes `correct` or `reject`; bulk resolution needs every record to have the same set of hard-failure codes; corrections are snake_case keys of the parsed snapshot (`lga_ref`, `ward_ref`, `facility_ref`, `raw_start`, `raw_end`, `round_year`, `round_quarter`) and a corrected start or end is re-parsed. Each action writes one explicit audit entry (event, old, new, reason) and suppresses the model's own | Phase 2A step 8. A quarantined record never has soft flags to override: flags live on accepted assessments |
 | D-32 | **Rule versions are pinned to rounds.** An open round uses the current published version; closing a round pins the version it was scored with (`rounds.rule_version_id`, CHECK `rounds_closed_has_rule_version`); a closed round is never rescored unless it is reopened (with a reason); `RuleVersionPublished` therefore asks for a rescore of **open** rounds only. Every read or write of a score goes through `RuleVersionForRound` (or, in SQL, the per-round version in `round_aggregates_v2.sql` and the SCORE_JUMP prior query), never "the highest published version" directly. One draft at a time (`scoring_rule_versions_one_draft`) | Owner decision, Phase 3 step 1 (requested as "D-18", which was already taken). Supersedes §7's "the dashboard reads the current version by default" for closed rounds. Without the per-round read, publishing v2 would drop every closed round out of the aggregates and blind SCORE_JUMP. Until `RescoreRoundJob` exists, a publish leaves open rounds with no scores under the new version |
+| D-33 | **`round_aggregates` is a cache of the aggregators, reconciled to 1e-9.** v3 counts accepted/flagged assessments only (v2 counted every status, so a withdrawn visit inflated `facility_count`). Aggregators read the view for one round when the filter maps onto a view row, and their own SQL otherwise. The view is refreshed by a debounced `RefreshRoundAggregatesJob` (unique per round, 60 s), so a dashboard answer can lag a new score by up to about a minute, then the round cache flushes. `edqa.aggregation.read_view=false` turns the view path off. In tests the job is faked globally (`tests/Pest.php`), because on the sync queue it would rebuild the view on every score | Phase 3 step 4. The aggregators are the specification; the view is an optimisation that must agree with them |
 
 Add new decisions here with the next ID. Any new Composer/npm package needs a line.
 

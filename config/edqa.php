@@ -16,6 +16,11 @@ return [
         // ARCHITECTURE.md §7, D-04: 'unweighted' = every facility counts once in a mean, up to
         // LGA, owner and state. 'facility_count' has no agreed meaning yet (Q-27) and is refused.
         'weighting' => 'unweighted',
+
+        // Read round_aggregates when a filter maps onto its rows (one round, a scope, an owner
+        // type, a level), else compute with SQL. The view is reconciled with that SQL to 1e-9
+        // (RoundAggregatesReconciliationTest) and is ignored until first populated.
+        'read_view' => true,
     ],
 
     'presentation' => [

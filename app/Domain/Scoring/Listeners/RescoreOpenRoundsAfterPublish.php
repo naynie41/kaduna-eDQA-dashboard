@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Log;
  * PLACEHOLDER: publishing rescores every OPEN round under the new version; closed rounds keep
  * their pinned one (D-32). Until RescoreRoundJob exists the request is logged, so none is lost
  * silently. Until then an open round has no scores under the new version, and its aggregates are
- * empty: do not publish a new version in production before the rescore job lands.
+ * empty: do not publish a new version in production before the rescore job lands. When it does,
+ * it dispatches RefreshRoundAggregatesJob::debounced() for each round it rescored.
  */
 final class RescoreOpenRoundsAfterPublish
 {

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domain\Reporting\Jobs\RefreshRoundAggregatesJob;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,17 @@ it('can refresh the aggregates through the function and read the view', function
     appRole()->select('select refresh_round_aggregates()');
 
     expect(appRole()->table('round_aggregates')->count())->toBeInt();
+});
+
+it('runs the debounced refresh job as the runtime role', function (): void {
+    // The job uses the default connection, as it does in the worker container (edqa_app).
+    config(['database.default' => 'pgsql_app_test']);
+    DB::purge('pgsql_app_test');
+
+    app()->call([new RefreshRoundAggregatesJob(1), 'handle']);
+
+    expect(DB::selectOne('select current_user as role')?->role)->toBe('edqa_app')
+        ->and(DB::selectOne("select ispopulated from pg_matviews where matviewname = 'round_aggregates'")?->ispopulated)->toBeTrue();
 });
 
 it('cannot refresh the view directly: only through the SECURITY DEFINER function', function (): void {

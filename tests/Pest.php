@@ -6,6 +6,7 @@ use App\Domain\Ingestion\Actions\ProcessParsedBatch;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Reporting\Jobs\RefreshRoundAggregatesJob;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\DTOs\RuleFailure;
 use App\Domain\Validation\Models\QuarantinedRecord;
@@ -14,13 +15,17 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
 // Feature tests boot the app and run against the edqa_test Postgres database (never SQLite).
+// On the sync test queue the debounced view refresh would rebuild round_aggregates on every scored
+// assessment, so it is faked here (only that job); RefreshRoundAggregatesJobTest drives it itself.
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(fn () => Queue::fake([RefreshRoundAggregatesJob::class]))
     ->in('Feature');
 
 // Unit tests that need translations or config boot the app, without a database.
