@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * hard rule 8); status and timestamps move through the lifecycle. Not audited: raw input.
  *
  * @property array<string, mixed> $payload
+ * @property SubmissionStatus $status
  */
 #[UseFactory(SubmissionFactory::class)]
 final class Submission extends Model

@@ -7,6 +7,7 @@ namespace App\Domain\Round\Models;
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Plan\Models\PlanAction;
 use App\Domain\Round\Enums\RoundStatus;
+use App\Domain\Scoring\Models\ScoringRuleVersion;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use App\Support\Audit\Audited;
 use Carbon\CarbonImmutable;
@@ -14,6 +15,7 @@ use Database\Factories\RoundFactory;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -21,6 +23,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * @property CarbonImmutable $window_start
  * @property CarbonImmutable $window_end
+ * @property RoundStatus $status
+ * @property int|null $rule_version_id
  */
 #[UseFactory(RoundFactory::class)]
 final class Round extends Model
@@ -32,6 +36,7 @@ final class Round extends Model
 
     protected $fillable = [
         'year', 'quarter', 'window_start', 'window_end', 'status', 'closed_at', 'reopened_reason',
+        'rule_version_id',
     ];
 
     /** Mirrors the column default, so a new model matches its stored row. */
@@ -47,9 +52,21 @@ final class Round extends Model
             'window_end' => 'immutable_date',
             'status' => RoundStatus::class,
             'closed_at' => 'immutable_datetime',
+            'rule_version_id' => 'integer',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
+    }
+
+    /**
+     * The version a closed round is pinned to (D-32); null while open. Read scores through
+     * RuleVersionForRound, which handles both.
+     *
+     * @return BelongsTo<ScoringRuleVersion, $this>
+     */
+    public function ruleVersion(): BelongsTo
+    {
+        return $this->belongsTo(ScoringRuleVersion::class, 'rule_version_id');
     }
 
     /** @return HasMany<Assessment, $this> */
@@ -72,6 +89,6 @@ final class Round extends Model
 
     protected function auditedAttributes(): array
     {
-        return ['year', 'quarter', 'window_start', 'window_end', 'status', 'closed_at', 'reopened_reason'];
+        return ['year', 'quarter', 'window_start', 'window_end', 'status', 'closed_at', 'reopened_reason', 'rule_version_id'];
     }
 }

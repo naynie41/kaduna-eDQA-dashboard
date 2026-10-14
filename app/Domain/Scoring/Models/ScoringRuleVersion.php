@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domain\Scoring\Models;
 
 use App\Domain\Assessment\Models\AssessmentScore;
+use App\Domain\Scoring\CurrentRuleVersion;
 use App\Models\User;
 use App\Support\Audit\Audited;
+use Carbon\CarbonImmutable;
 use Database\Factories\ScoringRuleVersionFactory;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +20,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Versioned scoring config: { bands, item_weights, na_policy, choice_map }. Draft until
  * published_at; the current version is the highest published one (ARCHITECTURE.md §7).
  *
+ * @property int $version
  * @property array<string, mixed> $config
+ * @property CarbonImmutable|null $published_at
  */
 #[UseFactory(ScoringRuleVersionFactory::class)]
 final class ScoringRuleVersion extends Model
@@ -29,6 +33,13 @@ final class ScoringRuleVersion extends Model
     use HasFactory;
 
     protected $fillable = ['version', 'config', 'created_by', 'published_at', 'published_reason'];
+
+    /** Any write may change which version is current: drop the cached answer. */
+    protected static function booted(): void
+    {
+        self::saved(fn () => CurrentRuleVersion::forget());
+        self::deleted(fn () => CurrentRuleVersion::forget());
+    }
 
     /** @return array<string, string> */
     protected function casts(): array

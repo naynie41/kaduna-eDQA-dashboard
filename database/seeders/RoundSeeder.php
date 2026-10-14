@@ -28,6 +28,7 @@ final class RoundSeeder extends Seeder
     {
         $now = now();
         $rows = [];
+        $pinned = DB::table('scoring_rule_versions')->whereNotNull('published_at')->orderByDesc('version')->value('id');
 
         foreach (self::ROUNDS as [$year, $quarter, $status]) {
             $start = CarbonImmutable::create($year, 3 * $quarter - 2, 1);
@@ -41,11 +42,13 @@ final class RoundSeeder extends Seeder
                 'status' => $status,
                 // Closed about three weeks after the window, once late submissions were in.
                 'closed_at' => $status === 'closed' ? $end->addDays(21)->setTime(17, 0) : null,
+                // A closed round pins the version it was scored with (D-32): rule version 1.
+                'rule_version_id' => $status === 'closed' ? $pinned : null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
         }
 
-        DB::table('rounds')->upsert($rows, ['year', 'quarter'], ['window_start', 'window_end', 'status', 'closed_at', 'updated_at']);
+        DB::table('rounds')->upsert($rows, ['year', 'quarter'], ['window_start', 'window_end', 'status', 'closed_at', 'rule_version_id', 'updated_at']);
     }
 }

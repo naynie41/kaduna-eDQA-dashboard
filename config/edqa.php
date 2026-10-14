@@ -12,6 +12,13 @@ return [
         'require_two_factor' => EnvFlag::enabledUnlessFalse(env('EDQA_REQUIRE_2FA')),
     ],
 
+    'presentation' => [
+        // Q-09: how a score is rounded for display, and therefore which band it shows (Q-26):
+        // 'half_up' (default) or 'truncate'. The live tool shows the private overall 73.67 as
+        // 73, which only truncation gives. App\Domain\Scoring\Presentation reads this.
+        'rounding' => 'half_up',
+    ],
+
     'validation' => [
         // ARCHITECTURE.md §6, in catalogue order: the pipeline runs them in this order and
         // UNKNOWN_FORM_VERSION must come first. Strings, not ::class: the rule classes arrive

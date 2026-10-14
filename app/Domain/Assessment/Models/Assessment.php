@@ -20,6 +20,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * hard rule. An ODK edit updates it in place (audited).
  *
  * status has no enum yet: its values are an open question.
+ *
+ * @property string $status accepted | flagged (Q-18)
+ * @property list<string> $flags soft-rule codes and SLOT_ALL_NA notes
  */
 #[UseFactory(AssessmentFactory::class)]
 final class Assessment extends Model

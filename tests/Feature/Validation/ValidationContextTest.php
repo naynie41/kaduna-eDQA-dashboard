@@ -161,13 +161,17 @@ it('holds the highest published rule version, ignoring drafts', function (): voi
         'na_policy' => 'exclude', 'choice_map' => ['yes' => 'pass'],
     ]]);
 
-    expect(contextFor([])->ruleConfig()?->bands['strong'])->toBe(95.0);
+    $context = contextFor([]);
+
+    expect($context->ruleConfig()?->bands['strong'])->toBe(95.0)
+        ->and($context->ruleVersionId())->toBe(ScoringRuleVersion::query()->whereNotNull('published_at')->max('id'));
 });
 
 it('holds no rule config when nothing is published', function (): void {
     ScoringRuleVersion::factory()->create();
 
-    expect(contextFor([])->ruleConfig())->toBeNull();
+    expect(contextFor([])->ruleConfig())->toBeNull()
+        ->and(contextFor([])->ruleVersionId())->toBeNull();
 });
 
 it('counts a visit on the last day of the window, in local time', function (): void {
@@ -228,6 +232,19 @@ it('refuses to register a submission it cannot place in a round and facility', f
 });
 
 // ---- Prior scores (SCORE_JUMP)
+
+it('reads an earlier closed round under its pinned version, after a newer one is published (D-32)', function (): void {
+    ScoringRuleVersion::factory()->published()->create();
+    $facility = Facility::factory()->create();
+    $q1 = Round::factory()->closed()->create(['year' => 2026, 'quarter' => 1]);
+    Assessment::factory()->forRound($q1)->withScores(['availability' => 60, 'consistency' => 60, 'validity' => 60])->create(['facility_id' => $facility->id]);
+    ScoringRuleVersion::factory()->published()->create(); // v2: Q1 is never rescored under it
+    $q2 = Round::factory()->create(['year' => 2026, 'quarter' => 2]);
+
+    $context = contextFor([ParsedSubmissionBuilder::new()->forFacility($facility)->inRound($q2)->build()]);
+
+    expect($context->priorOverallScore($facility->id, $context->round(2026, 2)))->toEqualWithDelta(60.0, 0.0001);
+});
 
 it("gives a facility's overall score from its latest earlier round", function (): void {
     ScoringRuleVersion::factory()->published()->create();

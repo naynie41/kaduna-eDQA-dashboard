@@ -104,6 +104,14 @@ return [
             'processors' => [PsrLogMessageProcessor::class],
         ],
 
+        // CONVENTION.md §2.9: ingestion and validation. Structured context only, never payloads
+        // or credentials. Containers log to stderr (CLAUDE.md hard rule 13).
+        'edqa' => [
+            'driver' => 'stack',
+            'channels' => ['stderr'],
+            'ignore_exceptions' => false,
+        ],
+
         'stderr' => [
             'driver' => 'monolog',
             'level' => env('LOG_LEVEL', 'debug'),

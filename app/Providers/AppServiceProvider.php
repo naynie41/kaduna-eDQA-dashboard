@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Scoring\Events\RuleVersionPublished;
+use App\Domain\Scoring\Listeners\RescoreOpenRoundsAfterPublish;
+use App\Domain\Validation\Events\QuarantineResolved;
+use App\Domain\Validation\Listeners\RescoreAfterQuarantineResolved;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -28,6 +33,10 @@ final class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        // Domain listeners live outside app/Listeners, so they are registered here.
+        Event::listen(QuarantineResolved::class, RescoreAfterQuarantineResolved::class);
+        Event::listen(RuleVersionPublished::class, RescoreOpenRoundsAfterPublish::class);
     }
 
     /**

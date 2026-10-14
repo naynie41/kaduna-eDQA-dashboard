@@ -7,6 +7,54 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-13
+
+Phase 2A (Validation): the validation gate, step 6 of `CLAUDE.md` §6, plus the pure core of the
+score calculator. Every submission is validated before it can influence a number; failures are
+quarantined and can be corrected, rejected or superseded. Submissions still arrive from tests:
+the ODK client and parser (Phase 2B) wait for credentials.
+
+### Added
+
+- The 14 validation rules, one class each: 10 hard (`UNKNOWN_FORM_VERSION`, `COLUMN_DRIFT`,
+  `LGA_UNKNOWN`, `FACILITY_UNKNOWN`, `FACILITY_LGA_MISMATCH`, `ITEMS_INCOMPLETE`, `SCORE_RANGE`,
+  `END_BEFORE_START`, `ROUND_WINDOW`, `DUPLICATE_ASSESSMENT`) and 4 soft (`SCORE_JUMP`,
+  `ALL_PERFECT`, `VISIT_TOO_SHORT`, `ASSESSOR_VOLUME`), with soft thresholds in config and every
+  detail message in `lang/en/validation_rules.php`.
+- `ValidationPipeline`: runs every rule and collects every failure, skips field-reading rules
+  for an unknown form version, and turns a rule that throws into a hard `RULE_ERROR`.
+- `ValidationContext`: everything the rules need, loaded in 7 queries per batch whatever its
+  size, and tracking the batch so in-batch duplicates and assessor volume are caught.
+- `ProcessParsedSubmission` and `ProcessParsedBatch`: a hard failure becomes a quarantined record;
+  otherwise an assessment, item responses and nine scores, with soft flags. ODK edits update the
+  assessment in place and supersede the original.
+- Pure `ScoreCalculator` with `RuleConfig` and `ScoreCard`: N/A excluded, item weights, full
+  precision, and a 1,000-set property test keeping every score within 0–100.
+- Quarantine resolution: correct and reprocess (whitelisted fields only, through a correction
+  overlay), reject, override a soft flag, bulk resolve, and automatic supersede, each needing a
+  reason of 10+ characters and writing one audit entry. `QuarantineResolved` event with a
+  placeholder rescore listener.
+- API: `GET /api/quarantine` (flat or grouped by rule), `POST /api/quarantine/{id}/resolve`,
+  `POST /api/quarantine/bulk-resolve`, `POST /api/assessments/{id}/flags/{code}/override`.
+  Domain refusals return 409 `{ code, message }`.
+- `quarantined_records.parsed` and `.corrections` columns.
+- Broken-submission fixtures: one per rule and live-report defect, each quarantining or flagging
+  with exactly its expected codes.
+- `edqa` log channel; architecture test allowing only ingestion, validation and the Data issues
+  endpoints to touch quarantine or raw submissions.
+
+### Changed
+
+- A visit's round is decided by its date (start, else submission time); a disagreeing round in
+  the form quarantines (D-28).
+- An assessor is a name plus device ID when present (D-29).
+
+### Fixed
+
+- Every stored timestamp was an hour off: the database session ran in UTC while Laravel writes
+  times without an offset. The session now runs in the app time zone and ODK times are converted
+  before writing (D-30). Local data written before this needs `make fresh`.
+
 ## [0.1.0] - 2026-10-04
 
 Phase 1 (Foundation): build steps 1–5 of `CLAUDE.md` §6. No ODK ingestion, validation, scoring
@@ -63,5 +111,6 @@ or dashboard pages yet.
 - The session cookie is `Secure` unless `SESSION_SECURE_COOKIE=false`, which is meant for local
   HTTP development only.
 
-[Unreleased]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/releases/tag/v0.1.0

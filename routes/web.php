@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Auth\TwoFactorSetupController;
 use App\Http\Controllers\OdkWebhookController;
+use App\Http\Controllers\Quarantine\BulkResolveQuarantineController;
+use App\Http\Controllers\Quarantine\OverrideSoftFlagController;
+use App\Http\Controllers\Quarantine\QuarantineIndexController;
+use App\Http\Controllers\Quarantine\ResolveQuarantineController;
+use App\Http\Controllers\Scoring\ScoringRuleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -31,4 +36,19 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
     Route::inertia('/', 'dashboard')->name('home');
 
     require __DIR__.'/settings.php';
+
+    // JSON for admin interactivity (ARCHITECTURE.md §8): same session, same guard. 120/min per
+    // user (SECURITY.md §8).
+    Route::prefix('api')->name('api.')->middleware('throttle:120,1')->group(function (): void {
+        Route::get('quarantine', QuarantineIndexController::class)->name('quarantine.index');
+        Route::post('quarantine/bulk-resolve', BulkResolveQuarantineController::class)->name('quarantine.bulk-resolve');
+        Route::post('quarantine/{record}/resolve', ResolveQuarantineController::class)->whereNumber('record')->name('quarantine.resolve');
+        Route::post('assessments/{assessment}/flags/{code}/override', OverrideSoftFlagController::class)
+            ->whereNumber('assessment')->name('assessments.flags.override');
+
+        Route::get('scoring-rules', [ScoringRuleController::class, 'index'])->name('scoring-rules.index');
+        Route::post('scoring-rules', [ScoringRuleController::class, 'store'])->name('scoring-rules.store');
+        Route::post('scoring-rules/{version}/preview', [ScoringRuleController::class, 'preview'])->whereNumber('version')->name('scoring-rules.preview');
+        Route::post('scoring-rules/{version}/publish', [ScoringRuleController::class, 'publish'])->whereNumber('version')->name('scoring-rules.publish');
+    });
 });

@@ -17,6 +17,9 @@ $pgsql = [
     'prefix_indexes' => true,
     'search_path' => 'public',
     'sslmode' => env('DB_SSLMODE', 'prefer'),
+    // Laravel writes timestamps without an offset, so the session must run in the app's time
+    // zone (config/app.php), or every timestamptz is stored an hour off (D-30).
+    'timezone' => env('APP_TIMEZONE', 'Africa/Lagos'),
 ];
 
 return [

@@ -58,6 +58,15 @@ it('fails a start or end that is not an ISO date, naming each', function (string
     'both' => ['null', '14/04/2026', "start 'null', end '14/04/2026'"],
 ]);
 
+it('fails a start or end the parser could not read, even when the raw text looks like a date', function (string $missing): void {
+    $builder = ParsedSubmissionBuilder::new();
+    $missing === 'start' ? $builder->withStartedAt(null) : $builder->withEndedAt(null);
+    $submission = $builder->build();
+    $raw = $missing === 'start' ? $submission->rawStart : $submission->rawEnd;
+
+    expect(checkRule(ColumnDriftRule::class, $submission)[0]->detail ?? null)->toBe("{$missing} '{$raw}'");
+})->with(['start', 'end']);
+
 it('accepts any ISO 8601 form ODK may send', function (string $start): void {
     expect(checkRule(ColumnDriftRule::class, ParsedSubmissionBuilder::new()->withRawStart($start)->build()))->toBe([]);
 })->with(['2026-04-14T08:00:00Z', '2026-04-14T09:00+01:00', '2026-04-14']);

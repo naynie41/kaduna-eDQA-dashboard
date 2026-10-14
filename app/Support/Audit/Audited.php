@@ -39,12 +39,6 @@ trait Audited
      */
     public function tapActivity(Activity $activity, string $eventName): void
     {
-        $request = request();
-
-        $context = app()->runningInConsole() && $request->route() === null
-            ? ['source' => 'console']
-            : ['ip' => $request->ip(), 'user_agent' => $request->userAgent()];
-
-        $activity->properties = ($activity->properties ?? collect())->merge($context);
+        $activity->properties = ($activity->properties ?? collect())->merge(AuditLog::requestContext());
     }
 }

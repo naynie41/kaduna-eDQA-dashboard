@@ -149,3 +149,35 @@ it('does not let every role execute the SECURITY DEFINER function', function ():
         // An entry for PUBLIC starts with "=" (e.g. "=X/owner").
         ->and($function->acl)->not->toContain('{=X')->not->toContain(',=X');
 });
+
+// D-32: a closed round reads its pinned version; an open round reads the current one.
+it('keeps a closed round on its pinned version after a newer version is published', function (): void {
+    $v1 = Rows::ruleVersion(['version' => 1, 'published_at' => now()->subYear()]);
+    $closed = Rows::round(['status' => 'closed', 'rule_version_id' => $v1]);
+    $open = Rows::round();
+    scoreAssessment(Rows::assessment(['round_id' => $closed]), $v1, [
+        'availability' => [80, 80, 80], 'consistency' => [80, 80, 80], 'validity' => [80, 80, 80],
+    ]);
+    $v2 = Rows::ruleVersion(['version' => 2, 'published_at' => now()]);
+    scoreAssessment(Rows::assessment(['round_id' => $open]), $v2, [
+        'availability' => [60, 60, 60], 'consistency' => [60, 60, 60], 'validity' => [60, 60, 60],
+    ]);
+
+    DB::select('select refresh_round_aggregates()');
+
+    expect(aggregateRow($closed, 'state', 0))->toMatchArray(['overall' => 80.0, 'facility_count' => 1])
+        ->and(aggregateRow($open, 'state', 0))->toMatchArray(['overall' => 60.0, 'facility_count' => 1]);
+});
+
+it('ignores scores a closed round has under any version but its pinned one', function (): void {
+    $v1 = Rows::ruleVersion(['version' => 1, 'published_at' => now()->subYear()]);
+    $v2 = Rows::ruleVersion(['version' => 2, 'published_at' => now()]);
+    $closed = Rows::round(['status' => 'closed', 'rule_version_id' => $v1]);
+    $assessment = Rows::assessment(['round_id' => $closed]);
+    scoreAssessment($assessment, $v1, ['availability' => [70, 70, 70], 'consistency' => [70, 70, 70], 'validity' => [70, 70, 70]]);
+    scoreAssessment($assessment, $v2, ['availability' => [99, 99, 99], 'consistency' => [99, 99, 99], 'validity' => [99, 99, 99]]);
+
+    DB::select('select refresh_round_aggregates()');
+
+    expect(aggregateRow($closed, 'state', 0))->toMatchArray(['overall' => 70.0]);
+});

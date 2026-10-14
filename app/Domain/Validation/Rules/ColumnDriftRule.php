@@ -57,10 +57,12 @@ final class ColumnDriftRule implements ValidationRule
         if (Normalise::nullIfBlank($ward) !== null && (isset($this->reserved[Normalise::name((string) $ward)]) || Normalise::isNumeric((string) $ward))) {
             $shifted['ward'] = (string) $ward;
         }
-        if (! Normalise::isIsoDate($submission->rawStart)) {
+        // A raw value that looks like a date but did not parse is drift too: an accepted
+        // assessment needs both times.
+        if (! Normalise::isIsoDate($submission->rawStart) || $submission->startedAt === null) {
             $shifted['start'] = $submission->rawStart;
         }
-        if (! Normalise::isIsoDate($submission->rawEnd)) {
+        if (! Normalise::isIsoDate($submission->rawEnd) || $submission->endedAt === null) {
             $shifted['end'] = $submission->rawEnd;
         }
 

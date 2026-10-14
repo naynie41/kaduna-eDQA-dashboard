@@ -10,6 +10,7 @@ use App\Domain\Validation\Enums\QuarantineResolution;
 use App\Domain\Validation\Enums\QuarantineStatus;
 use App\Models\User;
 use App\Support\Audit\Audited;
+use Carbon\CarbonImmutable;
 use Database\Factories\QuarantinedRecordFactory;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,9 +18,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A submission that failed at least one hard rule, with every failure
- * ([{code, severity, detail}]). Reporting never reads this (CLAUDE.md hard rule 6).
- * The audit trail records its resolution, not the payload.
+ * A submission that failed at least one hard rule, with every failure, hard and soft
+ * ([{code, severity, detail, field}]), the parsed snapshot and any correction overlay.
+ * Reporting never reads this (CLAUDE.md hard rule 6). The audit trail records corrections and
+ * resolution, not the payload.
+ *
+ * @property int|null $round_id
+ * @property array<string, mixed> $payload
+ * @property list<array<string, mixed>> $failures
+ * @property array<string, mixed>|null $parsed
+ * @property array<string, mixed> $corrections
+ * @property QuarantineStatus $status
+ * @property QuarantineResolution|null $resolution
+ * @property CarbonImmutable|null $resolved_at
+ * @property CarbonImmutable|null $created_at
  */
 #[UseFactory(QuarantinedRecordFactory::class)]
 final class QuarantinedRecord extends Model
@@ -31,11 +43,11 @@ final class QuarantinedRecord extends Model
 
     protected $fillable = [
         'submission_id', 'instance_id', 'round_id', 'facility_ref', 'lga_ref', 'payload', 'failures',
-        'status', 'resolution', 'resolved_by', 'resolved_at', 'resolution_note',
+        'parsed', 'corrections', 'status', 'resolution', 'resolved_by', 'resolved_at', 'resolution_note',
     ];
 
-    /** Mirrors the column default, so a new model matches its stored row. */
-    protected $attributes = ['status' => 'open'];
+    /** Mirrors the column defaults, so a new model matches its stored row. */
+    protected $attributes = ['status' => 'open', 'corrections' => '{}'];
 
     /** @return array<string, string> */
     protected function casts(): array
@@ -43,6 +55,8 @@ final class QuarantinedRecord extends Model
         return [
             'payload' => 'array',
             'failures' => 'array',
+            'parsed' => 'array',
+            'corrections' => 'array',
             'status' => QuarantineStatus::class,
             'resolution' => QuarantineResolution::class,
             'resolved_at' => 'immutable_datetime',
@@ -71,6 +85,6 @@ final class QuarantinedRecord extends Model
 
     protected function auditedAttributes(): array
     {
-        return ['status', 'resolution', 'resolved_by', 'resolved_at', 'resolution_note'];
+        return ['corrections', 'status', 'resolution', 'resolved_by', 'resolved_at', 'resolution_note'];
     }
 }

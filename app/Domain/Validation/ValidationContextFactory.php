@@ -29,6 +29,7 @@ final class ValidationContextFactory
         $facilities = $this->facilities($submissions);
         $facilityIds = array_values(array_map(fn (FacilitySnapshot $f): int => $f->id, $facilities));
         $rounds = $this->rounds();
+        [$ruleVersionId, $ruleConfig] = $this->ruleVersion();
 
         return new ValidationContext(
             lgas: $this->lgas(),
@@ -38,7 +39,8 @@ final class ValidationContextFactory
             priorScores: $this->priorScores($facilityIds, $rounds),
             assessorDays: $this->assessorDays($submissions),
             knownFormVersions: $this->knownFormVersions(),
-            ruleConfig: $this->ruleConfig(),
+            ruleConfig: $ruleConfig,
+            ruleVersionId: $ruleVersionId,
         );
     }
 
@@ -92,6 +94,7 @@ final class ValidationContextFactory
                 RoundStatus::from((string) $row->status),
                 CarbonImmutable::parse((string) $row->window_start, (string) config('app.timezone')),
                 CarbonImmutable::parse((string) $row->window_end, (string) config('app.timezone')),
+                $row->rule_version_id === null ? null : (int) $row->rule_version_id,
             );
         }
 
@@ -121,8 +124,8 @@ final class ValidationContextFactory
     }
 
     /**
-     * Overall score per facility per round under the highest published rule version, computed
-     * as round_aggregates does: dimension = mean of its non-null month slots, overall = mean of
+     * Overall score per facility per round, each round under its own rule version (D-32: pinned
+     * if closed, current if open), computed as round_aggregates does: dimension = mean of its non-null month slots, overall = mean of
      * the three dimensions (null if any dimension is all-N/A, and then skipped).
      *
      * @param  list<int>  $facilityIds
@@ -138,11 +141,17 @@ final class ValidationContextFactory
                 ORDER BY version DESC
                 LIMIT 1
             ),
+            -- D-32: each round under its own version: pinned if closed, current if open.
+            round_rule_version AS (
+                SELECT r.id AS round_id,
+                    CASE WHEN r.status = 'closed' THEN r.rule_version_id ELSE (SELECT id FROM current_rule_version) END AS rule_version_id
+                FROM rounds r
+            ),
             dimension_scores AS (
                 SELECT a.facility_id, a.round_id, s.dimension, avg(s.score) AS score
                 FROM assessments a
                 JOIN assessment_scores s ON s.assessment_id = a.id
-                JOIN current_rule_version v ON v.id = s.rule_version_id
+                JOIN round_rule_version rv ON rv.round_id = a.round_id AND rv.rule_version_id = s.rule_version_id
                 WHERE a.facility_id = ANY(?::bigint[])
                 GROUP BY a.facility_id, a.round_id, s.dimension
             )
@@ -203,17 +212,24 @@ final class ValidationContextFactory
     }
 
     /**
-     * The highest published version, as round_aggregates picks it. A published config the
-     * calculator cannot apply throws here: that is a setup error, not a submission's fault.
+     * The highest published version's ID and config, as round_aggregates picks it. A published
+     * config the calculator cannot apply throws here: that is a setup error, not a submission's
+     * fault.
+     *
+     * @return array{0: ?int, 1: ?RuleConfig}
      */
-    private function ruleConfig(): ?RuleConfig
+    private function ruleVersion(): array
     {
-        $config = DB::table('scoring_rule_versions')
+        $row = DB::table('scoring_rule_versions')
             ->whereNotNull('published_at')
             ->orderByDesc('version')
-            ->value('config');
+            ->first(['id', 'config']);
 
-        return is_string($config) ? RuleConfig::fromArray((array) json_decode($config, true, flags: JSON_THROW_ON_ERROR)) : null;
+        if ($row === null) {
+            return [null, null];
+        }
+
+        return [(int) $row->id, RuleConfig::fromArray((array) json_decode((string) $row->config, true, flags: JSON_THROW_ON_ERROR))];
     }
 
     /** @return array<string, true> */

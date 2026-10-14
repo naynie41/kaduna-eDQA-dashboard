@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Round\Models\Round;
+use App\Domain\Scoring\Models\ScoringRuleVersion;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -32,9 +33,12 @@ final class RoundFactory extends Factory
 
     public function closed(): self
     {
+        // Closing pins the version the round was scored with (D-32): the current published one.
         return $this->state([
             'status' => RoundStatus::Closed,
             'closed_at' => now(),
+            'rule_version_id' => fn (): int => (int) (ScoringRuleVersion::query()->whereNotNull('published_at')->orderByDesc('version')->value('id')
+                ?? ScoringRuleVersion::factory()->published()->create()->id),
         ]);
     }
 

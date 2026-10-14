@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Domain\Ingestion\Actions\ProcessParsedBatch;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Ingestion\Enums\SubmissionStatus;
+use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\DTOs\RuleFailure;
+use App\Domain\Validation\Models\QuarantinedRecord;
 use App\Domain\Validation\ValidationContextFactory;
 use App\Models\User;
 use Illuminate\Database\QueryException;
@@ -67,6 +71,32 @@ function checkRule(string $rule, ParsedSubmission $submission): array
     $context = app(ValidationContextFactory::class)->forBatch([$submission]);
 
     return app($rule)->check($submission, $context);
+}
+
+/**
+ * The raw Submission row for a parsed submission, as the 2B ingestion step will store it.
+ */
+function submissionRow(ParsedSubmission $parsed): Submission
+{
+    return Submission::factory()->create([
+        'instance_id' => $parsed->instanceId,
+        'deprecated_id' => $parsed->deprecatedId,
+        'form_version' => $parsed->formVersion,
+        'payload' => ['__id' => $parsed->instanceId, 'meta' => ['instanceID' => $parsed->instanceId]],
+        'submitted_at' => $parsed->submittedAt,
+        'status' => SubmissionStatus::Parsed,
+    ]);
+}
+
+/**
+ * Runs a parsed submission through the real pipeline and returns its quarantined record.
+ * Needs a published rule version.
+ */
+function quarantineThrough(ParsedSubmission $parsed): QuarantinedRecord
+{
+    app(ProcessParsedBatch::class)->execute([[submissionRow($parsed), $parsed]]);
+
+    return QuarantinedRecord::query()->where('instance_id', $parsed->instanceId)->sole();
 }
 
 /**

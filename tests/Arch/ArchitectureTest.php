@@ -29,6 +29,25 @@ arch('reporting never reads quarantine or raw submissions')
         'App\Domain\Ingestion\Models\Submission',
     ]);
 
+// The same rule from the other side, so it holds before Reporting has a single class: only
+// ingestion, validation, their models' relationships and the Data issues endpoints may touch
+// quarantine or raw submissions. A new reader anywhere else fails here.
+arch('only ingestion, validation and the Data issues endpoints touch quarantine or raw submissions')
+    ->expect([
+        'App\Domain\Validation\Models\QuarantinedRecord',
+        'App\Domain\Ingestion\Models\Submission',
+    ])
+    ->toOnlyBeUsedIn([
+        'App\Domain\Ingestion',
+        'App\Domain\Validation',
+        'App\Domain\Assessment\Models',
+        'App\Domain\Round\Models',
+        'App\Http\Controllers\Quarantine',
+        'App\Http\Resources\Quarantine',
+        'Database\Factories',
+        'Tests',
+    ]);
+
 // CLAUDE.md hard rule 1: ODK is the only data source.
 it('has no CSV import path', function (): void {
     // Arch tests don't boot Laravel, so no app_path() here.

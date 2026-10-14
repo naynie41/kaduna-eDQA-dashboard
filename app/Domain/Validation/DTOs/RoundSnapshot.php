@@ -17,6 +17,7 @@ final readonly class RoundSnapshot
         public RoundStatus $status,
         public CarbonImmutable $windowStart,
         public CarbonImmutable $windowEnd,
+        public ?int $ruleVersionId = null, // pinned once closed (D-32)
     ) {}
 
     public function isOpen(): bool

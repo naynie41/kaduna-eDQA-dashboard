@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domain\Scoring\DTOs\RuleConfig;
+use App\Domain\Scoring\Exceptions\InvalidRuleConfig;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
 use Database\Seeders\ScoringRuleVersionSeeder;
 
@@ -51,4 +52,15 @@ it('refuses a config it cannot score with, rather than guessing', function (arra
     'choice mapped to a non-outcome' => [['choice_map' => ['yes' => 'pass', 'no' => 'maybe']]],
     'weight key without a dimension' => [['item_weights' => ['summary_form' => 2]]],
     'weight for an unknown dimension' => [['item_weights' => ['quality.summary_form' => 2]]],
+    'choice map without an N/A outcome' => [['choice_map' => ['yes' => 'pass', 'no' => 'fail']]],
+    'choice map without a fail outcome' => [['choice_map' => ['yes' => 'pass', 'na' => 'na']]],
+    'bands equal' => [['bands' => ['strong' => 80, 'acceptable' => 80, 'review' => 70]]],
+    'negative band' => [['bands' => ['strong' => 90, 'acceptable' => 80, 'review' => -1]]],
 ]);
+
+it('refuses a bad config with a domain exception naming the problem', function (): void {
+    expect(fn () => RuleConfig::fromArray([
+        'bands' => ['strong' => 80, 'acceptable' => 90, 'review' => 70],
+        'item_weights' => [], 'na_policy' => 'exclude', 'choice_map' => ['yes' => 'pass', 'no' => 'fail', 'na' => 'na'],
+    ]))->toThrow(InvalidRuleConfig::class, __('scoring.errors.bands_not_descending'));
+});

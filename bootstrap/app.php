@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Domain\Scoring\Exceptions\InvalidRuleConfig;
+use App\Domain\Scoring\Exceptions\RuleVersionRefused;
+use App\Domain\Validation\Exceptions\QuarantineActionRefused;
 use App\Http\Middleware\EnsureTwoFactorConfirmed;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SecurityHeaders;
@@ -34,4 +37,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Domain refusals: 409 { code, message } (ARCHITECTURE.md §8 conventions).
+        $refusal = fn (QuarantineActionRefused|RuleVersionRefused|InvalidRuleConfig $e) => response()->json(
+            ['code' => $e->errorCode, 'message' => $e->getMessage()],
+            409,
+        );
+        $exceptions->render(fn (QuarantineActionRefused $e) => $refusal($e));
+        $exceptions->render(fn (RuleVersionRefused $e) => $refusal($e));
+        $exceptions->render(fn (InvalidRuleConfig $e) => $refusal($e));
     })->create();

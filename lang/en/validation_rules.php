@@ -16,6 +16,14 @@ return [
     // How a round is named in any detail.
     'round_label' => 'Q:quarter :year',
 
+    // Not one of the 14: the pipeline's own failure when a rule throws. Quarantines, so a broken
+    // rule can never let a submission through.
+    'RULE_ERROR' => [
+        'name' => 'Rule could not run',
+        'why' => 'A validation rule failed with an error, so this submission could not be fully checked. It is held back until the rule is fixed and it is reprocessed.',
+        'detail' => 'rule :rule failed to run: :message',
+    ],
+
     'UNKNOWN_FORM_VERSION' => [
         'name' => 'Unknown form version',
         'why' => 'Each version of the ODK form names its questions differently. A version the portal has no field map for would be read with the wrong map, and its scores would be silently wrong, so it is held back until a map is added.',

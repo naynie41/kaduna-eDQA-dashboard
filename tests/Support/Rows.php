@@ -62,8 +62,13 @@ final class Rows
     public static function round(array $overrides = []): int
     {
         $year = 2000 + self::next();
+        // A closed round always has its pinned rule version (rounds_closed_has_rule_version).
+        $pinned = ($overrides['status'] ?? 'open') === 'closed'
+            ? ['rule_version_id' => $overrides['rule_version_id'] ?? self::ruleVersion()]
+            : [];
 
         return DB::table('rounds')->insertGetId([
+            ...$pinned,
             'year' => $year,
             'quarter' => 1,
             'window_start' => "{$year}-01-01",
@@ -110,10 +115,12 @@ final class Rows
     /** @param array<string, mixed> $overrides */
     public static function ruleVersion(array $overrides = []): int
     {
+        // Published by default: only one draft may exist at a time (scoring_rule_versions_one_draft).
         return DB::table('scoring_rule_versions')->insertGetId([
             'version' => self::next(),
             'config' => json_encode(['bands' => ['strong' => 90]]),
             'created_by' => $overrides['created_by'] ?? self::user(),
+            'published_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
             ...$overrides,

@@ -41,6 +41,7 @@ final class ValidationContext
         private array $assessorDays,
         private readonly array $knownFormVersions,
         private readonly ?RuleConfig $ruleConfig,
+        private readonly ?int $ruleVersionId,
     ) {}
 
     /** By code first, then by name, ignoring case, spacing and punctuation. */
@@ -115,6 +116,12 @@ final class ValidationContext
     public function ruleConfig(): ?RuleConfig
     {
         return $this->ruleConfig;
+    }
+
+    /** That version's ID, recorded on every score it produces; null when none is published. */
+    public function ruleVersionId(): ?int
+    {
+        return $this->ruleVersionId;
     }
 
     /**
