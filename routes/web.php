@@ -8,6 +8,7 @@ use App\Http\Controllers\Quarantine\BulkResolveQuarantineController;
 use App\Http\Controllers\Quarantine\OverrideSoftFlagController;
 use App\Http\Controllers\Quarantine\QuarantineIndexController;
 use App\Http\Controllers\Quarantine\ResolveQuarantineController;
+use App\Http\Controllers\Scoring\RescoreController;
 use App\Http\Controllers\Scoring\ScoringRuleController;
 use Illuminate\Support\Facades\Route;
 
@@ -50,5 +51,7 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
         Route::post('scoring-rules', [ScoringRuleController::class, 'store'])->name('scoring-rules.store');
         Route::post('scoring-rules/{version}/preview', [ScoringRuleController::class, 'preview'])->whereNumber('version')->name('scoring-rules.preview');
         Route::post('scoring-rules/{version}/publish', [ScoringRuleController::class, 'publish'])->whereNumber('version')->name('scoring-rules.publish');
+        Route::post('rounds/{round}/rescore', [RescoreController::class, 'store'])->whereNumber('round')->name('rounds.rescore');
+        Route::get('rescores/{batchId}', [RescoreController::class, 'show'])->where('batchId', '[A-Za-z0-9-]+')->name('rescores.show');
     });
 });

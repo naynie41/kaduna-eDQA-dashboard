@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Assessment\Events\AssessmentCorrected;
 use App\Domain\Assessment\Events\AssessmentScored;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Reporting\DTOs\ReportFilter;
@@ -14,6 +15,7 @@ use App\Domain\Reporting\RoundCache;
 use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Events\RuleVersionPublished;
+use App\Domain\Scoring\Listeners\RescoreAfterAssessmentCorrected;
 use App\Domain\Scoring\Listeners\RescoreOpenRoundsAfterPublish;
 use App\Domain\Validation\Events\QuarantineResolved;
 use App\Domain\Validation\Listeners\RescoreAfterQuarantineResolved;
@@ -46,6 +48,7 @@ final class AppServiceProvider extends ServiceProvider
         // Domain listeners live outside app/Listeners, so they are registered here.
         Event::listen(QuarantineResolved::class, RescoreAfterQuarantineResolved::class);
         Event::listen(RuleVersionPublished::class, RescoreOpenRoundsAfterPublish::class);
+        Event::listen(AssessmentCorrected::class, RescoreAfterAssessmentCorrected::class);
 
         // Cached aggregates (RoundCache) follow the data they were computed from.
         Event::listen(AssessmentScored::class, [FlushRoundCache::class, 'onScored']);

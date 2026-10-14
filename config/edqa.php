@@ -23,6 +23,15 @@ return [
         'read_view' => true,
     ],
 
+    'rescore' => [
+        // ARCHITECTURE.md §7: assessments per RescoreRoundJob in the batch (one transaction each).
+        'chunk_size' => 200,
+
+        // Automatic triggers (publish, quarantine resolved, correction) wait this long and
+        // collapse into one rescore per round (RequestRescoreJob).
+        'debounce_seconds' => 30,
+    ],
+
     'presentation' => [
         // Q-09: how a score is rounded for display, and therefore which band it shows (Q-26):
         // 'half_up' (default) or 'truncate'. The live tool shows the private overall 73.67 as

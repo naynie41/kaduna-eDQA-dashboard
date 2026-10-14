@@ -30,6 +30,17 @@ return [
         'choice_map_incomplete' => 'The choice map must lead to all three outcomes: pass, fail and N/A.',
         'na_policy_unknown' => 'N/A policy ":policy" is not supported.',
         'item_value_unmapped' => 'A stored answer ":value" is not in the choice map, so it cannot be scored.',
+
+        // Rescore
+        'round_closed' => 'A closed round keeps the scores it was closed with. Reopen it, with a reason, to rescore it.',
+    ],
+
+    // edqa:rescore
+    'rescore' => [
+        'choose' => 'Give a round id, or --all-open, not both.',
+        'unknown_round' => 'There is no round :id.',
+        'no_open_rounds' => 'There are no open rounds.',
+        'started' => 'Round :round (:year Q:quarter): rescoring :count assessments under rule version :version. Batch :batch (run :run).',
     ],
 
 ];

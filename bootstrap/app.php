@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domain\Scoring\Exceptions\InvalidRuleConfig;
+use App\Domain\Scoring\Exceptions\RescoreRefused;
 use App\Domain\Scoring\Exceptions\RuleVersionRefused;
 use App\Domain\Validation\Exceptions\QuarantineActionRefused;
 use App\Http\Middleware\EnsureTwoFactorConfirmed;
@@ -39,11 +40,12 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         // Domain refusals: 409 { code, message } (ARCHITECTURE.md §8 conventions).
-        $refusal = fn (QuarantineActionRefused|RuleVersionRefused|InvalidRuleConfig $e) => response()->json(
+        $refusal = fn (QuarantineActionRefused|RuleVersionRefused|InvalidRuleConfig|RescoreRefused $e) => response()->json(
             ['code' => $e->errorCode, 'message' => $e->getMessage()],
             409,
         );
         $exceptions->render(fn (QuarantineActionRefused $e) => $refusal($e));
         $exceptions->render(fn (RuleVersionRefused $e) => $refusal($e));
         $exceptions->render(fn (InvalidRuleConfig $e) => $refusal($e));
+        $exceptions->render(fn (RescoreRefused $e) => $refusal($e));
     })->create();

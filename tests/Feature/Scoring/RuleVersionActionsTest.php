@@ -9,15 +9,12 @@ use App\Domain\Scoring\CurrentRuleVersion;
 use App\Domain\Scoring\Events\RuleVersionPublished;
 use App\Domain\Scoring\Exceptions\InvalidRuleConfig;
 use App\Domain\Scoring\Exceptions\RuleVersionRefused;
-use App\Domain\Scoring\Listeners\RescoreOpenRoundsAfterPublish;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
 use App\Domain\Scoring\RuleVersionForRound;
 use App\Models\User;
 use Database\Seeders\ScoringRuleVersionSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Log;
-use Psr\Log\LoggerInterface;
 use Spatie\Activitylog\Models\Activity;
 
 beforeEach(function (): void {
@@ -135,21 +132,4 @@ it('gives an open round the current version and a closed round its pinned one, e
         ->and($closed->rule_version_id)->toBe($this->v1->id)
         ->and($resolver->config($closed)->bands['strong'])->toBe(90.0)
         ->and($resolver->config($open)->bands['strong'])->toBe(95.0);
-});
-
-it('asks for a rescore of open rounds only after a publish', function (): void {
-    $open = Round::factory()->create();
-    Round::factory()->closed()->create();
-    $logger = Mockery::mock(LoggerInterface::class);
-    $logger->shouldReceive('info')->once()->withArgs(fn (string $message, array $context): bool => $message === 'rule_version.published.rescore_pending'
-        && $context['round_ids'] === [$open->id]);
-    Log::shouldReceive('channel')->with('edqa')->andReturn($logger);
-
-    app(RescoreOpenRoundsAfterPublish::class)->handle(new RuleVersionPublished($this->v1->id));
-});
-
-it('wires the rescore listener to the publish event', function (): void {
-    Event::fake([RuleVersionPublished::class]);
-
-    Event::assertListening(RuleVersionPublished::class, RescoreOpenRoundsAfterPublish::class);
 });

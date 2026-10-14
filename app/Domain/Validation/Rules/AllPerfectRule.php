@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Validation\Rules;
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Scoring\ScoreFlags;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\Enums\Severity;
 use App\Domain\Validation\Rules\Concerns\BuildsFailures;
@@ -20,15 +21,13 @@ final class AllPerfectRule implements ValidationRule
 {
     use BuildsFailures;
 
-    private const SLOTS = 9;
-
     public function __construct(
         private readonly SubmissionScorer $scorer,
     ) {}
 
     public function code(): string
     {
-        return 'ALL_PERFECT';
+        return ScoreFlags::ALL_PERFECT;
     }
 
     public function severity(): Severity
@@ -48,15 +47,6 @@ final class AllPerfectRule implements ValidationRule
             return [];
         }
 
-        $perfect = 0;
-        foreach ($card->slots as $months) {
-            foreach ($months as $score) {
-                if ($score === 100.0) {
-                    $perfect++;
-                }
-            }
-        }
-
-        return $perfect === self::SLOTS ? [$this->fail('detail', ['count' => self::SLOTS], 'items')] : [];
+        return ScoreFlags::allPerfect($card) ? [$this->fail('detail', ['count' => ScoreFlags::SLOTS], 'items')] : [];
     }
 }

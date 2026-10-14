@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Validation\Rules;
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Scoring\ScoreFlags;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\Enums\Severity;
 use App\Domain\Validation\Rules\Concerns\BuildsFailures;
@@ -28,7 +29,7 @@ final class ScoreJumpRule implements ValidationRule
 
     public function code(): string
     {
-        return 'SCORE_JUMP';
+        return ScoreFlags::SCORE_JUMP;
     }
 
     public function severity(): Severity
@@ -55,10 +56,10 @@ final class ScoreJumpRule implements ValidationRule
             return [];
         }
 
-        $change = $card->overall - $previous;
-        if (abs($change) <= $this->maxJump) {
+        if (! ScoreFlags::jumped($card->overall, $previous, $this->maxJump)) {
             return [];
         }
+        $change = $card->overall - $previous;
 
         // Presentation only: the comparison above used full precision.
         return [$this->fail('detail', [

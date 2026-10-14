@@ -147,7 +147,8 @@ Everything runs inside the containers.
 make up                                  # start the dev stack (app, web :8080, vite, worker, postgres, redis, mailpit)
 make sh                                  # shell in the app container
 make check                               # pint --test, phpstan, pest
-make test                                # pest --parallel against edqa_test
+make test                                # pest --parallel against edqa_test (slow group excluded)
+make test-slow                           # the slow group: rescore of 2,200 assessments < 5 min
 make fresh                               # drop, migrate and seed the dev database
 make grants-check                        # prove edqa_app's least-privilege grants
 make prod-build                          # build the app, worker and web images locally

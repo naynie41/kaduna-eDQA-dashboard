@@ -8,7 +8,7 @@ APP_DB_USER     := edqa_app
 APP_DB_PASSWORD := edqa_app_dev
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build sh logs artisan composer npm test lint check fresh routes prod-build grants-check
+.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-13s %s\n", $$1, $$2}'
@@ -47,6 +47,9 @@ npm: ## Run npm in the vite container: make npm c="run build"
 
 test: ## Pest against edqa_test (parallel)
 	$(EXEC) composer test
+
+test-slow: ## The slow group only (rescore performance, ARCHITECTURE.md §10)
+	$(EXEC) vendor/bin/pest --group=slow
 
 lint: ## Pint (test mode) and Larastan
 	$(EXEC) composer lint

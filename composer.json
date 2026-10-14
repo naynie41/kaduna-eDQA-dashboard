@@ -49,7 +49,7 @@
         ],
         "test": [
             "Composer\\Config::disableProcessTimeout",
-            "pest --parallel"
+            "pest --parallel --exclude-group=slow"
         ],
         "check": [
             "@lint",

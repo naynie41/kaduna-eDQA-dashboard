@@ -110,8 +110,9 @@ not depend on `Ingestion` or `Validation` models (architecture test).
 | `SubmissionIngested` | log counters on `odk_pull_runs` |
 | `SubmissionQuarantined` | bump quarantine badge cache |
 | `AssessmentScored` | dispatch debounced `RefreshRoundAggregatesJob`, flush round cache tag |
-| `QuarantineResolved` | dispatch `RescoreRoundJob` for the round |
-| `RuleVersionPublished` | dispatch `RescoreRoundJob` per affected round |
+| `QuarantineResolved` | debounced `RequestRescoreJob` for the round → `RescoreRound` |
+| `RuleVersionPublished` | debounced `RequestRescoreJob` per **open** round (D-32) → `RescoreRound` |
+| `AssessmentCorrected` | debounced `RequestRescoreJob` for the round → `RescoreRound` |
 | `RoundClosed` | refresh materialised view, snapshot |
 | `PullFailed` | admin alert, digest entry |
 
@@ -667,11 +668,27 @@ recomputes it.
 
 Triggered by: rule version publish, quarantine resolution, assessment correction, manual button.
 
-- `RescoreRoundJob` queued, chunked by 200 assessments, reports progress (`job_batches` /
-  Bus::batch).
-- Reads item responses → `ScoreCalculator` → upserts `assessment_scores` for the target version.
-- Ends with `REFRESH MATERIALIZED VIEW CONCURRENTLY round_aggregates` and cache flush for the round.
-- Target: full round (~2,200 assessments) in < 5 minutes.
+- `RescoreRound::start()` refuses a closed round (`RescoreRefused`, 409 `round_closed`; D-32),
+  records a `rescore_runs` row (trigger, requester, reason, rule version, progress) and audits
+  `rescore_requested` on the round, then dispatches a `Bus::batch` of `RescoreRoundJob` on the
+  `rescore` queue: one job per `edqa.rescore.chunk_size` (200) accepted/flagged assessments.
+- Each chunk (`RescoreAssessments`) is one transaction: item responses → `RuleConfig::outcome()`
+  (Q-25) → `ScoreCalculator` under the run's version → one `INSERT … ON CONFLICT DO UPDATE …
+  WHERE score IS DISTINCT FROM` on (assessment, dimension, month, version). Unchanged rows are not
+  touched (no `computed_at` churn); every inserted or changed row is audited in bulk, shaped as
+  the model's own entries. SCORE_JUMP, ALL_PERFECT and the SLOT_ALL_NA notes are recomputed
+  (`ScoreFlags`, shared with the validation rules); other soft flags are kept, a flag overridden
+  through `OverrideSoftFlag` is never raised again, status follows. The run counts each chunk once
+  (`completed_chunks`), so a retry or second delivery never double-counts. An assessment that can
+  no longer be scored loses that version's rows (audited) and counts as `unscorable`.
+- The batch's `then`/`finally` callbacks (`FinishRescore`) close the run (failed while any chunk
+  is failed, succeeded once all pass, including after a retry), dispatch
+  `RefreshRoundAggregatesJob` and flush the round cache.
+- Automatic triggers go through `RequestRescoreJob` (unique per round, delayed
+  `edqa.rescore.debounce_seconds`), so a bulk resolution rescores the round once. Manual:
+  `edqa:rescore {round?} {--all-open}` and `POST /api/rounds/{id}/rescore`.
+- Target: full round (~2,200 assessments) in < 5 minutes. Measured (`make test-slow`, dev
+  container, 198,000 items): 4.0 s first run, 1.3 s for a repeat that writes nothing.
 
 ---
 
@@ -689,6 +706,8 @@ No public API, no API tokens in v1.
 | GET | `/api/rounds` | Rounds and status |
 | POST | `/api/rounds/{id}/close` | Close round, snapshot aggregates |
 | POST | `/api/rounds/{id}/reopen` | Reopen (reason required) |
+| POST | `/api/rounds/{id}/rescore` | Rescore (reason required, audited); 202 with `{ batch_id, run_id, … }`; 409 for a closed round |
+| GET | `/api/rescores/{batchId}` | Progress: chunks (total, processed, failed), assessments, changed scores and flags, status |
 | POST | `/api/odk/pull` | Manual pull; returns `{ run_id }` |
 | GET | `/api/odk/pull/{runId}` | Progress: fetched, parsed, accepted, quarantined, status |
 | GET | `/api/odk/status` | Connection state, last success, cursor position |
@@ -867,6 +886,7 @@ blocks use Inertia deferred props; charts are `React.lazy`; fonts self-hosted wi
 | D-31 | Quarantine resolution: a rejected record is `status = resolved, resolution = rejected` (the schema's CHECK has no `rejected` status); soft flags are overridden on the assessment (`POST /api/assessments/{id}/flags/{code}/override`), not through `/api/quarantine/{id}/resolve`, which takes `correct` or `reject`; bulk resolution needs every record to have the same set of hard-failure codes; corrections are snake_case keys of the parsed snapshot (`lga_ref`, `ward_ref`, `facility_ref`, `raw_start`, `raw_end`, `round_year`, `round_quarter`) and a corrected start or end is re-parsed. Each action writes one explicit audit entry (event, old, new, reason) and suppresses the model's own | Phase 2A step 8. A quarantined record never has soft flags to override: flags live on accepted assessments |
 | D-32 | **Rule versions are pinned to rounds.** An open round uses the current published version; closing a round pins the version it was scored with (`rounds.rule_version_id`, CHECK `rounds_closed_has_rule_version`); a closed round is never rescored unless it is reopened (with a reason); `RuleVersionPublished` therefore asks for a rescore of **open** rounds only. Every read or write of a score goes through `RuleVersionForRound` (or, in SQL, the per-round version in `round_aggregates_v2.sql` and the SCORE_JUMP prior query), never "the highest published version" directly. One draft at a time (`scoring_rule_versions_one_draft`) | Owner decision, Phase 3 step 1 (requested as "D-18", which was already taken). Supersedes §7's "the dashboard reads the current version by default" for closed rounds. Without the per-round read, publishing v2 would drop every closed round out of the aggregates and blind SCORE_JUMP. Until `RescoreRoundJob` exists, a publish leaves open rounds with no scores under the new version |
 | D-33 | **`round_aggregates` is a cache of the aggregators, reconciled to 1e-9.** v3 counts accepted/flagged assessments only (v2 counted every status, so a withdrawn visit inflated `facility_count`). Aggregators read the view for one round when the filter maps onto a view row, and their own SQL otherwise. The view is refreshed by a debounced `RefreshRoundAggregatesJob` (unique per round, 60 s), so a dashboard answer can lag a new score by up to about a minute, then the round cache flushes. `edqa.aggregation.read_view=false` turns the view path off. In tests the job is faked globally (`tests/Pest.php`), because on the sync queue it would rebuild the view on every score | Phase 3 step 4. The aggregators are the specification; the view is an optimisation that must agree with them |
+| D-34 | **Rescore is chunked, idempotent and debounced.** `RescoreRound` refuses closed rounds (D-32); progress is kept in `rescore_runs` (the admin history; `job_batches` is the queue's own and is pruned). A chunk writes only rows whose value changes and audits each one (inserted or changed; Q-20 still open on volume). Score-based soft flags are recomputed by the same pure checks the rules use (`ScoreFlags`); an administrator's override, found by its `flag_overridden` audit entry, is permanent. Automatic triggers are collapsed per round by `RequestRescoreJob`; a manual request needs a reason. An assessment a new version can no longer score loses that version's rows instead of keeping stale ones. **Known limit:** after a publish each open round is rescored on its own, so a later open round's SCORE_JUMP may compare against an earlier open round not yet rescored under the new version (no prior score, so no flag); rescoring that round again settles it | Phase 3 step 5. Measured: 2,200 assessments in 4.0 s |
 
 Add new decisions here with the next ID. Any new Composer/npm package needs a line.
 

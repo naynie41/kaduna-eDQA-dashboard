@@ -3,9 +3,14 @@
 declare(strict_types=1);
 
 use App\Domain\Reporting\Jobs\RefreshRoundAggregatesJob;
+use App\Domain\Round\Models\Round;
+use App\Domain\Scoring\Actions\RescoreRound;
+use App\Domain\Scoring\Enums\RescoreStatus;
+use App\Domain\Scoring\Enums\RescoreTrigger;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\RescoreFixture;
 
 // Run by `make grants-check`: edqa_test is migrated by edqa_migrator and has had
 // post-migrate-grants.sql applied (DEPLOY.md §8.2–8.3). These tests then act as edqa_app, the
@@ -51,6 +56,21 @@ it('runs the debounced refresh job as the runtime role', function (): void {
 
     expect(DB::selectOne('select current_user as role')?->role)->toBe('edqa_app')
         ->and(DB::selectOne("select ispopulated from pg_matviews where matviewname = 'round_aggregates'")?->ispopulated)->toBeTrue();
+});
+
+it('rescores a round as the runtime role: scores, audit, flags, progress and the batch', function (): void {
+    // The data is written as the owner (edqa_app may not insert LGAs); the rescore runs as edqa_app.
+    $f = RescoreFixture::build();
+    $f->assessment($f->q2, default: 'yes/yes');
+    config(['database.default' => 'pgsql_app_test']);
+    DB::purge('pgsql_app_test');
+
+    $run = app(RescoreRound::class)->start(Round::query()->findOrFail($f->q2), RescoreTrigger::Console)->refresh();
+
+    expect(DB::selectOne('select current_user as role')?->role)->toBe('edqa_app')
+        ->and($run->status)->toBe(RescoreStatus::Succeeded)
+        ->and($run->changed_scores)->toBe(9)
+        ->and($run->changed_flags)->toBe(1);
 });
 
 it('cannot refresh the view directly: only through the SECURITY DEFINER function', function (): void {
