@@ -43,12 +43,14 @@ final readonly class ScoreValue implements JsonSerializable
         );
     }
 
-    public static function fromNullable(?float $value, RuleConfig $rules): self
+    public static function fromNullable(?float $value, ?RuleConfig $rules): self
     {
-        if ($value !== null) {
-            return self::from($value, $rules);
-        }
+        return $value === null || $rules === null ? self::none() : self::from($value, $rules);
+    }
 
+    /** No score: "—" and "No data". Needs no rule version. */
+    public static function none(): self
+    {
         $label = __('scoring.no_data');
 
         return new self(null, self::NO_DATA, self::NO_DATA, null, is_string($label) ? $label : 'No data');

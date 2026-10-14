@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Assessment\Events\AssessmentScored;
+use App\Domain\Facility\Models\Lga;
+use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Listeners\FlushRoundCache;
+use App\Domain\Reporting\RoundCache;
+use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Events\RuleVersionPublished;
 use App\Domain\Scoring\Listeners\RescoreOpenRoundsAfterPublish;
 use App\Domain\Validation\Events\QuarantineResolved;
@@ -37,6 +43,14 @@ final class AppServiceProvider extends ServiceProvider
         // Domain listeners live outside app/Listeners, so they are registered here.
         Event::listen(QuarantineResolved::class, RescoreAfterQuarantineResolved::class);
         Event::listen(RuleVersionPublished::class, RescoreOpenRoundsAfterPublish::class);
+
+        // Cached aggregates (RoundCache) follow the data they were computed from.
+        Event::listen(AssessmentScored::class, [FlushRoundCache::class, 'onScored']);
+        Event::listen(QuarantineResolved::class, [FlushRoundCache::class, 'onResolved']);
+        Event::listen(RuleVersionPublished::class, [FlushRoundCache::class, 'onPublished']);
+        Round::saved(fn () => app(RoundCache::class)->flushAll());
+        Round::deleted(fn () => app(RoundCache::class)->flushAll());
+        Lga::saved(fn () => ReportFilter::forgetLgaCodes());
     }
 
     /**

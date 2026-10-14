@@ -38,6 +38,17 @@ final class Presentation
         return ($scaled < 0 ? ceil($scaled) : floor($scaled)) / $factor;
     }
 
+    /**
+     * The value as displayed (1 dp by default), in SQL: for aggregators that must count or
+     * compare what people see, e.g. "facilities 90+" (Q-26).
+     */
+    public static function sql(string $expression, int $dp = 1): string
+    {
+        return self::mode() === 'truncate'
+            ? "trunc(({$expression})::numeric, {$dp})"
+            : "round(({$expression})::numeric, {$dp})";
+    }
+
     /** @return 'half_up'|'truncate' */
     private static function mode(): string
     {

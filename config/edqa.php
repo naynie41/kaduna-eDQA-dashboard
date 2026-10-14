@@ -12,6 +12,12 @@ return [
         'require_two_factor' => EnvFlag::enabledUnlessFalse(env('EDQA_REQUIRE_2FA')),
     ],
 
+    'aggregation' => [
+        // ARCHITECTURE.md §7, D-04: 'unweighted' = every facility counts once in a mean, up to
+        // LGA, owner and state. 'facility_count' has no agreed meaning yet (Q-27) and is refused.
+        'weighting' => 'unweighted',
+    ],
+
     'presentation' => [
         // Q-09: how a score is rounded for display, and therefore which band it shows (Q-26):
         // 'half_up' (default) or 'truncate'. The live tool shows the private overall 73.67 as

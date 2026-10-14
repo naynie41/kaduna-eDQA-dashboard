@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Validation;
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Reporting\Queries\FacilityRoundOverallsQuery;
 use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Scoring\DTOs\RuleConfig;
 use App\Domain\Validation\DTOs\FacilitySnapshot;
@@ -20,6 +21,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class ValidationContextFactory
 {
+    public function __construct(
+        private readonly FacilityRoundOverallsQuery $overalls,
+    ) {}
+
     /** LGAs, facilities, rounds, accepted assessments, prior scores, assessor-days, rule config. */
     public const QUERY_COUNT = 7;
 
@@ -124,9 +129,8 @@ final class ValidationContextFactory
     }
 
     /**
-     * Overall score per facility per round, each round under its own rule version (D-32: pinned
-     * if closed, current if open), computed as round_aggregates does: dimension = mean of its non-null month slots, overall = mean of
-     * the three dimensions (null if any dimension is all-N/A, and then skipped).
+     * Each facility's overall per round, latest round first, from FacilityRoundOverallsQuery (the
+     * aggregate lives in Reporting, hard rule 5). Only rounds the context knows are kept.
      *
      * @param  list<int>  $facilityIds
      * @param  list<RoundSnapshot>  $rounds
@@ -134,44 +138,15 @@ final class ValidationContextFactory
      */
     private function priorScores(array $facilityIds, array $rounds): array
     {
-        $rows = DB::select(<<<'SQL'
-            WITH current_rule_version AS (
-                SELECT id FROM scoring_rule_versions
-                WHERE published_at IS NOT NULL
-                ORDER BY version DESC
-                LIMIT 1
-            ),
-            -- D-32: each round under its own version: pinned if closed, current if open.
-            round_rule_version AS (
-                SELECT r.id AS round_id,
-                    CASE WHEN r.status = 'closed' THEN r.rule_version_id ELSE (SELECT id FROM current_rule_version) END AS rule_version_id
-                FROM rounds r
-            ),
-            dimension_scores AS (
-                SELECT a.facility_id, a.round_id, s.dimension, avg(s.score) AS score
-                FROM assessments a
-                JOIN assessment_scores s ON s.assessment_id = a.id
-                JOIN round_rule_version rv ON rv.round_id = a.round_id AND rv.rule_version_id = s.rule_version_id
-                WHERE a.facility_id = ANY(?::bigint[])
-                GROUP BY a.facility_id, a.round_id, s.dimension
-            )
-            SELECT facility_id, round_id,
-                (avg(score) FILTER (WHERE dimension = 'availability')
-                 + avg(score) FILTER (WHERE dimension = 'consistency')
-                 + avg(score) FILTER (WHERE dimension = 'validity')) / 3 AS overall
-            FROM dimension_scores
-            GROUP BY facility_id, round_id
-            SQL, ['{'.implode(',', $facilityIds).'}']);
-
         $sequence = [];
         foreach ($rounds as $round) {
             $sequence[$round->id] = $round->sequence();
         }
 
         $scores = [];
-        foreach ($rows as $row) {
-            if ($row->overall !== null && isset($sequence[(int) $row->round_id])) {
-                $scores[(int) $row->facility_id][] = ['sequence' => $sequence[(int) $row->round_id], 'overall' => (float) $row->overall];
+        foreach ($this->overalls->forFacilities($facilityIds) as $row) {
+            if (isset($sequence[$row['round_id']])) {
+                $scores[$row['facility_id']][] = ['sequence' => $sequence[$row['round_id']], 'overall' => $row['overall']];
             }
         }
 
