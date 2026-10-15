@@ -17,6 +17,8 @@
 @theme {
     --color-paper: #f1f3ef;
     --color-panel: #ffffff;
+    --color-panel-soft: #fafcfa; /* hero and mini tiles (prototype) */
+    --color-panel-tint: #f3f7f5; /* the hero gradient's foot */
     --color-ink: #17302b;
     --color-ink-2: #5a6f68;
     --color-ink-3: #8b9c96; /* decorative only, never text */
@@ -25,6 +27,16 @@
     --color-deep-2: #12645b;
     --color-wash: #dce9e5;
     --color-rail: #0b3d37;
+    /* On the rail: text #CFE0DC (12:1), muted text #8FB5AE (5.6:1; the prototype's #6E9A93 is
+       3.9:1, too low for 11px), the active item and its accent, the footer rule. */
+    --color-rail-ink: #cfe0dc;
+    --color-rail-muted: #8fb5ae;
+    --color-rail-active: #0f5049;
+    --color-rail-accent: #63b3a6;
+    --color-rail-line: #17564f;
+
+    /* The rail becomes a top bar below 760px (ARCHITECTURE.md §9.1): the `rail:` variant. */
+    --breakpoint-rail: 47.5rem;
     --color-ok: #2d7753;
     --color-ok-bg: #e4f0e7;
     --color-warn: #8a6408;
@@ -36,6 +48,13 @@
     --color-pub-bg: #dce9e5;
     --color-priv: #8a5a12;
     --color-priv-bg: #f5e9d4;
+
+    /* Chart series (CONVENTION.md §6). Overall is #81988F: the prototype's #B7C4BF fails the
+       3:1 non-text contrast. The Strong / target line uses warn-fill, dashed. */
+    --color-series-availability: #0d4b44;
+    --color-series-consistency: #5a6f68;
+    --color-series-validity: #a2760a;
+    --color-series-overall: #81988f;
 
     --font-sans: 'IBM Plex Sans', 'Segoe UI', Roboto, system-ui, sans-serif;
     --font-display: 'Archivo', 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
@@ -75,6 +94,8 @@
 
     html {
         font-size: 15px;
+        /* An in-page link or focus moved by the browser stops below the sticky top bar. */
+        scroll-padding-top: var(--sticky-header-height, 8.5rem);
     }
 
     body {
@@ -86,8 +107,15 @@
     h1,
     h2,
     h3 {
-        @apply font-display;
+        @apply font-display font-semibold;
         letter-spacing: -0.012em;
+    }
+
+    /* Numbers line up in columns everywhere, including inputs and tables. */
+    table,
+    input,
+    select {
+        font-variant-numeric: tabular-nums;
     }
 
     /* Visible focus everywhere, never removed (CONVENTION.md §6). */

@@ -13,6 +13,8 @@ use App\Domain\Reporting\Support\RoundSelection;
 use App\Domain\Reporting\Support\Scores;
 use App\Domain\Reporting\Support\Weighting;
 use App\Domain\Round\Models\Round;
+use App\Domain\Scoring\DTOs\ScoreValue;
+use App\Domain\Scoring\Presentation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -57,6 +59,36 @@ final class QuarterTrendAggregator
 
             return $points;
         });
+    }
+
+    /**
+     * The chart's takeaway in words (ACCESSIBILITY: every figure states its point): the latest
+     * round with data, and how far it moved from the round before it with data. The change is
+     * worked out at full precision and shown as rounded for display; null when no round has data.
+     *
+     * @param  list<TrendPoint>  $points
+     */
+    public function takeaway(array $points): ?string
+    {
+        $scored = array_values(array_filter($points, fn (TrendPoint $p): bool => $p->overall->value !== null));
+        $latest = end($scored);
+        if ($latest === false) {
+            return null;
+        }
+        $previous = $scored[count($scored) - 2] ?? null;
+        if ($previous === null || $previous->overall->value === null || $latest->overall->value === null) {
+            return (string) __('reporting.trend.takeaway_single', ['round' => $latest->label, 'score' => $latest->overall->display]);
+        }
+
+        $change = Presentation::round(abs($latest->overall->value - $previous->overall->value), 1);
+        $key = $change === 0.0 ? 'unchanged' : ($latest->overall->value > $previous->overall->value ? 'up' : 'down');
+
+        return (string) __("reporting.trend.takeaway_{$key}", [
+            'round' => $latest->label,
+            'score' => $latest->overall->display,
+            'change' => ScoreValue::format($change, 1),
+            'previous' => $previous->label,
+        ]);
     }
 
     /**

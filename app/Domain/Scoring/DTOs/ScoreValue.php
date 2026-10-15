@@ -75,7 +75,7 @@ final readonly class ScoreValue implements JsonSerializable
     }
 
     /** Already rounded by Presentation: the formatter only lays it out, exactly $dp decimals. */
-    private static function format(float|int $rounded, int $dp): string
+    public static function format(float|int $rounded, int $dp): string
     {
         $formatter = new NumberFormatter('en_NG', NumberFormatter::DECIMAL);
         $formatter->setAttribute(NumberFormatter::MIN_FRACTION_DIGITS, $dp);

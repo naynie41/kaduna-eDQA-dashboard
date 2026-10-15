@@ -9,14 +9,14 @@
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "skipLibCheck": true,
-
         "strict": true,
         "noUncheckedIndexedAccess": true,
         "exactOptionalPropertyTypes": true,
         "noImplicitOverride": true,
-
         "paths": {
-            "@/*": ["./resources/js/*"]
+            "@/*": [
+                "./resources/js/*"
+            ]
         }
     },
     "include": [
@@ -25,6 +25,8 @@
         "resources/js/**/*.tsx",
         "vite.config.ts",
         "vitest.config.ts",
-        "eslint.config.js"
+        "eslint.config.js",
+        "playwright.config.ts",
+        "tests/e2e/**/*.ts"
     ]
 }

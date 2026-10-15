@@ -149,6 +149,9 @@ make sh                                  # shell in the app container
 make check                               # pint --test, phpstan, pest
 make test                                # pest --parallel against edqa_test (slow group excluded)
 make test-slow                           # the slow group: rescore of 2,200 assessments < 5 min
+make e2e                                 # Playwright + axe against the running dev stack (c="shell" to pick specs)
+make size                                # bundle budget: first-visit gzipped JS < 300 KB
+make npm c="test"                        # Vitest (also c="run typecheck", c="run lint")
 make fresh                               # drop, migrate and seed the dev database
 make grants-check                        # prove edqa_app's least-privilege grants
 make prod-build                          # build the app, worker and web images locally

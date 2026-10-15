@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Domain\Reporting\Aggregators\ShellStatusAggregator;
+use App\Domain\Validation\Queries\QuarantineQuery;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -46,8 +48,14 @@ final class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user === null ? null : ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
             ],
+            // The shell's footer count and ODK status bar (ARCHITECTURE.md §9.1); signed-in only.
+            'shell' => fn (): ?array => $user === null ? null : [
+                'assessments' => app(ShellStatusAggregator::class)->assessments(),
+                'sync' => app(ShellStatusAggregator::class)->sync(),
+                'quarantined' => app(QuarantineQuery::class)->openCount(),
+            ],
             // UI strings, read in React with t() (CONVENTION.md §7, CLAUDE.md hard rule 10).
-            'translations' => fn (): array => collect(self::TRANSLATION_GROUPS)
+            'translations' => fn (): array => collect([...self::TRANSLATION_GROUPS, ...$this->pageGroups($request)])
                 ->mapWithKeys(fn (string $group): array => [$group => __($group)])
                 ->all(),
         ];
@@ -55,4 +63,18 @@ final class HandleInertiaRequests extends Middleware
 
     /** Language groups shared with every page. */
     private const TRANSLATION_GROUPS = ['common', 'auth', 'dashboard'];
+
+    /**
+     * Extra groups only some pages need.
+     *
+     * @return list<string>
+     */
+    private function pageGroups(Request $request): array
+    {
+        return match (true) {
+            $request->routeIs('dev.*') => ['dev', 'enums'],
+            $request->routeIs('dashboard.*') => ['enums'],
+            default => [],
+        };
+    }
 }

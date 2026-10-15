@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import PageProviders from '@/layouts/PageProviders';
 import { useTranslate } from '@/lib/i18n';
 
 export type AuthLayoutProps = {
@@ -7,6 +8,14 @@ export type AuthLayoutProps = {
 
 /** Sign-in and account-security pages: one centred panel, readable from 360px up. */
 export default function AuthLayout({ children }: AuthLayoutProps) {
+    return (
+        <PageProviders>
+            <AuthFrame>{children}</AuthFrame>
+        </PageProviders>
+    );
+}
+
+function AuthFrame({ children }: AuthLayoutProps) {
     const t = useTranslate();
 
     return (
@@ -16,7 +25,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                     <span className="block font-display text-xl font-semibold text-deep">{t('common.app_name')}</span>
                     <span className="block text-sm text-ink-2">{t('common.app_tagline')}</span>
                 </p>
-                <div className="rounded-[var(--radius-panel)] bg-panel p-6 shadow-[var(--shadow-panel)] sm:p-8">{children}</div>
+                <div className="rounded-panel bg-panel p-6 shadow-panel sm:p-8">{children}</div>
             </main>
         </div>
     );

@@ -11,6 +11,7 @@ use App\Domain\Reporting\Support\FacilityScoresSql;
 use App\Domain\Reporting\Support\RoundSelection;
 use App\Domain\Reporting\Support\Scores;
 use App\Domain\Reporting\Support\Weighting;
+use App\Domain\Round\MonthSlot;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -56,14 +57,13 @@ final class MonthSlotAggregator
                 $rules = $this->sql->configFor($round);
                 $row = $byRound->get($round->id);
                 foreach ([1, 2, 3] as $slot) {
-                    $month = 3 * ($round->quarter - 1) + $slot;
                     $points[] = new MonthSlotPoint(
                         roundId: $round->id,
                         year: $round->year,
                         quarter: $round->quarter,
                         slot: $slot,
-                        month: $month,
-                        label: (string) __('reporting.month_label', ['month' => (string) __("reporting.months.{$month}"), 'year' => (string) $round->year]),
+                        month: MonthSlot::month($round->quarter, $slot),
+                        label: MonthSlot::label($round->year, $round->quarter, $slot),
                         availability: Scores::of($row?->{"availability_m{$slot}"}, $rules),
                         consistency: Scores::of($row?->{"consistency_m{$slot}"}, $rules),
                         validity: Scores::of($row?->{"validity_m{$slot}"}, $rules),

@@ -23,6 +23,12 @@ return [
         'read_view' => true,
     ],
 
+    'status' => [
+        // ARCHITECTURE.md §9.1: the sync status bar turns amber when the last successful ODK
+        // pull is older than this.
+        'stale_after_minutes' => 30,
+    ],
+
     'rounds' => [
         // ARCHITECTURE.md §3: a round's window lies inside its quarter, but may end up to this many
         // days after the quarter for late visits (allowed with a warning). Windows never overlap.

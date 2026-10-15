@@ -30,6 +30,12 @@ final class QuarantineQuery
         return $this->filtered($filters)->orderByDesc('id')->paginate(self::PER_PAGE);
     }
 
+    /** Records still waiting for an administrator: the shell's "N in quarantine". */
+    public function openCount(): int
+    {
+        return QuarantinedRecord::query()->where('status', 'open')->count();
+    }
+
     /**
      * Records per hard-failure code, most frequent first. A record failing two rules counts in
      * both groups.

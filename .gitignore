@@ -46,3 +46,4 @@ Thumbs.db
 /.zed
 /.phpactor.json
 npm-debug.log
+/storage/e2e

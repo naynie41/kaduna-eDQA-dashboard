@@ -45,12 +45,15 @@ export default tseslint.config(
             ...reactHooks.configs.recommended.rules,
             '@typescript-eslint/no-explicit-any': 'error',
             'react/no-danger': 'error',
+            // A scrollable region must be reachable from the keyboard to be scrolled (WCAG
+            // 2.1.1), so a named role="region" may take tabIndex={0}; nothing else non-interactive.
+            'jsx-a11y/no-noninteractive-tabindex': ['error', { tags: [], roles: ['tabpanel', 'region'] }],
             'react/prop-types': 'off',
             'no-console': 'warn',
         },
     },
     {
-        files: ['*.config.{js,ts}'],
+        files: ['*.config.{js,ts}', 'scripts/**/*.mjs', 'tests/e2e/**/*.{ts,mjs}'],
         languageOptions: {
             globals: { ...globals.node },
         },

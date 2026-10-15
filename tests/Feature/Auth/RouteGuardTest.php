@@ -98,7 +98,7 @@ it('lets a user without 2FA reach setup and log out', function (): void {
 });
 
 it('lets a user with confirmed 2FA reach the dashboard', function (): void {
-    $this->actingAs(User::factory()->withTwoFactor()->create())->get('/')->assertOk();
+    $this->actingAs(User::factory()->withTwoFactor()->create())->get('/dashboard/home')->assertOk();
 });
 
 // ---- EDQA_REQUIRE_2FA switch (D-26): on unless explicitly false
@@ -111,7 +111,7 @@ it('lets a user without 2FA reach the dashboard when the requirement is switched
     config(['edqa.auth.require_two_factor' => false]);
     $user = User::factory()->create(['two_factor_confirmed_at' => null]);
 
-    $this->actingAs($user)->get('/')->assertOk();
+    $this->actingAs($user)->get('/dashboard/home')->assertOk();
 });
 
 it('still challenges a user who has set up 2FA when the requirement is switched off', function (): void {

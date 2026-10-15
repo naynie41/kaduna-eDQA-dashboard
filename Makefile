@@ -8,7 +8,7 @@ APP_DB_USER     := edqa_app
 APP_DB_PASSWORD := edqa_app_dev
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check
+.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e size
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-13s %s\n", $$1, $$2}'
@@ -73,3 +73,10 @@ grants-check: ## Prove the least-privilege grants: tests/Grants act as edqa_app 
 	$(COMPOSE) exec -T -e DB_DATABASE=edqa_test app php artisan edqa:db:apply-grants --no-interaction
 	$(COMPOSE) exec -T -e DB_APP_TEST_USERNAME=$(APP_DB_USER) -e DB_APP_TEST_PASSWORD=$(APP_DB_PASSWORD) \
 		app vendor/bin/pest tests/Grants
+
+e2e: ## Playwright against the running dev stack (seeds the local e2e admin first)
+	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
+	$(COMPOSE) --profile e2e run --rm playwright $(c)
+
+size: ## Bundle budget: gzipped JS on first visit to /dashboard/home must stay under 300 KB
+	$(COMPOSE) exec -T vite npm run size

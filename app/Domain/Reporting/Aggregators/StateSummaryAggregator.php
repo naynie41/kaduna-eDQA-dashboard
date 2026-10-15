@@ -53,6 +53,8 @@ final class StateSummaryAggregator
                 lgasCovered: Scores::int($row?->lgas),
                 facilitiesStrong: Scores::int($row?->strong),
                 facilitiesWeak: Scores::int($row?->weak),
+                strongAt: $rules?->bands['strong'],
+                weakBelow: $rules?->bands['review'],
             );
         });
     }

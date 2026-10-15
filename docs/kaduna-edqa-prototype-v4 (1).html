@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaduna eDQA &mdash; Data Quality Assessment e-tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F1F3EF;--panel:#FFF;--ink:#17302B;--ink-2:#5A6F68;--ink-3:#8B9C96;
+  --rule:#DCE2DC;--deep:#0D4B44;--deep-2:#12645B;--wash:#DCE9E5;
+  --ok:#2F7D57;--ok-bg:#E4F0E7;--warn:#A2760A;--warn-bg:#F6EDD8;
+  --bad:#9E3B2F;--bad-bg:#F6E2DE;--rail:#0B3D37;
+  --pub:#0D4B44;--pub-bg:#DCE9E5;--priv:#8A5A12;--priv-bg:#F5E9D4;
+  --shadow:0 1px 2px rgba(23,48,43,.06),0 8px 24px -16px rgba(23,48,43,.28);
+  --sans:"IBM Plex Sans","Segoe UI",Roboto,system-ui,sans-serif;
+  --display:"Archivo","IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.012em}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--deep-2);outline-offset:2px;border-radius:3px}
+.num{font-variant-numeric:tabular-nums}
+
+.shell{display:grid;grid-template-columns:210px 1fr;min-height:100vh}
+.rail{background:var(--rail);color:#CFE0DC;padding:20px 14px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh}
+.brand{display:flex;gap:11px;align-items:flex-start}
+.seal{width:34px;height:34px;flex:0 0 34px;border-radius:50%;border:1.5px solid #4E8880;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:11px;color:#EAF3F0}
+.brand b{display:block;font-family:var(--display);font-weight:600;font-size:14px;color:#fff;line-height:1.25}
+.brand span{font-size:11.5px;color:#7FA9A2;line-height:1.35;display:block;margin-top:2px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-head{font-size:11px;color:#6E9A93;margin:0 0 7px 10px}
+.nav button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:0;color:#C3D9D4;padding:8px 10px;border-radius:6px;font-size:14px}
+.nav button:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav button[aria-current="true"]{background:#0F5049;color:#fff;font-weight:500;box-shadow:inset 2px 0 0 #63B3A6}
+.rail-foot{margin-top:auto;font-size:11.5px;color:#6E9A93;border-top:1px solid #17564F;padding-top:14px}
+.rail-foot b{display:block;color:#B9D2CC;font-weight:500;font-family:var(--sans)}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.databar{border-bottom:1px solid #E6D6AC;background:var(--warn-bg);color:#6E5208;font-size:12.5px;padding:7px 26px;display:flex;gap:9px;align-items:center}
+.databar.live{background:var(--ok-bg);border-bottom-color:#BFDCC8;color:#245E41}
+.databar .grow{flex:1}
+.topbar{background:var(--panel);border-bottom:1px solid var(--rule);padding:14px 26px 0;position:sticky;top:0;z-index:20}
+.topline{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;padding-bottom:12px}
+.topline h1{font-size:17px;font-weight:600}
+.topline .sub{font-size:12.5px;color:var(--ink-2);margin-top:2px;max-width:70ch}
+.controls{margin-left:auto;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:3px}
+.field label{font-size:11px;color:var(--ink-2)}
+select{font-family:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;min-width:104px}
+.btn{border:1px solid var(--rule);background:var(--panel);color:var(--ink);padding:7px 13px;border-radius:6px;font-size:13.5px}
+.btn:hover{background:#F6F8F5}
+.btn-primary{background:var(--deep);border-color:var(--deep);color:#fff}
+.btn-primary:hover{background:var(--deep-2)}
+.btn-ghost{border-color:transparent;background:transparent;color:var(--deep-2)}
+.btn-sm{padding:4px 10px;font-size:12.5px}
+
+.tabs{display:flex;gap:2px;overflow-x:auto}
+.tabs button{background:none;border:0;padding:9px 12px 11px;font-size:13.5px;color:var(--ink-2);white-space:nowrap;border-bottom:2.5px solid transparent;border-radius:5px 5px 0 0}
+.tabs button:hover{color:var(--ink);background:#F6F8F5}
+.tabs button[aria-current="true"]{color:var(--deep);font-weight:600;border-bottom-color:var(--deep)}
+.tabs .count{font-size:11px;background:#EEF2ED;color:var(--ink-2);border-radius:20px;padding:1px 6px;margin-left:6px}
+.tabs button[aria-current="true"] .count{background:var(--wash);color:var(--deep)}
+.tabs .alert{background:var(--bad-bg);color:var(--bad)}
+
+.wrap{padding:22px 26px 60px;max-width:1280px}
+.page[hidden],.view[hidden]{display:none}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:10px;box-shadow:var(--shadow)}
+.panel-head{padding:16px 20px 0}
+.panel-head h2{font-size:15.5px;font-weight:600}
+.panel-head p{margin:3px 0 0;font-size:12.5px;color:var(--ink-2);max-width:70ch}
+.section-title{font-family:var(--display);font-size:13px;font-weight:600;color:var(--ink-2);margin:26px 0 11px}
+.note{font-size:12.5px;color:var(--ink-2);margin:10px 0 0;max-width:78ch}
+
+/* hero */
+.hero{display:grid;grid-template-columns:270px 1fr;overflow:hidden}
+.hero-left{padding:22px;border-right:1px solid var(--rule);background:linear-gradient(180deg,#FAFCFA,#F3F7F5)}
+.vf-label{font-size:12.5px;color:var(--ink-2)}
+.vf{font-family:var(--display);font-weight:700;font-size:64px;line-height:.94;letter-spacing:-.03em;margin:6px 0 2px}
+.vf-read{font-size:13px;line-height:1.45;color:var(--ink-2);margin:10px 0 0;max-width:31ch}
+.vf-read b{color:var(--ink);font-weight:600}
+.minis{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border-top:1px solid var(--rule);margin:20px -22px -22px}
+.mini{background:#FAFCFA;padding:12px 14px}
+.mini .k{font-family:var(--display);font-weight:600;font-size:19px}
+.mini .l{font-size:11.5px;color:var(--ink-2);line-height:1.3;margin-top:1px}
+.hero-right{padding:18px 22px 20px;min-width:0}
+
+/* dimension bars */
+.dims{display:flex;flex-direction:column;gap:13px;margin-top:14px}
+.dim{display:grid;grid-template-columns:118px 1fr 46px;gap:14px;align-items:center}
+.dim-name{font-size:13px;line-height:1.2}
+.dim-name span{display:block;font-size:11px;color:var(--ink-3)}
+.dtrack{height:20px;border-radius:4px;background:#EDF1EC;position:relative;overflow:hidden}
+.dfill{height:100%;border-radius:4px;background:var(--deep)}
+.dfill.w{background:var(--warn)}.dfill.b{background:var(--bad)}
+.animate .dfill{transition:width .5s cubic-bezier(.2,.7,.3,1)}
+.dmark{position:absolute;top:0;bottom:0;width:1.5px;background:rgba(23,48,43,.35)}
+.dval{text-align:right;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* owner split */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule)}
+.own{background:var(--panel);padding:16px 18px}
+.own .h{display:flex;align-items:baseline;gap:9px}
+.own .h b{font-family:var(--display);font-size:14px;font-weight:600}
+.own .h .c{font-size:12.5px;color:var(--ink-2)}
+.own.pub .h b{color:var(--pub)}.own.priv .h b{color:var(--priv)}
+.own .big{font-family:var(--display);font-weight:700;font-size:38px;line-height:1;margin:8px 0 2px}
+.own .cap{font-size:11.5px;color:var(--ink-2)}
+.ownrow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule);margin-top:14px;border:1px solid var(--rule);border-radius:7px;overflow:hidden}
+.ownrow div{background:#FAFCFA;padding:8px 10px}
+.ownrow .k{font-family:var(--display);font-weight:600;font-size:17px}
+.ownrow .l{font-size:11px;color:var(--ink-2)}
+
+/* lga grid */
+.lga-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+.lga{background:var(--panel);border:0;padding:10px 11px 11px;text-align:left;display:block;border-left:3px solid transparent}
+.lga:hover{background:#F6F8F5}
+.lga[aria-pressed="true"]{background:var(--wash)}
+.lga .n{font-size:12.5px;line-height:1.2;display:block}
+.lga .v{font-family:var(--display);font-weight:600;font-size:17px;margin-top:4px;font-variant-numeric:tabular-nums;display:block}
+.lga .f{font-size:11px;color:var(--ink-3)}
+.lga.s-ok{border-left-color:var(--ok)}.lga.s-warn{border-left-color:var(--warn)}.lga.s-bad{border-left-color:var(--bad)}
+.lga.s-ok .v{color:var(--ok)}.lga.s-warn .v{color:var(--warn)}.lga.s-bad .v{color:var(--bad)}
+
+.cols{display:grid;grid-template-columns:1.15fr 1fr;gap:18px;align-items:start}
+.cols-even{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.cols-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start}
+.chart-wrap{padding:6px 18px 16px}
+svg.chart{width:100%;display:block;overflow:visible}
+.chart text{font-family:var(--sans);font-size:10.5px;fill:var(--ink-3)}
+.chart .gridline{stroke:#EDF1EC;stroke-width:1}
+.chart .axis{stroke:var(--rule);stroke-width:1}
+.chart .line{fill:none;stroke:var(--deep);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.chart .target{stroke:var(--warn);stroke-width:1.5;stroke-dasharray:5 4}
+.chart .dot{fill:#fff;stroke:var(--deep);stroke-width:2.5}
+.chart .dot-last{fill:var(--deep)}
+.chart .val{font-size:10.5px;fill:var(--ink-2);font-weight:600}
+
+.scroll-x{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;font-weight:500;font-size:11.5px;color:var(--ink-2);padding:10px 12px;border-bottom:1px solid var(--rule);white-space:nowrap}
+tbody td{padding:9px 12px;border-bottom:1px solid #EEF2ED;vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#FAFCFA}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td.heat{text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
+.tag{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:20px;line-height:1.5;white-space:nowrap}
+.t-ok{background:var(--ok-bg);color:var(--ok)}.t-warn{background:var(--warn-bg);color:var(--warn)}
+.t-bad{background:var(--bad-bg);color:var(--bad)}.t-mute{background:#EEF2ED;color:var(--ink-2)}
+.t-pub{background:var(--pub-bg);color:var(--pub)}.t-priv{background:var(--priv-bg);color:var(--priv)}
+.sub-txt{font-size:11.5px;color:var(--ink-3);display:block}
+.empty{padding:26px 20px;color:var(--ink-2);font-size:13.5px;text-align:center}
+
+.segbar{display:inline-flex;border:1px solid var(--rule);border-radius:7px;overflow:hidden}
+.segbar button{background:var(--panel);border:0;padding:6px 14px;font-size:13px;color:var(--ink-2);border-right:1px solid var(--rule)}
+.segbar button:last-child{border-right:0}
+.segbar button[aria-pressed="true"]{background:var(--deep);color:#fff;font-weight:500}
+
+.prow{display:grid;grid-template-columns:1fr 130px 44px;gap:12px;align-items:center;padding:8px 20px;border-bottom:1px solid #EEF2ED}
+.prow:last-child{border-bottom:0}
+.prow .pl{font-size:13px}
+.prow .pl span{display:block;font-size:11px;color:var(--ink-3)}
+.ptrack{height:7px;border-radius:4px;background:#EDF1EC;overflow:hidden}
+.pfill{height:100%;border-radius:4px;background:var(--deep)}
+.pfill.w{background:var(--warn)}.pfill.b{background:var(--bad)}
+.pval{text-align:right;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+
+.admin-cols{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
+.drop{margin:16px 20px 20px;border:1.5px dashed #BFCFC9;border-radius:9px;background:#FAFCFA;padding:26px 20px;text-align:center}
+.drop.over{border-color:var(--deep);background:var(--wash)}
+.drop .icon{color:var(--ink-3);margin-bottom:8px}
+.drop h3{font-size:14.5px;font-weight:600}
+.drop p{margin:4px 0 14px;font-size:12.5px;color:var(--ink-2)}
+.result{margin:0 20px 20px;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.result-head{padding:12px 15px;background:#FAFCFA;border-bottom:1px solid var(--rule);display:flex;gap:10px;align-items:center}
+.result-head b{font-size:13.5px}
+.step{display:flex;gap:10px;align-items:flex-start;padding:7px 0;font-size:13px;color:var(--ink-2)}
+.step .mark{width:17px;height:17px;flex:0 0 17px;border-radius:50%;border:1.5px solid var(--rule);display:grid;place-items:center;font-size:10px;margin-top:1px;color:var(--ink-3)}
+.step.done .mark{background:var(--ok);border-color:var(--ok);color:#fff}
+.step.done{color:var(--ink)}
+.step.fail .mark{background:var(--warn);border-color:var(--warn);color:#fff}
+.reject{border:1px solid #E6D6AC;background:var(--warn-bg);border-radius:7px;padding:12px 14px;font-size:12.5px;color:#6E5208;margin:13px 15px 15px}
+.reject b{display:block;margin-bottom:5px;font-size:13px}
+.reject ul{margin:0;padding-left:17px}.reject li{margin-bottom:3px}
+.schema td{padding:7px 12px;border-bottom:1px solid #EEF2ED;font-size:12.5px}
+.schema td:first-child{color:var(--deep);white-space:nowrap;font-variant-numeric:tabular-nums}
+.src{display:flex;gap:12px;padding:14px 18px;border-bottom:1px solid #EEF2ED;align-items:flex-start}
+.src:last-child{border-bottom:0}
+.src .dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:0 0 8px}
+.src .dot.live{background:var(--ok)}.src .dot.idle{background:var(--ink-3)}.src .dot.err{background:var(--bad)}
+.src .b{flex:1;min-width:0}
+.src .b b{font-size:13.5px;font-weight:600;display:block}
+.src .b span{font-size:12px;color:var(--ink-2);display:block;margin-top:1px}
+.toggle{width:38px;height:21px;border-radius:20px;border:0;background:#D2DAD6;position:relative;flex:0 0 38px;transition:background .16s;margin-top:2px}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;transition:left .16s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.toggle[aria-pressed="true"]{background:var(--ok)}
+.toggle[aria-pressed="true"]::after{left:19px}
+.search{width:100%;font-family:inherit;font-size:13.5px;border:1px solid var(--rule);border-radius:6px;padding:8px 11px}
+.issue{display:flex;gap:12px;padding:13px 18px;border-bottom:1px solid #EEF2ED;align-items:flex-start}
+.issue:last-child{border-bottom:0}
+.issue .b{flex:1;min-width:0}
+.issue .b b{font-size:13.5px;font-weight:600;display:block}
+.issue .b span{font-size:12px;color:var(--ink-2);display:block;margin-top:2px}
+.issue code{font-size:11.5px;background:#EEF2ED;padding:1px 5px;border-radius:3px;color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:#EAF3F0;padding:11px 18px;border-radius:8px;font-size:13.5px;box-shadow:0 10px 30px -10px rgba(0,0,0,.4);z-index:60;max-width:88vw}
+.toast[hidden]{display:none}
+
+@media (max-width:1080px){.cols,.cols-even,.cols-3,.admin-cols,.split{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.hero-left{border-right:0;border-bottom:1px solid var(--rule)}}
+@media (max-width:760px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:row;align-items:center;gap:14px;padding:12px 16px;overflow-x:auto}
+  .rail-foot,.nav-head{display:none}.nav{flex-direction:row;gap:6px}
+  .wrap,.topbar,.databar{padding-left:16px;padding-right:16px}
+  .vf{font-size:52px}.dim{grid-template-columns:96px 1fr 40px;gap:9px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="brand">
+      <div class="seal">KD</div>
+      <div><b>eDQA e-tool</b><span>Kaduna State &middot; version 4 concept</span></div>
+    </div>
+    <nav class="nav" aria-label="Workspaces">
+      <p class="nav-head">Workspace</p>
+      <button id="nav-report" aria-current="true" onclick="showView('report')">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="1.5" width="5" height="7" rx="1"/><rect x="9.5" y="1.5" width="5" height="4" rx="1"/><rect x="1.5" y="11" width="5" height="3.5" rx="1"/><rect x="9.5" y="8" width="5" height="6.5" rx="1"/></svg>
+        Dashboard
+      </button>
+      <button id="nav-admin" aria-current="false" onclick="showView('admin')">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 10.5V2.5M8 2.5 5 5.5M8 2.5l3 3"/><path d="M2 10v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3"/></svg>
+        Administration
+      </button>
+    </nav>
+    <div class="rail-foot"><b id="rail-rows">&mdash;</b><span>Support: HSDF</span></div>
+  </aside>
+
+  <div class="main">
+    <div class="databar" id="databar">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v4M8 11h.01"/></svg>
+      <span class="grow" id="databar-text"></span>
+      <button class="btn btn-sm" onclick="showView('admin')">Import data</button>
+    </div>
+
+    <header class="topbar">
+      <div class="topline">
+        <div>
+          <h1 id="page-title">Home</h1>
+          <p class="sub" id="page-sub"></p>
+        </div>
+        <div class="controls" id="dash-controls">
+          <div class="field"><label for="f-year">Year</label><select id="f-year" onchange="render()"></select></div>
+          <div class="field"><label for="f-q">Quarter</label><select id="f-q" onchange="render()"></select></div>
+          <div class="field"><label for="f-lga">LGA</label><select id="f-lga" onchange="render()"></select></div>
+          <div class="field"><label for="f-level">Level</label><select id="f-level" onchange="render()"></select></div>
+          <div class="field"><label for="f-owner">Owner</label><select id="f-owner" onchange="render()"></select></div>
+          <button class="btn" onclick="exportCsv()">Export</button>
+        </div>
+      </div>
+      <div class="tabs" id="tabs" role="tablist"></div>
+    </header>
+
+    <!-- ===================== DASHBOARD ===================== -->
+    <main class="wrap view" id="view-report">
+
+      <!-- HOME -->
+      <section class="page" id="p-home">
+        <div class="panel hero">
+          <div class="hero-left">
+            <div class="vf-label">Average quality score</div>
+            <div class="vf num" id="h-score">&mdash;</div>
+            <p class="vf-read" id="h-read"></p>
+            <div class="minis">
+              <div class="mini"><div class="k num" id="h-fac">&mdash;</div><div class="l">Facilities visited</div></div>
+              <div class="mini"><div class="k num" id="h-lga">&mdash;</div><div class="l">Local governments</div></div>
+              <div class="mini"><div class="k num" id="h-strong">&mdash;</div><div class="l">Facilities scoring 90+</div></div>
+              <div class="mini"><div class="k num" id="h-weak">&mdash;</div><div class="l">Facilities under 70</div></div>
+            </div>
+          </div>
+          <div class="hero-right">
+            <h2 style="font-size:15.5px;font-weight:600">The three dimensions</h2>
+            <p style="margin:3px 0 0;font-size:12.5px;color:var(--ink-2);max-width:62ch">Each facility is scored out of 100 on all three, across the three months of the quarter. Overall is their mean.</p>
+            <div class="dims" id="h-dims"></div>
+            <p class="note" id="h-weakest"></p>
+          </div>
+        </div>
+
+        <h2 class="section-title">Public and private facilities</h2>
+        <section class="panel"><div class="split" id="h-split"></div></section>
+
+        <div class="cols" style="margin-top:18px">
+          <section class="panel">
+            <div class="panel-head"><h2>Quality score by quarter</h2><p>Overall score across assessed facilities in each round.</p></div>
+            <div class="chart-wrap"><svg class="chart" id="h-trend" viewBox="0 0 560 200" style="height:200px" role="img" aria-label="Score by quarter"></svg></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>Weakest local governments</h2><p>Lowest overall quality score this selection.</p></div>
+            <table style="margin-top:8px"><tbody id="h-worst"></tbody></table>
+          </section>
+        </div>
+      </section>
+
+      <!-- FACILITY VIEW -->
+      <section class="page" id="p-facility" hidden>
+        <section class="panel">
+          <div class="panel-head" style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+            <div style="flex:1;min-width:220px">
+              <h2>Facility view</h2>
+              <p>Results at facility level. Each report shows the three months of the quarter and the overall for that dimension.</p>
+            </div>
+            <div class="segbar" id="fac-metric"></div>
+          </div>
+          <div class="scroll-x">
+            <table style="margin-top:12px">
+              <thead><tr>
+                <th>Facility name</th><th>LGA</th><th>Ward</th><th>Owner</th><th>Assessed</th>
+                <th class="n" id="fh1">Month 1</th><th class="n" id="fh2">Month 2</th><th class="n" id="fh3">Month 3</th><th class="n">Overall</th>
+              </tr></thead>
+              <tbody id="fac-table"></tbody>
+            </table>
+          </div>
+        </section>
+        <p class="note" id="fac-note"></p>
+      </section>
+
+      <!-- LGA VIEW -->
+      <section class="page" id="p-lga" hidden>
+        <div class="lga-grid" id="lga-grid"></div>
+        <h2 class="section-title">All four reports by local government</h2>
+        <section class="panel">
+          <div class="scroll-x">
+            <table>
+              <thead><tr>
+                <th>LGA</th><th class="n">Facilities</th>
+                <th class="n">Availability</th><th class="n">Consistency</th><th class="n">Validity</th>
+                <th class="n">Month 1</th><th class="n">Month 2</th><th class="n">Month 3</th>
+                <th class="n">Overall</th><th>Status</th>
+              </tr></thead>
+              <tbody id="lga-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <!-- MONITOR -->
+      <section class="page" id="p-monitor" hidden>
+        <section class="panel"><div class="split" id="mon-split"></div></section>
+        <div class="cols" style="margin-top:18px">
+          <section class="panel">
+            <div class="panel-head"><h2>Facilities visited by local government</h2><p>Coverage of the assessment exercise. The line marks the state average.</p></div>
+            <div style="padding:10px 0 6px" id="mon-coverage"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>Coverage by level</h2><p>Facility tier reached in this selection.</p></div>
+            <div style="padding:10px 0 6px" id="mon-level"></div>
+            <div class="panel-head" style="padding-top:12px"><h2 style="font-size:14px">Assessment window</h2></div>
+            <table style="margin-top:6px"><tbody id="mon-window"></tbody></table>
+          </section>
+        </div>
+      </section>
+
+      <!-- VISUALS -->
+      <section class="page" id="p-visuals" hidden>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+          <div class="segbar" id="vis-owner"></div>
+          <span style="font-size:12.5px;color:var(--ink-2)" id="vis-caption"></span>
+        </div>
+        <div class="cols-3">
+          <section class="panel">
+            <div class="panel-head" style="padding-bottom:2px"><h2 style="font-size:13.5px">Month 1 of the quarter</h2></div>
+            <div class="chart-wrap"><svg class="chart" id="vm1" viewBox="0 0 300 210" style="height:210px" role="img" aria-label="Month 1 scores"></svg></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head" style="padding-bottom:2px"><h2 style="font-size:13.5px">Month 2 of the quarter</h2></div>
+            <div class="chart-wrap"><svg class="chart" id="vm2" viewBox="0 0 300 210" style="height:210px" role="img" aria-label="Month 2 scores"></svg></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head" style="padding-bottom:2px"><h2 style="font-size:13.5px">Month 3 of the quarter</h2></div>
+            <div class="chart-wrap"><svg class="chart" id="vm3" viewBox="0 0 300 210" style="height:210px" role="img" aria-label="Month 3 scores"></svg></div>
+          </section>
+        </div>
+        <h2 class="section-title" id="vis-rank-title">Scores by local government</h2>
+        <div class="cols-even">
+          <section class="panel">
+            <div class="panel-head" style="padding-bottom:2px"><h2 style="font-size:13.5px">Overall</h2></div>
+            <div class="chart-wrap"><svg class="chart" id="vr-overall" viewBox="0 0 460 300" style="height:300px" role="img" aria-label="Overall by LGA"></svg></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head" style="padding-bottom:2px"><h2 style="font-size:13.5px">Availability</h2></div>
+            <div class="chart-wrap"><svg class="chart" id="vr-availability" viewBox="0 0 460 300" style="height:300px" role="img" aria-label="Availability by LGA"></svg></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head" style="padding-bottom:2px"><h2 style="font-size:13.5px">Consistency</h2></div>
+            <div class="chart-wrap"><svg class="chart" id="vr-consistency" viewBox="0 0 460 300" style="height:300px" role="img" aria-label="Consistency by LGA"></svg></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head" style="padding-bottom:2px"><h2 style="font-size:13.5px">Validity</h2></div>
+            <div class="chart-wrap"><svg class="chart" id="vr-validity" viewBox="0 0 460 300" style="height:300px" role="img" aria-label="Validity by LGA"></svg></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- IMPLEMENTATION PLAN -->
+      <section class="page" id="p-plan" hidden>
+        <section class="panel">
+          <div class="panel-head"><h2>Implementation plan</h2><p>Generated from the results. Each local government gets an action against its weakest dimension, with an owner and a review point.</p></div>
+          <div class="scroll-x">
+            <table style="margin-top:10px">
+              <thead><tr><th>LGA</th><th class="n">Overall</th><th>Weakest dimension</th><th class="n">Score</th><th>Recommended action</th><th>Owner</th><th>Review</th></tr></thead>
+              <tbody id="plan-table"></tbody>
+            </table>
+          </div>
+        </section>
+        <div class="cols-even" style="margin-top:18px">
+          <section class="panel">
+            <div class="panel-head"><h2>Actions by type</h2><p>How the state workplan breaks down.</p></div>
+            <table style="margin-top:8px"><tbody id="plan-summary"></tbody></table>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>What each action means</h2><p>The standard response attached to each dimension.</p></div>
+            <table style="margin-top:8px">
+              <tbody>
+                <tr><td><b>Availability</b><span class="sub-txt">The register or tool was not there to check</span></td><td>Restock HMIS tools, confirm the facility has the current register set</td></tr>
+                <tr><td><b>Consistency</b><span class="sub-txt">Summary form does not agree with the register</span></td><td>On-site mentoring on reconciling the monthly summary against the register</td></tr>
+                <tr><td><b>Validity</b><span class="sub-txt">Entries do not meet the data element definition</span></td><td>Retraining on definitions and correct completion of the tool</td></tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===================== ADMIN ===================== -->
+    <main class="wrap view" id="view-admin" hidden>
+
+      <section class="page" id="a-imports">
+        <div class="admin-cols">
+          <div>
+            <section class="panel">
+              <div class="panel-head"><h2>Import assessment data</h2><p>Drop a CSV and every page redraws from it. Nothing leaves this device.</p></div>
+              <div class="drop" id="drop">
+                <div class="icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4M12 4 8 8M12 4l4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div>
+                <h3>Drop a CSV here</h3>
+                <p>Rows are checked against the scoring rules before anything loads.</p>
+                <input type="file" id="file" accept=".csv,text/csv" hidden onchange="handleFile(this.files[0])">
+                <button class="btn btn-primary" onclick="document.getElementById('file').click()">Choose file</button>
+                <button class="btn btn-ghost" onclick="downloadTemplate()">Download template</button>
+                <button class="btn btn-ghost" onclick="restoreSample()">Restore sample data</button>
+              </div>
+              <div id="result"></div>
+            </section>
+
+            <h2 class="section-title">Expected columns</h2>
+            <section class="panel">
+              <table class="schema"><tbody>
+                <tr><td>year</td><td>Assessment year.</td></tr>
+                <tr><td>quarter</td><td>Q1 to Q4. Month 1 to 3 are derived from this.</td></tr>
+                <tr><td>lga</td><td>Local government name. Blank rows are held.</td></tr>
+                <tr><td>ward</td><td>Ward the facility sits in.</td></tr>
+                <tr><td>facility</td><td>Facility name as on the master list.</td></tr>
+                <tr><td>level</td><td>Primary, Secondary or Tertiary.</td></tr>
+                <tr><td>owner</td><td>Public or Private.</td></tr>
+                <tr><td>start_date, end_date</td><td>Assessment visit dates.</td></tr>
+                <tr><td>availability_m1 &hellip; m3</td><td>Score out of 100 for each month.</td></tr>
+                <tr><td>consistency_m1 &hellip; m3</td><td>Score out of 100 for each month.</td></tr>
+                <tr><td>validity_m1 &hellip; m3</td><td>Score out of 100 for each month.</td></tr>
+              </tbody></table>
+              <p class="note" style="padding:0 12px 14px">Overall is never imported. It is always recalculated as the mean of the nine scores, so a stored overall can never drift from its parts.</p>
+            </section>
+
+            <h2 class="section-title">Import history</h2>
+            <section class="panel"><table><thead><tr><th>File</th><th class="n">Rows</th><th>Status</th></tr></thead><tbody id="history"></tbody></table></section>
+          </div>
+          <div>
+            <section class="panel">
+              <div class="panel-head" style="padding-bottom:14px"><h2>Loaded data set</h2></div>
+              <div style="padding:0 20px 18px" id="dataset-info"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- DATA ISSUES -->
+      <section class="page" id="a-issues" hidden>
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Data issues</h2>
+            <p>Checks that run on every import. Rows failing a hard rule never reach the dashboard, so a broken row can no longer render as a chart.</p>
+          </div>
+          <div id="issue-list"></div>
+        </section>
+        <p class="note">Each check exists because a real report can fail this way: a score above 100 means a total was written into a per-month column, a ward reading "Quarterly" means the columns shifted by one, and a facility name that parses as a number means a header row was ingested as data.</p>
+        <h2 class="section-title">Rows currently held</h2>
+        <section class="panel">
+          <div class="scroll-x"><table>
+            <thead><tr><th class="n">Line</th><th>Check</th><th>Facility</th><th>LGA</th><th>Detail</th></tr></thead>
+            <tbody id="held-table"></tbody>
+          </table></div>
+        </section>
+      </section>
+
+      <section class="page" id="a-sources" hidden>
+        <div class="admin-cols">
+          <section class="panel">
+            <div class="panel-head" style="padding-bottom:12px"><h2>Connected systems</h2><p>Wired up in the full build. The prototype shows the states they report.</p></div>
+            <div class="src"><span class="dot live"></span><div class="b"><b>KoboToolbox &mdash; eDQA assessment form</b><span>Assessor submissions, one per facility visit.</span></div><button class="toggle" aria-pressed="true" aria-label="Kobo sync" onclick="tog(this,'KoboToolbox')"></button></div>
+            <div class="src"><span class="dot live"></span><div class="b"><b>DHIS2 &mdash; Kaduna instance</b><span>Supplies the reported monthly values the assessment is checked against.</span></div><button class="toggle" aria-pressed="true" aria-label="DHIS2 sync" onclick="tog(this,'DHIS2')"></button></div>
+            <div class="src"><span class="dot err"></span><div class="b"><b>Facility master list</b><span>Credentials expired. LGA and ward names cannot be validated until this is restored.</span></div><button class="btn btn-sm" onclick="toast('Re-authorisation screen opens here in the full build.')">Fix</button></div>
+            <div class="src"><span class="dot idle"></span><div class="b"><b>Google Sheets archive</b><span>Rounds from 2019 onward. Read only.</span></div><button class="toggle" aria-pressed="false" aria-label="Sheets sync" onclick="tog(this,'the Sheets archive')"></button></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head" style="padding-bottom:14px"><h2>Nightly schedule</h2><p>All times West Africa Standard.</p></div>
+            <div style="padding:0 20px 18px">
+              <div class="step done"><span class="mark">&#10003;</span><span>02:15 &mdash; Kobo submissions</span></div>
+              <div class="step done"><span class="mark">&#10003;</span><span>02:40 &mdash; DHIS2 monthly values</span></div>
+              <div class="step"><span class="mark"></span><span>03:00 &mdash; Master list match (paused)</span></div>
+              <div class="step done"><span class="mark">&#10003;</span><span>03:30 &mdash; Rescore and publish</span></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="page" id="a-facilities" hidden>
+        <section class="panel">
+          <div class="panel-head"><h2>Facility master list</h2><p>Built from the loaded data. Every import is matched against it.</p></div>
+          <div style="padding:14px 20px 0"><input class="search" id="fsearch" placeholder="Search by facility, ward or local government" oninput="renderFacilities()"></div>
+          <div class="scroll-x"><table style="margin-top:8px">
+            <thead><tr><th>Facility</th><th>Ward</th><th>LGA</th><th>Level</th><th>Owner</th><th class="n">Visits</th><th class="n">Latest score</th></tr></thead>
+            <tbody id="fac-master"></tbody>
+          </table></div>
+        </section>
+      </section>
+
+      <section class="page" id="a-users" hidden>
+        <section class="panel">
+          <div class="panel-head"><h2>Roles and access</h2><p>The private and public split in the current tool is a page toggle. Here it is a permission, so partner accounts cannot reach private facility names at all.</p></div>
+          <table style="margin-top:10px">
+            <thead><tr><th>Role</th><th class="n">People</th><th>Can do</th></tr></thead>
+            <tbody>
+              <tr><td>State M&amp;E officer</td><td class="n">4</td><td>Import any round, edit records, publish, manage users</td></tr>
+              <tr><td>LGA M&amp;E officer</td><td class="n">23</td><td>Import and edit records for their own LGA only</td></tr>
+              <tr><td>Program manager</td><td class="n">11</td><td>View everything, export, own implementation plan actions</td></tr>
+              <tr><td>Partner &amp; donor</td><td class="n">9</td><td>View published rounds, public facilities, aggregated to LGA</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </section>
+
+      <section class="page" id="a-protocol" hidden>
+        <section class="panel">
+          <div class="panel-head"><h2>Scoring rules</h2><p>What the portal applies when it scores a round. Changing a threshold rescores every page immediately.</p></div>
+          <div style="padding:16px 20px 4px;display:flex;gap:18px;flex-wrap:wrap">
+            <div class="field" style="min-width:150px"><label for="t-strong">Strong at or above</label>
+              <select id="t-strong" onchange="setThresh()"><option>85</option><option selected>90</option><option>95</option></select></div>
+            <div class="field" style="min-width:150px"><label for="t-ok">Acceptable at or above</label>
+              <select id="t-ok" onchange="setThresh()"><option>75</option><option selected>80</option><option>85</option></select></div>
+            <div class="field" style="min-width:150px"><label for="t-weak">Needs action below</label>
+              <select id="t-weak" onchange="setThresh()"><option>65</option><option selected>70</option><option>75</option></select></div>
+          </div>
+          <p class="note" style="padding:0 20px 18px">These bands drive the colour on every table, the status column, and which local governments appear in the implementation plan.</p>
+          <table>
+            <thead><tr><th>Dimension</th><th>What it measures</th><th class="n">State score</th></tr></thead>
+            <tbody id="proto-table"></tbody>
+          </table>
+        </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+/* ============================================================
+   DATA LAYER
+   Row shape mirrors the real e-tool:
+   {year, quarter, lga, ward, facility, level, owner,
+    start_date, end_date,
+    availability:[m1,m2,m3], consistency:[...], validity:[...]}
+   Overall is always derived, never stored.
+   ============================================================ */
+let ROWS=[], HELD=[], SOURCE_NAME="Built-in sample data", IS_SAMPLE=true, HISTORY=[];
+let TH={strong:90,ok:80,weak:70};
+const DIMS=["availability","consistency","validity"];
+const DIM_LABEL={availability:"Availability",consistency:"Consistency",validity:"Validity",overall:"Overall"};
+const DIM_MEANS={availability:"Was the source document there to check?",
+  consistency:"Does the summary form agree with the register?",
+  validity:"Do the entries meet the data element definition?"};
+const MONTHS={Q1:["January","February","March"],Q2:["April","May","June"],
+  Q3:["July","August","September"],Q4:["October","November","December"]};
+
+/* facility counts read off the Monitor page of the live tool */
+const LGA_PUBLIC={"Sanga":98,"Zangon Kataf":95,"Kaduna South":93,"Giwa":93,"Chikun":91,"Lere":91,
+  "Kaura":89,"Jema'a":89,"Soba":89,"Zaria":87,"Sabon Gari":86,"Kachia":85,"Igabi":83,"Jaba":83,
+  "Makarfi":82,"Ikara":81,"Kubau":81,"Kagarko":80,"Kaduna North":80,"Birnin Gwari":78,
+  "Kajuru":76,"Kauru":75,"Kudan":72};
+const LGAS=Object.keys(LGA_PUBLIC).sort();
+const WARDS=["Kakangi","Chikaji","Zabi","Kufana","Iddah","Danmahawayi","Kawo","Ungwan Rimi","Tudun Wada",
+  "Sabon Tasha","Kujama","Rigachikun","Wusasa","Samaru","Bomo","Randagi","Kuyello","Kwassam","Manchok",
+  "Saminaka","Zonkwa","Anchau","Hunkuyi","Maigana","Buruku","Gwantu","Pambeguwa","Kidandan","Dogarawa",
+  "Basawa","Gonin Gora","Barnawa","Malali","Rido","Kakau","Turunku","Damau","Likoro","Kamuru","Iddah"];
+const PATTERNS=[w=>"PHC "+w, w=>"HC "+w, w=>w+" Health Clinic", w=>w+" Health Post",
+  w=>w+" Maternity", w=>w+" Dispensary", w=>w+" Medical Centre", w=>w+" Mission Health Centre"];
+const QUARTERS=[[2025,"Q3"],[2025,"Q4"],[2026,"Q1"],[2026,"Q2"]];
+const LEVELS=["Primary","Secondary","Tertiary"];
+
+function rnd(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}
+  h+=h<<13;h^=h>>>7;h+=h<<3;h^=h>>>17;h+=h<<5;return((h>>>0)%100000)/100000}
+function gauss(seed,mean,sd){
+  const u=Math.max(1e-6,rnd(seed+"a")), v=rnd(seed+"b");
+  return mean+sd*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+const r1=v=>Math.round(v*100)/100;
+
+/* state means taken from the live scorecards */
+const TARGET={Public:{availability:90.6,consistency:76.4,validity:90.6},
+              Private:{availability:71.7,consistency:58.5,validity:80.8}};
+
+function buildSample(){
+  const rows=[];
+  LGAS.forEach((lga,li)=>{
+    const nPub=LGA_PUBLIC[lga], nPriv=5+Math.round(rnd("pv"+lga)*10);
+    const wards=[];
+    for(let i=0;i<10;i++) wards.push(WARDS[(li*4+i)%WARDS.length]);
+    const lgaLift=gauss("ll"+lga,0,3.2);
+    const mk=(i,owner)=>{
+      const w=wards[i%wards.length];
+      const nm=PATTERNS[Math.floor(rnd("pt"+lga+owner+i)*PATTERNS.length)](w);
+      const name=nm+(i>=wards.length?" "+(Math.floor(i/wards.length)+1):"");
+      const level=rnd("lv"+lga+owner+i)>0.93?"Secondary":(rnd("lv2"+lga+owner+i)>0.995?"Tertiary":"Primary");
+      return {facility:name,ward:w,level,owner};
+    };
+    const facs=[];
+    for(let i=0;i<nPub;i++) facs.push(mk(i,"Public"));
+    for(let i=0;i<nPriv;i++) facs.push(mk(i+7,"Private"));
+    facs.forEach((f,fi)=>{
+      const key=lga+f.facility+f.owner;
+      const qi=Math.floor(rnd("qs"+key)*QUARTERS.length);
+      const visits=rnd("vv"+key)>0.82?2:1;
+      for(let v=0;v<visits;v++){
+        const [year,quarter]=QUARTERS[(qi+v)%QUARTERS.length];
+        const t=TARGET[f.owner], seed=key+year+quarter;
+        const facLift=gauss("fl"+key,0,4.5);
+        const row={year,quarter,lga,ward:f.ward,facility:f.facility,level:f.level,owner:f.owner,
+          start_date:visitDate(year,quarter,seed),end_date:visitDate(year,quarter,seed)};
+        DIMS.forEach(d=>{
+          row[d]=[0,1,2].map(m=>r1(clamp(gauss(seed+d+m,t[d]+lgaLift+facLift+m*0.9,6.5),35,100)));
+        });
+        rows.push(row);
+      }
+    });
+  });
+  return rows;
+}
+function visitDate(year,quarter,seed){
+  const mi=Math.floor(rnd("dm"+seed)*3), month=["Q1","Q2","Q3","Q4"].indexOf(quarter)*3+mi+1;
+  const day=1+Math.floor(rnd("dd"+seed)*27);
+  return year+"-"+String(month).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+}
+
+/* ---------- derived ---------- */
+const uniq=a=>[...new Set(a)];
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+function monthScore(row,m){return avg(DIMS.map(d=>row[d][m]))}
+function dimScore(row,d){return avg(row[d])}
+function overall(row){return avg(DIMS.map(d=>dimScore(row,d)))}
+
+let F={year:"all",quarter:"all",lga:"all",level:"all",owner:"all"};
+function readFilters(){
+  F={year:val("f-year"),quarter:val("f-q"),lga:val("f-lga"),level:val("f-level"),owner:val("f-owner")};
+}
+const val=id=>{const e=document.getElementById(id);return e?e.value:"all"};
+function sel(extra){
+  return ROWS.filter(r=>
+    (F.year==="all"||String(r.year)===F.year)&&
+    (F.quarter==="all"||r.quarter===F.quarter)&&
+    (F.lga==="all"||r.lga===F.lga)&&
+    (F.level==="all"||r.level===F.level)&&
+    (F.owner==="all"||r.owner===F.owner)&&
+    (!extra||extra(r)));
+}
+function agg(rows){
+  const o={n:rows.length,facilities:uniq(rows.map(r=>r.lga+"|"+r.facility)).length};
+  DIMS.forEach(d=>o[d]=rows.length?avg(rows.map(r=>dimScore(r,d))):0);
+  o.months=[0,1,2].map(m=>rows.length?avg(rows.map(r=>monthScore(r,m))):0);
+  o.overall=rows.length?avg(rows.map(r=>overall(r))):0;
+  return o;
+}
+function band(v){return v>=TH.strong?"ok":v>=TH.ok?"warn":v>=TH.weak?"warn":"bad"}
+function statusLabel(v){return v>=TH.strong?"Strong":v>=TH.ok?"Acceptable":v>=TH.weak?"Review":"Needs action"}
+function statusTag(v){return v>=TH.strong?"ok":v>=TH.ok?"ok":v>=TH.weak?"warn":"bad"}
+const n0=v=>Math.round(v).toLocaleString("en-NG");
+const n1=v=>v.toFixed(1);
+function heat(v){
+  if(!Number.isFinite(v)) return "";
+  const t=clamp((v-55)/45,0,1);
+  return `background:hsl(146,${Math.round(28+t*26)}%,${Math.round(96-t*30)}%);color:${t>0.62?"#fff":"var(--ink)"}`;
+}
+
+/* ============================================================
+   CSV
+   ============================================================ */
+function parseCsv(text){
+  const rows=[];let cur="",row=[],q=false;
+  text=text.replace(/\r\n?/g,"\n");
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){cur+='"';i++}else q=false}else cur+=c}
+    else if(c==='"')q=true;
+    else if(c===","){row.push(cur);cur=""}
+    else if(c==="\n"){row.push(cur);rows.push(row);row=[];cur=""}
+    else cur+=c;}
+  if(cur.length||row.length){row.push(cur);rows.push(row)}
+  return rows.filter(r=>r.some(c=>c.trim()!==""));
+}
+const COLS=["year","quarter","lga","ward","facility","level","owner","start_date","end_date",
+  "availability_m1","availability_m2","availability_m3","consistency_m1","consistency_m2","consistency_m3",
+  "validity_m1","validity_m2","validity_m3"];
+const REQUIRED=["quarter","lga","facility","availability_m1","consistency_m1","validity_m1"];
+
+const CHECKS=[
+  {id:"range",   name:"Score outside 0 to 100",
+   why:"A per-month column holding a total instead of a score. The live report shows 347.66 and 392.42 this way."},
+  {id:"lga",     name:"Local government missing",
+   why:"Renders as a null row and inflates the LGA count. Kaduna has 23, not 24."},
+  {id:"numname", name:"Facility name is a number",
+   why:"A header or year value ingested as a facility, such as 2019.00."},
+  {id:"shift",   name:"Columns shifted",
+   why:"Ward reading Quarterly, or a month name in a date field, means the row is offset by one."},
+  {id:"missing", name:"Required score missing",
+   why:"A dimension with no value cannot be averaged into an overall."},
+  {id:"dupe",    name:"Duplicate facility and round",
+   why:"The same facility assessed twice in one quarter double counts in every average."}
+];
+const MONTHNAMES=["january","february","march","april","may","june","july","august","september","october","november","december"];
+
+function ingest(text,name){
+  const grid=parseCsv(text);
+  if(grid.length<2) return {ok:false,fatal:"The file has no data rows under the header."};
+  const head=grid[0].map(h=>h.trim().toLowerCase().replace(/\s+/g,"_"));
+  const miss=REQUIRED.filter(c=>!head.includes(c));
+  if(miss.length) return {ok:false,fatal:"Missing column"+(miss.length>1?"s":"")+": "+miss.join(", ")+". Download the template to see the expected header."};
+  const idx=Object.fromEntries(head.map((h,i)=>[h,i]));
+  const out=[],held=[],seen=new Set();
+  for(let i=1;i<grid.length;i++){
+    const g=grid[i], get=k=>k in idx?(g[idx[k]]||"").trim():"";
+    const num=k=>{const s=get(k).replace(/[, ]/g,"");return s===""?NaN:Number(s)};
+    const rec={year:Number(get("year"))||new Date().getFullYear(),
+      quarter:(get("quarter").match(/Q[1-4]/i)||[get("quarter")])[0].toUpperCase(),
+      lga:get("lga"),ward:get("ward"),facility:get("facility"),
+      level:get("level")||"Primary",owner:/priv/i.test(get("owner"))?"Private":"Public",
+      start_date:get("start_date"),end_date:get("end_date")};
+    let fail=null,detail="";
+    DIMS.forEach(d=>rec[d]=[1,2,3].map(m=>num(d+"_m"+m)));
+    const flat=DIMS.flatMap(d=>rec[d]);
+
+    if(!rec.lga||/^null$/i.test(rec.lga)){fail="lga";detail="lga column was "+(rec.lga||"blank")}
+    else if(!rec.facility||/^\d+(\.\d+)?$/.test(rec.facility)){fail="numname";detail="facility name was "+(rec.facility||"blank")}
+    else if(/^quarterly$/i.test(rec.ward)||MONTHNAMES.includes(rec.start_date.toLowerCase())){
+      fail="shift";detail="ward "+(rec.ward||"blank")+", start "+(rec.start_date||"blank")}
+    else if(flat.some(v=>!Number.isFinite(v))){fail="missing";detail="one or more score cells were blank or not numeric"}
+    else if(flat.some(v=>v<0||v>100)){fail="range";detail="highest value was "+Math.max(...flat).toFixed(2)}
+    else{
+      const k=[rec.year,rec.quarter,rec.lga,rec.facility].join("|");
+      if(seen.has(k)){fail="dupe";detail=rec.quarter+" "+rec.year+" already recorded for this facility"}
+      else seen.add(k);
+    }
+    if(fail) held.push({line:i+1,check:fail,facility:rec.facility||"\u2014",lga:rec.lga||"\u2014",detail});
+    else out.push(rec);
+  }
+  if(!out.length) return {ok:false,fatal:"Every row failed a check. Open Data issues to see why."};
+  return {ok:true,rows:out,held,name};
+}
+function toCsv(rows){
+  const esc=v=>/[",\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':String(v);
+  const line=r=>[r.year,r.quarter,r.lga,r.ward,r.facility,r.level,r.owner,r.start_date,r.end_date,
+    ...DIMS.flatMap(d=>r[d])].map(esc).join(",");
+  return COLS.join(",")+"\n"+rows.map(line).join("\n");
+}
+function download(name,text){
+  const b=new Blob([text],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(b);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function downloadTemplate(){download("edqa_template.csv",toCsv(ROWS.slice(0,30)));
+  toast("Template saved with the expected header and 30 example rows.")}
+function exportCsv(){readFilters();download("edqa_export.csv",toCsv(sel()));
+  toast("Exported the rows behind the current view.")}
+
+function handleFile(file){
+  if(!file) return;
+  const rd=new FileReader();
+  rd.onerror=()=>showResult({ok:false,fatal:"That file could not be read. Try saving it again as CSV."});
+  rd.onload=()=>{
+    const res=ingest(String(rd.result),file.name);
+    if(res.ok){
+      ROWS=res.rows;HELD=res.held;SOURCE_NAME=file.name;IS_SAMPLE=false;
+      HISTORY.unshift({name:file.name,rows:res.rows.length,held:res.held.length});
+      rebuildControls();render();renderAdmin();
+      toast(n0(res.rows.length)+" rows loaded, "+n0(res.held.length)+" held. Every page now reads from "+file.name+".");
+    }
+    showResult(res);
+  };
+  rd.readAsText(file);
+}
+function showResult(res){
+  const el=document.getElementById("result");
+  if(!res.ok){
+    el.innerHTML=`<div class="result"><div class="result-head"><b style="color:var(--bad)">Import stopped</b></div>
+      <div class="reject" style="border-color:#E4C4BE;background:var(--bad-bg);color:#7A2E24">${res.fatal}</div></div>`;
+    return;
+  }
+  const byCheck=new Map();
+  res.held.forEach(h=>byCheck.set(h.check,(byCheck.get(h.check)||0)+1));
+  const list=[...byCheck].map(([k,v])=>`<li>${v} &mdash; ${CHECKS.find(c=>c.id===k).name.toLowerCase()}</li>`).join("");
+  el.innerHTML=`<div class="result">
+    <div class="result-head"><b>${res.name}</b><span class="tag t-ok">${n0(res.rows.length)} rows loaded</span></div>
+    <div style="padding:12px 15px 4px">
+      <div class="step done"><span class="mark">&#10003;</span><span>Header matched the expected columns</span></div>
+      <div class="step ${res.held.length?"fail":"done"}"><span class="mark">${res.held.length?"!":"\u2713"}</span><span>${res.held.length?n0(res.held.length)+" rows held by the quality checks":"Every row passed the quality checks"}</span></div>
+      <div class="step done"><span class="mark">&#10003;</span><span>Overall recalculated from the nine monthly scores</span></div>
+    </div>
+    ${res.held.length?`<div class="reject"><b>${n0(res.held.length)} rows held</b><ul>${list}</ul>
+      <p style="margin:8px 0 0">Open Data issues for the line numbers.</p></div>`:`<div style="padding:0 15px 15px"></div>`}
+  </div>`;
+}
+function restoreSample(){
+  ROWS=buildSample();HELD=[];SOURCE_NAME="Built-in sample data";IS_SAMPLE=true;
+  document.getElementById("result").innerHTML="";
+  rebuildControls();render();renderAdmin();toast("Back to the built-in sample data.");
+}
+function setThresh(){
+  TH={strong:Number(val("t-strong")),ok:Number(val("t-ok")),weak:Number(val("t-weak"))};
+  render();toast("Bands updated. Every table and the implementation plan rescored.");
+}
+
+/* ============================================================
+   PAGES
+   ============================================================ */
+const REPORT_PAGES=[["home","Home"],["facility","Facility view"],["lga","LGA view"],
+  ["monitor","Monitor"],["visuals","Visuals"],["plan","Implementation plan"]];
+const ADMIN_PAGES=[["imports","Imports"],["issues","Data issues"],["sources","Data sources"],
+  ["facilities","Facility list"],["users","Users & roles"],["protocol","Scoring rules"]];
+let view="report",page="home",facMetric="overall",visOwner="all";
+
+function buildTabs(){
+  const list=view==="report"?REPORT_PAGES:ADMIN_PAGES;
+  document.getElementById("tabs").innerHTML=list.map(([id,label])=>{
+    let badge="";
+    if(id==="lga") badge=`<span class="count">${uniq(ROWS.map(r=>r.lga)).length}</span>`;
+    if(id==="issues"&&HELD.length) badge=`<span class="count alert">${HELD.length}</span>`;
+    return `<button role="tab" aria-current="${page===id}" onclick="showPage('${id}')">${label}${badge}</button>`;
+  }).join("");
+}
+const TITLES={home:"Home",facility:"Facility view",lga:"LGA view",monitor:"Monitor",
+  visuals:"Visuals",plan:"Implementation plan",imports:"Imports",issues:"Data issues",
+  sources:"Data sources",facilities:"Facility master list",users:"Users and roles",protocol:"Scoring rules"};
+const SUBS={
+  home:"Overall picture of the quarterly data quality assessment across Kaduna State.",
+  facility:"Results at facility level. Use the filters to narrow to a ward, level or owner.",
+  lga:"Results aggregated to local government, across all four reports.",
+  monitor:"The assessment exercise by ownership type and local government.",
+  visuals:"Scores by month position within the quarter, and ranked by local government.",
+  plan:"Actions generated from the results, with an owner and a review point."};
+
+function showView(v){
+  view=v;page=(v==="report"?"home":"imports");
+  document.getElementById("view-report").hidden=v!=="report";
+  document.getElementById("view-admin").hidden=v!=="admin";
+  document.getElementById("dash-controls").style.display=v==="report"?"":"none";
+  document.getElementById("nav-report").setAttribute("aria-current",v==="report");
+  document.getElementById("nav-admin").setAttribute("aria-current",v==="admin");
+  buildTabs();showPage(page);
+}
+function showPage(id){
+  page=id;
+  const prefix=view==="report"?"p-":"a-";
+  (view==="report"?REPORT_PAGES:ADMIN_PAGES).forEach(([pid])=>{
+    const el=document.getElementById(prefix+pid);if(el)el.hidden=pid!==id;});
+  document.getElementById("page-title").textContent=TITLES[id]||id;
+  document.getElementById("page-sub").textContent=SUBS[id]||"";
+  buildTabs();
+  if(view==="report")render();else renderAdmin();
+  window.scrollTo({top:0});
+}
+
+/* ============================================================
+   RENDER — dashboard
+   ============================================================ */
+function render(){
+  readFilters();
+  const rows=sel(),a=agg(rows);
+  document.getElementById("rail-rows").textContent=n0(ROWS.length)+" assessments";
+  if(SUBS[page]) document.getElementById("page-sub").textContent=
+    SUBS[page]+" "+n0(a.facilities)+" facilities in view.";
+
+  if(page==="home") renderHome(rows,a);
+  if(page==="facility") renderFacility(rows);
+  if(page==="lga") renderLga(rows);
+  if(page==="monitor") renderMonitor(rows);
+  if(page==="visuals") renderVisuals();
+  if(page==="plan") renderPlan();
+}
+
+function renderHome(rows,a){
+  document.getElementById("h-score").textContent=rows.length?Math.round(a.overall):"\u2014";
+  document.getElementById("h-read").innerHTML=rows.length
+    ? `Averaged across <b>${n0(a.facilities)}</b> facilities and the three months of each assessed quarter.`
+    : `No assessments match these filters.`;
+  const per=uniq(rows.map(r=>r.lga+"|"+r.facility)).map(k=>{
+    const rr=rows.filter(r=>r.lga+"|"+r.facility===k);return avg(rr.map(overall));});
+  document.getElementById("h-fac").textContent=n0(a.facilities);
+  document.getElementById("h-lga").textContent=uniq(rows.map(r=>r.lga)).length;
+  document.getElementById("h-strong").textContent=n0(per.filter(v=>v>=TH.strong).length);
+  document.getElementById("h-weak").textContent=n0(per.filter(v=>v<TH.weak).length);
+
+  document.getElementById("h-dims").innerHTML=DIMS.concat("overall").map(d=>{
+    const v=d==="overall"?a.overall:a[d],b=band(v);
+    return `<div class="dim">
+      <div class="dim-name">${DIM_LABEL[d]}<span>${d==="overall"?"mean of the three":DIM_MEANS[d].replace(/\?$/,"")}</span></div>
+      <div class="dtrack"><div class="dfill ${b==="warn"?"w":b==="bad"?"b":""}" style="width:${clamp(v,0,100)}%"></div>
+        <span class="dmark" style="left:${TH.strong}%"></span></div>
+      <div class="dval">${rows.length?n1(v):"\u2014"}</div></div>`;
+  }).join("");
+  const weakest=DIMS.reduce((x,y)=>a[x]<a[y]?x:y);
+  document.getElementById("h-weakest").textContent=rows.length
+    ? DIM_LABEL[weakest]+" is the weakest dimension at "+n1(a[weakest])+". The mark on each bar is the strong threshold of "+TH.strong+"."
+    : "";
+
+  document.getElementById("h-split").innerHTML=["Public","Private"].map(o=>{
+    const rr=sel(r=>r.owner===o),g=agg(rr);
+    return `<div class="own ${o.toLowerCase()==="public"?"pub":"priv"}">
+      <div class="h"><b>${o} facilities</b><span class="c">${n0(g.facilities)} visited</span></div>
+      <div class="big" style="color:${o==="Public"?"var(--pub)":"var(--priv)"}">${rr.length?Math.round(g.overall):"\u2014"}</div>
+      <div class="cap">overall quality score</div>
+      <div class="ownrow">${DIMS.map(d=>
+        `<div><div class="k">${rr.length?Math.round(g[d]):"\u2014"}</div><div class="l">${DIM_LABEL[d]}</div></div>`).join("")}</div>
+    </div>`;}).join("");
+
+  drawQuarterTrend();
+  const worst=uniq(rows.map(r=>r.lga)).map(l=>({l,v:agg(rows.filter(r=>r.lga===l)).overall}))
+    .sort((x,y)=>x.v-y.v).slice(0,6);
+  document.getElementById("h-worst").innerHTML=worst.length?worst.map(w=>
+    `<tr><td>${w.l}</td><td class="n" style="width:88px"><span class="tag t-${statusTag(w.v)}">${n1(w.v)}</span></td></tr>`).join("")
+    :`<tr><td class="empty">Nothing to rank.</td></tr>`;
+}
+
+function renderFacility(rows){
+  document.getElementById("fac-metric").innerHTML=DIMS.concat("overall").map(d=>
+    `<button aria-pressed="${facMetric===d}" onclick="facMetric='${d}';render()">${DIM_LABEL[d]}</button>`).join("");
+  const qs=uniq(rows.map(r=>r.quarter));
+  const mn=qs.length===1?MONTHS[qs[0]]:["Month 1","Month 2","Month 3"];
+  [1,2,3].forEach(i=>document.getElementById("fh"+i).textContent=mn[i-1]);
+  const get=(r,m)=>facMetric==="overall"?monthScore(r,m):r[facMetric][m];
+  const tot=r=>facMetric==="overall"?overall(r):dimScore(r,facMetric);
+  const list=rows.slice().sort((x,y)=>tot(x)-tot(y)).slice(0,60);
+  document.getElementById("fac-table").innerHTML=list.length?list.map(r=>
+    `<tr><td>${r.facility}</td><td>${r.lga}</td><td>${r.ward}</td>
+     <td><span class="tag ${r.owner==="Public"?"t-pub":"t-priv"}">${r.owner}</span></td>
+     <td class="num">${r.quarter} ${r.year}<span class="sub-txt">${r.start_date}</span></td>
+     ${[0,1,2].map(m=>`<td class="heat" style="${heat(get(r,m))}">${n1(get(r,m))}</td>`).join("")}
+     <td class="n"><span class="tag t-${statusTag(tot(r))}">${n1(tot(r))}</span></td></tr>`).join("")
+    :`<tr><td colspan="9" class="empty">No facilities match these filters.</td></tr>`;
+  document.getElementById("fac-note").textContent=
+    "Showing the "+list.length+" lowest scoring of "+n0(rows.length)+" assessments in view, weakest first. "+
+    "The live tool sorts by month 1 descending, which puts the best facilities on top and hides the ones needing help.";
+}
+
+function renderLga(rows){
+  const list=uniq(rows.map(r=>r.lga)).map(l=>({l,...agg(rows.filter(r=>r.lga===l))}))
+    .sort((x,y)=>y.overall-x.overall);
+  document.getElementById("lga-grid").innerHTML=list.map(r=>
+    `<button class="lga s-${statusTag(r.overall)}" aria-pressed="${F.lga===r.l}" onclick="pickLga('${r.l.replace(/'/g,"\\'")}')">
+      <span class="n">${r.l}</span><span class="v">${Math.round(r.overall)}</span>
+      <span class="f">${r.facilities} facilities</span></button>`).join("")
+    ||`<div class="empty">No local governments match these filters.</div>`;
+  document.getElementById("lga-table").innerHTML=list.length?list.map(r=>
+    `<tr><td>${r.l}</td><td class="n">${r.facilities}</td>
+     ${DIMS.map(d=>`<td class="heat" style="${heat(r[d])}">${n1(r[d])}</td>`).join("")}
+     ${r.months.map(m=>`<td class="heat" style="${heat(m)}">${n1(m)}</td>`).join("")}
+     <td class="n">${n1(r.overall)}</td>
+     <td><span class="tag t-${statusTag(r.overall)}">${statusLabel(r.overall)}</span></td></tr>`).join("")
+    :`<tr><td colspan="10" class="empty">Nothing to show.</td></tr>`;
+}
+
+function renderMonitor(rows){
+  document.getElementById("mon-split").innerHTML=["Public","Private"].map(o=>{
+    const rr=sel(r=>r.owner===o),g=agg(rr);
+    return `<div class="own ${o==="Public"?"pub":"priv"}">
+      <div class="h"><b>${o} facilities</b><span class="c">${n0(g.facilities)} visited</span></div>
+      <div class="big" style="color:${o==="Public"?"var(--pub)":"var(--priv)"}">${rr.length?Math.round(g.overall):"\u2014"}</div>
+      <div class="cap">overall quality score</div>
+      <div class="ownrow">${DIMS.map(d=>
+        `<div><div class="k">${rr.length?Math.round(g[d]):"\u2014"}</div><div class="l">${DIM_LABEL[d]}</div></div>`).join("")}</div>
+    </div>`;}).join("");
+
+  const byLga=uniq(rows.map(r=>r.lga)).map(l=>({l,c:uniq(rows.filter(r=>r.lga===l).map(r=>r.facility)).length}))
+    .sort((x,y)=>y.c-x.c);
+  const max=Math.max(1,...byLga.map(b=>b.c));
+  const mean=avg(byLga.map(b=>b.c));
+  document.getElementById("mon-coverage").innerHTML=byLga.length?byLga.map(b=>
+    `<div class="prow"><div class="pl">${b.l}<span>${b.c} facilities visited</span></div>
+      <div class="ptrack" style="position:relative"><div class="pfill" style="width:${b.c/max*100}%"></div>
+      <span style="position:absolute;top:-2px;bottom:-2px;left:${mean/max*100}%;width:1.5px;background:var(--warn)"></span></div>
+      <div class="pval">${b.c}</div></div>`).join("")
+    :`<div class="empty">No coverage to show.</div>`;
+
+  const byLevel=LEVELS.map(lv=>({lv,c:uniq(rows.filter(r=>r.level===lv).map(r=>r.lga+"|"+r.facility)).length}));
+  const lmax=Math.max(1,...byLevel.map(b=>b.c));
+  document.getElementById("mon-level").innerHTML=byLevel.map(b=>
+    `<div class="prow"><div class="pl">${b.lv}<span>${b.c} facilities</span></div>
+      <div class="ptrack"><div class="pfill" style="width:${b.c/lmax*100}%"></div></div>
+      <div class="pval">${b.c}</div></div>`).join("");
+
+  const dates=rows.map(r=>r.start_date).filter(Boolean).sort();
+  document.getElementById("mon-window").innerHTML=`
+    <tr><td>Rounds in view</td><td class="n">${uniq(rows.map(r=>r.quarter+" "+r.year)).length}</td></tr>
+    <tr><td>First visit</td><td class="n">${dates[0]||"\u2014"}</td></tr>
+    <tr><td>Last visit</td><td class="n">${dates[dates.length-1]||"\u2014"}</td></tr>
+    <tr><td>Assessments recorded</td><td class="n">${n0(rows.length)}</td></tr>`;
+}
+
+function renderVisuals(){
+  document.getElementById("vis-owner").innerHTML=["all","Public","Private"].map(o=>
+    `<button aria-pressed="${visOwner===o}" onclick="visOwner='${o}';render()">${o==="all"?"Overall":o}</button>`).join("");
+  const rows=sel(r=>visOwner==="all"||r.owner===visOwner);
+  document.getElementById("vis-caption").textContent=
+    (visOwner==="all"?"All facilities":visOwner+" facilities")+" \u00b7 "+n0(rows.length)+" assessments";
+  const qs=uniq(rows.map(r=>r.quarter)).sort();
+  [1,2,3].forEach(m=>drawMonthChart("vm"+m,rows,m-1,qs));
+  document.getElementById("vis-rank-title").textContent=
+    "Scores by local government"+(visOwner==="all"?"":" \u2014 "+visOwner.toLowerCase()+" facilities");
+  ["overall",...DIMS].forEach(d=>drawRank("vr-"+d,rows,d));
+}
+
+const ACTIONS={
+  availability:["Restock HMIS tools and confirm the current register set is in place","LGA M&E officer"],
+  consistency:["On-site mentoring on reconciling the monthly summary against the register","State M&E team"],
+  validity:["Retraining on data element definitions and correct tool completion","Program manager"]
+};
+function renderPlan(){
+  const rows=sel();
+  const list=uniq(rows.map(r=>r.lga)).map(l=>{
+    const g=agg(rows.filter(r=>r.lga===l));
+    const weakest=DIMS.reduce((x,y)=>g[x]<g[y]?x:y);
+    return {l,overall:g.overall,weakest,score:g[weakest]};
+  }).sort((x,y)=>x.overall-y.overall);
+  const qs=uniq(rows.map(r=>r.quarter+" "+r.year));
+  const review=qs.length?qs.sort()[qs.length-1]:"next round";
+  document.getElementById("plan-table").innerHTML=list.length?list.map(r=>{
+    const [action,owner]=ACTIONS[r.weakest];
+    return `<tr><td>${r.l}</td>
+      <td class="n"><span class="tag t-${statusTag(r.overall)}">${n1(r.overall)}</span></td>
+      <td>${DIM_LABEL[r.weakest]}</td><td class="heat" style="${heat(r.score)}">${n1(r.score)}</td>
+      <td>${action}</td><td>${owner}</td><td class="num">after ${review}</td></tr>`;}).join("")
+    :`<tr><td colspan="7" class="empty">No local governments in view.</td></tr>`;
+  const counts=new Map();
+  list.forEach(r=>counts.set(r.weakest,(counts.get(r.weakest)||0)+1));
+  document.getElementById("plan-summary").innerHTML=DIMS.map(d=>
+    `<tr><td>${ACTIONS[d][0]}<span class="sub-txt">weakest dimension: ${DIM_LABEL[d]}</span></td>
+     <td class="n" style="width:70px">${counts.get(d)||0}</td>
+     <td style="width:110px">${ACTIONS[d][1]}</td></tr>`).join("");
+}
+
+function pickLga(l){
+  const s=document.getElementById("f-lga");
+  s.value=s.value===l?"all":l;render();window.scrollTo({top:0,behavior:"smooth"});
+}
+
+/* ---------- charts ---------- */
+function drawQuarterTrend(){
+  const keys=uniq(ROWS.map(r=>r.year+" "+r.quarter)).sort();
+  const pts=keys.map(k=>{
+    const [y,q]=k.split(" ");
+    const rr=sel(r=>String(r.year)===y&&r.quarter===q);
+    return {q:q+" "+y,v:rr.length?agg(rr).overall:null};
+  }).filter(p=>p.v!==null);
+  const W=560,H=200,pad={l:34,r:16,t:14,b:26},iw=W-pad.l-pad.r,ih=H-pad.t-pad.b;
+  const x=i=>pts.length>1?pad.l+i*(iw/(pts.length-1)):pad.l+iw/2;
+  const y=v=>pad.t+ih-(clamp(v,50,100)-50)/50*ih;
+  let s="";
+  [50,60,70,80,90,100].forEach(g=>{s+=`<line class="gridline" x1="${pad.l}" y1="${y(g)}" x2="${W-pad.r}" y2="${y(g)}"/><text x="${pad.l-8}" y="${y(g)+4}" text-anchor="end">${g}</text>`});
+  s+=`<line class="target" x1="${pad.l}" y1="${y(TH.strong)}" x2="${W-pad.r}" y2="${y(TH.strong)}"/><text x="${W-pad.r}" y="${y(TH.strong)-7}" text-anchor="end" fill="#A2760A">Strong ${TH.strong}</text>`;
+  if(pts.length>1)s+=`<path class="line" d="${pts.map((p,i)=>(i?"L":"M")+x(i)+" "+y(p.v)).join(" ")}"/>`;
+  pts.forEach((p,i)=>{const last=i===pts.length-1;
+    s+=`<circle class="dot ${last?"dot-last":""}" cx="${x(i)}" cy="${y(p.v)}" r="${last?5:4}"/>`;
+    s+=`<text class="val" x="${x(i)}" y="${y(p.v)-12}" text-anchor="middle">${n1(p.v)}</text>`;
+    s+=`<text x="${x(i)}" y="${H-6}" text-anchor="middle">${p.q}</text>`;});
+  s+=`<line class="axis" x1="${pad.l}" y1="${pad.t+ih}" x2="${W-pad.r}" y2="${pad.t+ih}"/>`;
+  document.getElementById("h-trend").innerHTML=s;
+}
+
+function drawMonthChart(id,rows,m,qs){
+  const W=300,H=210,pad={l:30,r:8,t:10,b:44},iw=W-pad.l-pad.r,ih=H-pad.t-pad.b;
+  const series=DIMS.concat("overall");
+  const colors={availability:"#0D4B44",consistency:"#5A6F68",validity:"#A2760A",overall:"#B7C4BF"};
+  const groups=qs.length?qs:["Q1"];
+  const gw=iw/groups.length,bw=Math.min(11,(gw-10)/series.length);
+  const y=v=>pad.t+ih-clamp(v,0,100)/100*ih;
+  let s="";
+  [0,25,50,75,100].forEach(g=>{s+=`<line class="gridline" x1="${pad.l}" y1="${y(g)}" x2="${W-pad.r}" y2="${y(g)}"/><text x="${pad.l-6}" y="${y(g)+4}" text-anchor="end">${g}</text>`});
+  groups.forEach((q,gi)=>{
+    const rr=rows.filter(r=>r.quarter===q);
+    const gx=pad.l+gi*gw+gw/2;
+    series.forEach((d,si)=>{
+      if(!rr.length)return;
+      const v=d==="overall"?avg(rr.map(r=>monthScore(r,m))):avg(rr.map(r=>r[d][m]));
+      const bx=gx-(bw*series.length+(series.length-1)*2)/2+si*(bw+2);
+      s+=`<rect x="${bx}" y="${y(v)}" width="${bw}" height="${Math.max(1,pad.t+ih-y(v))}" rx="2" fill="${colors[d]}"><title>${DIM_LABEL[d]} ${q}: ${n1(v)}</title></rect>`;
+    });
+    const label=(MONTHS[q]&&MONTHS[q][m])||q;
+    s+=`<text x="${gx}" y="${pad.t+ih+14}" text-anchor="middle">${label}</text>`;
+    s+=`<text x="${gx}" y="${pad.t+ih+25}" text-anchor="middle" fill="#8B9C96">${q}</text>`;
+  });
+  s+=`<line class="axis" x1="${pad.l}" y1="${pad.t+ih}" x2="${W-pad.r}" y2="${pad.t+ih}"/>`;
+  series.forEach((d,i)=>{const lx=pad.l+(i%4)*68;
+    s+=`<rect x="${lx}" y="${H-11}" width="9" height="8" rx="2" fill="${colors[d]}"/><text x="${lx+13}" y="${H-4}" style="font-size:9.5px">${DIM_LABEL[d]}</text>`;});
+  document.getElementById(id).innerHTML=s;
+}
+
+function drawRank(id,rows,dim){
+  const list=uniq(rows.map(r=>r.lga)).map(l=>{
+    const rr=rows.filter(r=>r.lga===l);
+    return {l,v:dim==="overall"?agg(rr).overall:avg(rr.map(r=>dimScore(r,dim)))};
+  }).sort((a,b)=>b.v-a.v);
+  const W=460,rowH=11.4,H=Math.max(60,list.length*rowH+26);
+  const labelW=104,valW=30,barW=W-labelW-valW-8;
+  let s="";
+  list.forEach((r,i)=>{
+    const y=i*rowH+10,w=clamp(r.v,0,100)/100*barW;
+    const col=r.v>=TH.strong?"#0D4B44":r.v>=TH.ok?"#3F7A70":r.v>=TH.weak?"#A2760A":"#9E3B2F";
+    s+=`<text x="${labelW-6}" y="${y+4}" text-anchor="end" style="font-size:9.5px">${r.l}</text>`;
+    s+=`<rect x="${labelW}" y="${y-4.5}" width="${barW}" height="9" rx="2" fill="#EDF1EC"/>`;
+    s+=`<rect x="${labelW}" y="${y-4.5}" width="${Math.max(1,w)}" height="9" rx="2" fill="${col}"><title>${r.l}: ${n1(r.v)}</title></rect>`;
+    s+=`<text x="${W-2}" y="${y+4}" text-anchor="end" style="font-size:9.5px;font-weight:600">${n1(r.v)}</text>`;
+  });
+  const el=document.getElementById(id);
+  el.setAttribute("viewBox","0 0 "+W+" "+H);
+  el.style.height=H+"px";
+  el.innerHTML=s||`<text x="10" y="24">No data</text>`;
+}
+
+/* ============================================================
+   RENDER — admin
+   ============================================================ */
+function renderAdmin(){
+  const bar=document.getElementById("databar");
+  bar.classList.toggle("live",!IS_SAMPLE);
+  document.getElementById("databar-text").textContent=IS_SAMPLE
+    ? "Sample data modelled on the published eDQA v3 scorecards. Import a CSV to load real figures."
+    : "Showing "+SOURCE_NAME+" \u2014 "+n0(ROWS.length)+" assessments loaded, "+n0(HELD.length)+" rows held.";
+  document.getElementById("rail-rows").textContent=n0(ROWS.length)+" assessments";
+
+  const g=agg(ROWS);
+  document.getElementById("dataset-info").innerHTML=`
+    <div class="step done"><span class="mark">&#10003;</span><span>${SOURCE_NAME}</span></div>
+    <div class="step done"><span class="mark">&#10003;</span><span>${n0(ROWS.length)} assessments</span></div>
+    <div class="step done"><span class="mark">&#10003;</span><span>${uniq(ROWS.map(r=>r.year+" "+r.quarter)).length} rounds, ${uniq(ROWS.map(r=>r.lga)).length} local governments</span></div>
+    <div class="step done"><span class="mark">&#10003;</span><span>${n0(g.facilities)} distinct facilities</span></div>
+    <div class="step ${HELD.length?"fail":"done"}"><span class="mark">${HELD.length?"!":"\u2713"}</span><span>${HELD.length?n0(HELD.length)+" rows held by checks":"No rows held"}</span></div>`;
+
+  document.getElementById("history").innerHTML=HISTORY.length?HISTORY.map(h=>
+    `<tr><td>${h.name}</td><td class="n">${n0(h.rows)}</td>
+     <td>${h.held?`<span class="tag t-warn">${h.held} held</span>`:`<span class="tag t-ok">Imported</span>`}</td></tr>`).join("")
+    :`<tr><td colspan="3" class="empty">Nothing imported yet in this session.</td></tr>`;
+
+  const counts=new Map();HELD.forEach(h=>counts.set(h.check,(counts.get(h.check)||0)+1));
+  document.getElementById("issue-list").innerHTML=CHECKS.map(c=>{
+    const n=counts.get(c.id)||0;
+    return `<div class="issue">
+      <span class="tag ${n?"t-bad":"t-ok"}" style="min-width:58px;text-align:center">${n?n+" held":"clear"}</span>
+      <div class="b"><b>${c.name}</b><span>${c.why}</span></div></div>`;}).join("");
+  document.getElementById("held-table").innerHTML=HELD.length?HELD.slice(0,60).map(h=>
+    `<tr><td class="n">${h.line}</td><td>${CHECKS.find(c=>c.id===h.check).name}</td>
+     <td>${h.facility}</td><td>${h.lga}</td><td><code>${h.detail}</code></td></tr>`).join("")
+    :`<tr><td colspan="5" class="empty">No rows are being held. Import a file with broken rows to see this fill up.</td></tr>`;
+
+  const all=agg(ROWS);
+  document.getElementById("proto-table").innerHTML=DIMS.map(d=>
+    `<tr><td>${DIM_LABEL[d]}</td><td>${DIM_MEANS[d]}</td><td class="n">${ROWS.length?n1(all[d]):"\u2014"}</td></tr>`).join("")+
+    `<tr><td><b>Overall</b></td><td>Mean of the three dimensions across all three months</td><td class="n">${ROWS.length?n1(all.overall):"\u2014"}</td></tr>`;
+
+  if(page==="facilities") renderFacilities();
+}
+function renderFacilities(){
+  const term=(document.getElementById("fsearch").value||"").toLowerCase();
+  const map=new Map();
+  ROWS.forEach(r=>{
+    const k=r.lga+"|"+r.facility;
+    if(!map.has(k))map.set(k,{facility:r.facility,ward:r.ward,lga:r.lga,level:r.level,owner:r.owner,visits:0,last:null,lastKey:""});
+    const e=map.get(k);e.visits++;
+    const key=r.year+r.quarter;
+    if(key>=e.lastKey){e.lastKey=key;e.last=overall(r)}
+  });
+  const rows=[...map.values()]
+    .filter(r=>!term||(r.facility+" "+r.ward+" "+r.lga).toLowerCase().includes(term))
+    .sort((a,b)=>a.lga.localeCompare(b.lga)||a.facility.localeCompare(b.facility)).slice(0,80);
+  document.getElementById("fac-master").innerHTML=rows.length?rows.map(r=>
+    `<tr><td>${r.facility}</td><td>${r.ward}</td><td>${r.lga}</td><td>${r.level}</td>
+     <td><span class="tag ${r.owner==="Public"?"t-pub":"t-priv"}">${r.owner}</span></td>
+     <td class="n">${r.visits}</td>
+     <td class="n"><span class="tag t-${statusTag(r.last)}">${n1(r.last)}</span></td></tr>`).join("")
+    :`<tr><td colspan="7" class="empty">No facility matches that. Try a ward or local government name.</td></tr>`;
+}
+
+function tog(el,name){
+  const on=el.getAttribute("aria-pressed")==="true";
+  el.setAttribute("aria-pressed",String(!on));
+  toast(name+(on?" sync paused.":" sync turned on. Next pull runs tonight."));
+}
+let toastT;
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.hidden=false;
+  clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3600)}
+
+function rebuildControls(){
+  const opt=(id,vals,label)=>{
+    const e=document.getElementById(id);
+    e.innerHTML=`<option value="all">${label}</option>`+vals.map(v=>`<option>${v}</option>`).join("");
+  };
+  opt("f-year",uniq(ROWS.map(r=>r.year)).sort(),"All years");
+  opt("f-q",uniq(ROWS.map(r=>r.quarter)).sort(),"All quarters");
+  opt("f-lga",uniq(ROWS.map(r=>r.lga)).sort(),"All LGAs");
+  opt("f-level",uniq(ROWS.map(r=>r.level)).sort(),"All levels");
+  opt("f-owner",uniq(ROWS.map(r=>r.owner)).sort(),"Public and private");
+}
+
+const dropEl=document.getElementById("drop");
+["dragenter","dragover"].forEach(e=>dropEl.addEventListener(e,ev=>{ev.preventDefault();dropEl.classList.add("over")}));
+["dragleave","drop"].forEach(e=>dropEl.addEventListener(e,ev=>{ev.preventDefault();dropEl.classList.remove("over")}));
+dropEl.addEventListener("drop",ev=>{const f=ev.dataTransfer.files[0];if(f)handleFile(f)});
+
+ROWS=buildSample();
+rebuildControls();
+if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches) document.body.classList.add("animate");
+buildTabs();render();renderAdmin();
+</script>
+</body>
+</html>

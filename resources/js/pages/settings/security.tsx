@@ -1,4 +1,4 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Link } from '@inertiajs/react';
 import ErrorSummary from '@/components/ErrorSummary';
 import RecoveryCodeList from '@/components/RecoveryCodeList';
 import SubmitButton from '@/components/SubmitButton';
@@ -18,9 +18,7 @@ export default function Security({ status, twoFactorEnabled, recoveryCodes }: Se
 
     return (
         <>
-            <Head title={t('auth.settings.title')} />
-            <h1 className="mb-6 text-2xl font-semibold">{t('auth.settings.title')}</h1>
-
+            {/* The title (h1 and <title>) comes from AppShell. */}
             <div className="grid max-w-xl gap-8">
                 <section aria-labelledby="password-title" className="rounded-[var(--radius-panel)] bg-panel p-6 shadow-[var(--shadow-panel)]">
                     <h2 id="password-title" className="mb-4 text-lg font-semibold">

@@ -45,6 +45,7 @@ final class RoundCache
         DTOs\OwnerSplit::class,
         DTOs\StateSummary::class,
         DTOs\TrendPoint::class,
+        DTOs\WardScore::class,
         Enums\Metric::class,
         ScoreValue::class,
         Band::class,
@@ -53,7 +54,14 @@ final class RoundCache
         Ownership::class,
     ];
 
-    private const PREFIX = 'edqa:reporting:';
+    /**
+     * Bump when a cached DTO changes shape (a property added or renamed). Every key carries it,
+     * so a deploy never serves an object cached by the previous code: an older StateSummary
+     * would unserialize without its new properties (seen in Phase 4 step 2 as "NaN" thresholds).
+     */
+    public const SCHEMA = 2;
+
+    private const PREFIX = 'edqa:reporting:v'.self::SCHEMA.':';
 
     /**
      * @template T

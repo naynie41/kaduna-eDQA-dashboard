@@ -66,6 +66,24 @@ services:
     profiles: [scheduler]            # opt-in locally, so ODK isn't pulled every 10 minutes
     depends_on: [app]
 
+  # Playwright end-to-end tests (`make e2e`), opt-in. The image's browsers match @playwright/test
+  # 1.64.1 in package.json: bump both together. It reuses the vite service's node_modules and
+  # forwards its own localhost:8080 / :5173 to web and vite (tests/e2e/run.sh), so the
+  # browser sees the developer's origins.
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf
+    profiles: [e2e]
+    working_dir: /app
+    entrypoint: ["sh", "tests/e2e/run.sh"]
+    environment:
+      E2E_FORWARD: "8080=web:80,5173=vite:5173"
+      CI: "1"
+    ipc: host
+    volumes:
+      - .:/app
+      - vite-node-modules:/app/node_modules
+    depends_on: [web, vite]
+
   postgres:
     image: postgres:16-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
     environment: { POSTGRES_PASSWORD: postgres }

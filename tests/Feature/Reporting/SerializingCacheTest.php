@@ -12,6 +12,7 @@ use App\Domain\Reporting\Aggregators\OwnerSplitAggregator;
 use App\Domain\Reporting\Aggregators\QuarterTrendAggregator;
 use App\Domain\Reporting\Aggregators\StateSummaryAggregator;
 use App\Domain\Reporting\Aggregators\WeakestLgasAggregator;
+use App\Domain\Reporting\Aggregators\WeakestWardsAggregator;
 use App\Domain\Reporting\DTOs\FacilitySort;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Domain\Reporting\RoundCache;
@@ -50,6 +51,7 @@ it('returns the same answer from a serializing cache as when computed', function
     'month slots' => fn () => app(MonthSlotAggregator::class)->series(new ReportFilter),
     'coverage' => fn () => app(CoverageAggregator::class)->coverage(new ReportFilter),
     'assessment window' => fn () => app(AssessmentWindowAggregator::class)->windows(new ReportFilter),
+    'weakest wards' => fn () => app(WeakestWardsAggregator::class)->weakest(new ReportFilter(lga: 'AAA')),
     'facility page' => fn () => app(FacilityScoresQuery::class)->paginate(new ReportFilter(year: 2026), FacilitySort::default()),
 ]);
 

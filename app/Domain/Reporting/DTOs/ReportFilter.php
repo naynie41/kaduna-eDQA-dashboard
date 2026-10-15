@@ -32,6 +32,62 @@ final readonly class ReportFilter
     ) {}
 
     /**
+     * The dashboard's reading of a URL: each filter is kept only if it can be chosen in the filter
+     * bar, and anything else falls back to "all" rather than erroring (a stale bookmark still
+     * opens). A year needs a round; a quarter needs its year and a round in that quarter; an LGA
+     * must be one of the 23.
+     *
+     * @param  array<string, mixed>  $query
+     * @param  list<array{year: int, quarter: int}>  $rounds  every round there is
+     * @param  list<string>  $lgaCodes
+     */
+    public static function resolve(array $query, array $rounds, array $lgaCodes): self
+    {
+        $int = fn (string $key): ?int => is_string($query[$key] ?? null) && ctype_digit($query[$key]) ? (int) $query[$key] : null;
+        $string = fn (string $key): ?string => is_string($query[$key] ?? null) ? $query[$key] : null;
+
+        $year = $int('year');
+        if ($year !== null && ! in_array($year, array_column($rounds, 'year'), true)) {
+            $year = null;
+        }
+        $quarter = $int('quarter');
+        if ($year === null || ! in_array(['year' => $year, 'quarter' => $quarter], $rounds, true)) {
+            $quarter = null;
+        }
+        $lga = $string('lga');
+
+        return new self(
+            year: $year,
+            quarter: $quarter,
+            lga: $lga !== null && in_array($lga, $lgaCodes, true) ? $lga : null,
+            level: FacilityLevel::tryFrom((string) $string('level')),
+            owner: Ownership::tryFrom((string) $string('owner')),
+        );
+    }
+
+    /** The same filter across every round: for trends, which show all rounds whatever is chosen. */
+    public function withoutRound(): self
+    {
+        return new self(lga: $this->lga, level: $this->level, owner: $this->owner);
+    }
+
+    /**
+     * Every filter key, null when not set: the shape the filter bar reads.
+     *
+     * @return array{year: ?int, quarter: ?int, lga: ?string, level: ?string, owner: ?string}
+     */
+    public function toProps(): array
+    {
+        return [
+            'year' => $this->year,
+            'quarter' => $this->quarter,
+            'lga' => $this->lga,
+            'level' => $this->level?->value,
+            'owner' => $this->owner?->value,
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $query  request query parameters; unknown keys are ignored
      *
      * @throws ValidationException

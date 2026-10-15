@@ -28,6 +28,11 @@ export default defineConfig({
         // Precompressed .br/.gz next to each asset; Caddy serves them (`precompressed br gzip`).
         compression({ algorithms: ['brotliCompress', 'gzip'] }),
     ],
+    // Pre-bundle the lazily imported chart library at startup: discovered at runtime, it makes
+    // the dev server re-optimise and reload the page mid-visit.
+    optimizeDeps: {
+        include: ['recharts'],
+    },
     server: {
         // Reachable from the host when running in the dev container; HMR back to localhost.
         host: '0.0.0.0',
@@ -41,7 +46,19 @@ export default defineConfig({
             // Chokidar's default 100 ms poll keeps a bind-mounted repo busy; 1 s is plenty for HMR.
             interval: 1000,
             binaryInterval: 3000,
-            ignored: ['**/vendor/**', '**/discovery/**', '**/storage/**', '**/.claude/**'],
+            // Polling cost grows with every file watched: leave out everything the frontend never
+            // imports, notably public/build (a production build leaves ~150 files there).
+            ignored: [
+                '**/vendor/**',
+                '**/discovery/**',
+                '**/storage/**',
+                '**/.claude/**',
+                '**/public/build/**',
+                '**/tests/**',
+                '**/database/**',
+                '**/docs/**',
+                '**/bootstrap/cache/**',
+            ],
         },
     },
 });

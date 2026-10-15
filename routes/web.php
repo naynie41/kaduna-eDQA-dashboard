@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Auth\TwoFactorSetupController;
+use App\Http\Controllers\Dashboard;
+use App\Http\Controllers\Dashboard\DashboardRedirectController;
+use App\Http\Controllers\DevComponentsController;
 use App\Http\Controllers\OdkWebhookController;
 use App\Http\Controllers\Quarantine\BulkResolveQuarantineController;
 use App\Http\Controllers\Quarantine\OverrideSoftFlagController;
@@ -11,6 +14,7 @@ use App\Http\Controllers\Quarantine\ResolveQuarantineController;
 use App\Http\Controllers\Rounds\RoundController;
 use App\Http\Controllers\Scoring\RescoreController;
 use App\Http\Controllers\Scoring\ScoringRuleController;
+use App\Http\Middleware\ShareDashboardContext;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -35,7 +39,24 @@ Route::get('user/two-factor-recovery-codes', fn () => abort(404))
     ->name('two-factor.recovery-codes');
 
 Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function (): void {
-    Route::inertia('/', 'dashboard')->name('home');
+    // The dashboard (ARCHITECTURE.md §9.2): `/` and `/dashboard` open Home. Filters live in the
+    // query string, resolved once per request by ShareDashboardContext.
+    Route::get('/', DashboardRedirectController::class)->name('home');
+    Route::get('dashboard', DashboardRedirectController::class)->name('dashboard');
+    Route::prefix('dashboard')->name('dashboard.')->middleware(ShareDashboardContext::class)->group(function (): void {
+        Route::get('home', Dashboard\HomeController::class)->name('home');
+        Route::get('facility', Dashboard\FacilityController::class)->name('facility');
+        Route::get('lga', Dashboard\LgaController::class)->name('lga');
+        Route::get('monitor', Dashboard\MonitorController::class)->name('monitor');
+        Route::get('visuals', Dashboard\VisualsController::class)->name('visuals');
+        Route::get('plan', Dashboard\PlanController::class)->name('plan');
+    });
+
+    // Administration (ARCHITECTURE.md §9.3): a landing page until its five pages arrive (Phase 5).
+    Route::inertia('admin', 'admin/index')->name('admin');
+
+    // Component gallery for design review; 404 outside the local environment.
+    Route::get('dev/components', DevComponentsController::class)->name('dev.components');
 
     require __DIR__.'/settings.php';
 

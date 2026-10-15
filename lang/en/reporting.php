@@ -14,6 +14,14 @@ return [
         7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
     ],
 
+    // The trend chart's takeaway (QuarterTrendAggregator::takeaway).
+    'trend' => [
+        'takeaway_single' => ':round: :score.',
+        'takeaway_up' => ':round: :score, up :change points from :previous.',
+        'takeaway_down' => ':round: :score, down :change points from :previous.',
+        'takeaway_unchanged' => ':round: :score, unchanged from :previous.',
+    ],
+
     // edqa:report:summary
     'summary' => [
         'round' => ':round (:status, rule version :version)',
