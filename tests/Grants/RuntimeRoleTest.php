@@ -3,14 +3,22 @@
 declare(strict_types=1);
 
 use App\Domain\Reporting\Jobs\RefreshRoundAggregatesJob;
+use App\Domain\Round\Actions\CloseRound;
+use App\Domain\Round\Actions\CreateRound;
+use App\Domain\Round\Actions\ReopenRound;
+use App\Domain\Round\Actions\UpdateRoundWindow;
+use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Actions\RescoreRound;
 use App\Domain\Scoring\Enums\RescoreStatus;
 use App\Domain\Scoring\Enums\RescoreTrigger;
+use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\RescoreFixture;
+use Tests\Support\Rows;
 
 // Run by `make grants-check`: edqa_test is migrated by edqa_migrator and has had
 // post-migrate-grants.sql applied (DEPLOY.md §8.2–8.3). These tests then act as edqa_app, the
@@ -71,6 +79,22 @@ it('rescores a round as the runtime role: scores, audit, flags, progress and the
         ->and($run->status)->toBe(RescoreStatus::Succeeded)
         ->and($run->changed_scores)->toBe(9)
         ->and($run->changed_flags)->toBe(1);
+});
+
+it('creates, re-windows, closes and reopens a round as the runtime role', function (): void {
+    $admin = User::query()->findOrFail(Rows::user());
+    Rows::ruleVersion(['version' => 9001, 'created_by' => $admin->id]);
+    config(['database.default' => 'pgsql_app_test']);
+    DB::purge('pgsql_app_test');
+
+    // CreateRound and UpdateRoundWindow lock the rounds table; CloseRound refreshes the view.
+    $round = app(CreateRound::class)->execute(2091, 2, CarbonImmutable::parse('2091-04-01'), CarbonImmutable::parse('2091-06-30'), $admin)->round;
+    app(UpdateRoundWindow::class)->execute($round, CarbonImmutable::parse('2091-04-02'), CarbonImmutable::parse('2091-06-30'), $admin);
+    app(CloseRound::class)->execute($round, $admin);
+    $reopened = app(ReopenRound::class)->execute($round, $admin, 'Grants check reopening')->round;
+
+    expect(DB::selectOne('select current_user as role')?->role)->toBe('edqa_app')
+        ->and($reopened->status)->toBe(RoundStatus::Open);
 });
 
 it('cannot refresh the view directly: only through the SECURITY DEFINER function', function (): void {

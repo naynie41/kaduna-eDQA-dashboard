@@ -7,6 +7,64 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-14
+
+Phase 3 (Scoring and aggregation): steps 7 and 9 of `CLAUDE.md` §6, plus the round lifecycle.
+Every score is derived from item responses under the rule version its round uses; every number
+a page will show is computed by an Aggregator, reconciled with the `round_aggregates` view, and
+checked against the published reference figures. Data still comes from the synthetic seed:
+validating against a real client round waits for ODK access (`ARCHITECTURE.md` §11.5).
+
+### Added
+
+- Rule versions pinned to rounds (D-32): `RuleVersionForRound` decides the version everywhere;
+  `rounds.rule_version_id` with CHECK `rounds_closed_has_rule_version`; one draft at a time.
+- Scoring rules: `CreateDraftRuleVersion`, `PublishRuleVersion` (reason required, audited) and a
+  read-only band-change preview, at `/api/scoring-rules` (list, create, preview, publish).
+- Presentation: `ScoreValue` `{ value, display, headline, band, bandLabel }`, `Presentation`
+  rounding (`half_up` or `truncate`, Q-09) and `Bands::classify` on the displayed value (Q-26).
+- Ten aggregators in `App\Domain\Reporting\Aggregators` (state summary, dimensions, owner split,
+  LGA table, facility scores, quarter trend, month slots, coverage, assessment window, weakest
+  LGAs), all taking a `ReportFilter`, cached per round by `RoundCache`.
+- `round_aggregates` v3: accepted assessments only, each round under its own version; aggregators
+  read it when the filter maps onto a view row and fall back to SQL otherwise (D-33).
+- `RefreshRoundAggregatesJob`: debounced (unique per round for 60 s), then flushes the round cache.
+- Rescore (D-34): `RescoreRound` and a `Bus::batch` of `RescoreRoundJob` on the `rescore` queue,
+  200 assessments a chunk; idempotent upserts that touch only changed rows, audited; SCORE_JUMP,
+  ALL_PERFECT and all-N/A notes recomputed, overrides kept; progress in `rescore_runs`.
+  Triggers: rule publish (open rounds), quarantine resolved, the new `AssessmentCorrected` event,
+  `edqa:rescore {round?} {--all-open}` and `POST /api/rounds/{id}/rescore` (reason required),
+  with `GET /api/rescores/{batchId}`.
+- Round lifecycle (D-35): `CreateRound`, `UpdateRoundWindow`, `CloseRound`, `ReopenRound`, each
+  audited, with `GET/POST /api/rounds`, `PATCH /api/rounds/{id}`, `POST /api/rounds/{id}/close`
+  and `/reopen`; windows checked against the quarter (45-day grace for late visits) and each
+  other; closing pins the version, snapshots the view and dispatches `RoundClosed`.
+- `DemoScoringSeeder`: `make fresh` scores the demo data with the real rescore and pins closed
+  rounds to version 1; the generator now produces weak LGAs and a few ALL_PERFECT and SCORE_JUMP
+  flags. `edqa:report:summary {--round=} {--lga=}` prints the figures without a UI.
+- `make test-slow`: the rescore performance test (2,200 assessments; 3.7 s measured, target 5 min).
+
+### Changed
+
+- SCORE_JUMP and ALL_PERFECT share their checks with the rescore (`ScoreFlags`).
+- The default suite (`make check`) leaves out the `slow` group.
+
+### Fixed
+
+- `round_aggregates` counted withdrawn assessments in `facility_count` (v3 counts accepted and
+  flagged only).
+- Every cached dashboard answer came back as `__PHP_Incomplete_Class` on Redis or the database
+  cache store: the cache now unserializes only the aggregators' DTOs and enums, and rounds are
+  cached as plain columns (D-36).
+- `ReferenceFiguresTest` failed intermittently under parallel load: its bulk-loaded tables are now
+  analysed, as a live database's are, so the planner no longer picks a minutes-long plan.
+
+### Open
+
+- Q-09 and Q-26 (rounding mode and banding on the displayed value, decided together), Q-27
+  (`facility_count` weighting), Q-28 (a facility's score across several rounds), Q-29 (reopening
+  a round after a newer version) and Q-20 (audit volume of rescores) await the client.
+
 ## [0.2.0] - 2026-10-13
 
 Phase 2A (Validation): the validation gate, step 6 of `CLAUDE.md` §6, plus the pure core of the
@@ -111,6 +169,7 @@ or dashboard pages yet.
 - The session cookie is `Secure` unless `SESSION_SECURE_COOKIE=false`, which is meant for local
   HTTP development only.
 
-[Unreleased]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/releases/tag/v0.1.0

@@ -8,11 +8,9 @@ use App\Domain\Assessment\Events\AssessmentCorrected;
 use App\Domain\Assessment\Events\AssessmentScored;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Reporting\DTOs\ReportFilter;
-use App\Domain\Reporting\Jobs\RefreshRoundAggregatesJob;
 use App\Domain\Reporting\Listeners\FlushRoundCache;
 use App\Domain\Reporting\Listeners\RefreshAggregatesAfterScore;
 use App\Domain\Reporting\RoundCache;
-use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Events\RuleVersionPublished;
 use App\Domain\Scoring\Listeners\RescoreAfterAssessmentCorrected;
@@ -58,13 +56,8 @@ final class AppServiceProvider extends ServiceProvider
         Round::deleted(fn () => app(RoundCache::class)->flushAll());
         Lga::saved(fn () => ReportFilter::forgetLgaCodes());
 
-        // round_aggregates follows scores (debounced) and a round closing (its version is pinned).
+        // round_aggregates follows scores (debounced); CloseRound refreshes it itself (the snapshot).
         Event::listen(AssessmentScored::class, RefreshAggregatesAfterScore::class);
-        Round::saved(function (Round $round): void {
-            if ($round->wasChanged('status') && $round->status === RoundStatus::Closed) {
-                RefreshRoundAggregatesJob::debounced($round->id);
-            }
-        });
     }
 
     /**

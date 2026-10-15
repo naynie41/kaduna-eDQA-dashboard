@@ -23,6 +23,12 @@ return [
         'read_view' => true,
     ],
 
+    'rounds' => [
+        // ARCHITECTURE.md §3: a round's window lies inside its quarter, but may end up to this many
+        // days after the quarter for late visits (allowed with a warning). Windows never overlap.
+        'window_grace_days' => 45,
+    ],
+
     'rescore' => [
         // ARCHITECTURE.md §7: assessments per RescoreRoundJob in the batch (one transaction each).
         'chunk_size' => 200,

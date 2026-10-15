@@ -15,13 +15,14 @@ use RuntimeException;
  * DEMO assessments for local and staging (and tests): never production.
  *
  * One accepted assessment per sampled facility per round, each with a synthetic submission
- * and item responses only. Scores are NOT seeded: scoring arrives in Phase 3 and derives them
- * from these items (CLAUDE.md hard rule 2).
+ * and item responses only. Scores are never seeded: DemoScoringSeeder derives them from these
+ * items with the real rescore (CLAUDE.md hard rule 2).
  *
  * Items are tuned so pass rates approximate the published state means (CONVENTION.md §8):
  * Public ≈ 92 / 79 / 92, Private ≈ 75 / 62 / 84 (availability / consistency / validity). Each
  * item passes with probability (target + LGA lift + facility lift) / 100, so LGAs and
- * facilities differ realistically. Seeded, so every run produces the same data.
+ * facilities differ realistically. A few LGAs are held low (WEAK_LGAS), a few visits pass every
+ * item (ALL_PERFECT) and a few collapse (SCORE_JUMP). Seeded, so every run produces the same data.
  */
 final class DemoAssessmentSeeder extends Seeder
 {
@@ -43,6 +44,21 @@ final class DemoAssessmentSeeder extends Seeder
 
     private const FACILITY_LIFT_SD = 4.0;
 
+    /**
+     * LGAs held below the rest (points off every pass rate), so the LGA table and the weakest-LGA
+     * list have something under 80 to show. All LGA lifts are then centred on zero (weighted by
+     * facilities), so the state means stay on their targets.
+     */
+    private const WEAK_LGAS = ['Birnin Gwari' => -10.0, 'Kauru' => -10.0, 'Kudan' => -11.0];
+
+    /** About one visit in this many passes every item: ALL_PERFECT. */
+    private const PERFECT_EVERY = 250;
+
+    /** About one visit in this many collapses by COLLAPSE_DROP points: SCORE_JUMP against an earlier visit. */
+    private const COLLAPSE_EVERY = 80;
+
+    private const COLLAPSE_DROP = 40.0;
+
     private Randomizer $random;
 
     public function run(): void
@@ -59,7 +75,9 @@ final class DemoAssessmentSeeder extends Seeder
             ->get(['facilities.id', 'facilities.code', 'facilities.lga_id', 'facilities.ownership', 'lgas.name as lga', 'facilities.ward_id']);
         $rounds = DB::table('rounds')->orderBy('year')->orderBy('quarter')->get();
 
-        $lgaLift = $lgas->mapWithKeys(fn (object $l): array => [$l->id => $this->gauss(self::LGA_LIFT_SD)]);
+        $lgaLift = $lgas->mapWithKeys(fn (object $l): array => [$l->id => $this->gauss(self::LGA_LIFT_SD) + (self::WEAK_LGAS[$l->name] ?? 0.0)]);
+        $centre = $facilities->isEmpty() ? 0.0 : $facilities->avg(fn (object $f): float => $lgaLift[$f->lga_id]);
+        $lgaLift = $lgaLift->map(fn (float $lift): float => $lift - $centre);
         $facilityLift = $facilities->mapWithKeys(fn (object $f): array => [$f->id => $this->gauss(self::FACILITY_LIFT_SD)]);
 
         $visits = [];
@@ -158,9 +176,12 @@ final class DemoAssessmentSeeder extends Seeder
 
         foreach ($visits as [$round, $facility]) {
             $assessmentId = $assessmentIds[$submissionIds[$this->instanceId($round, $facility)]];
+            $visit = "{$round->year}q{$round->quarter}-{$facility->code}";
+            $perfect = crc32("perfect-{$visit}") % self::PERFECT_EVERY === 0;
+            $drop = crc32("collapse-{$visit}") % self::COLLAPSE_EVERY === 0 ? self::COLLAPSE_DROP : 0.0;
 
             foreach (self::TARGETS[$facility->ownership] as $dimension => $target) {
-                $passRate = max(0.0, min(1.0, ($target + $lgaLift[$facility->lga_id] + $facilityLift[$facility->id]) / 100));
+                $passRate = $perfect ? 1.0 : max(0.0, min(1.0, ($target + $lgaLift[$facility->lga_id] + $facilityLift[$facility->id] - $drop) / 100));
 
                 foreach ([1, 2, 3] as $slot) {
                     for ($i = 1; $i <= self::ITEMS_PER_CELL; $i++) {

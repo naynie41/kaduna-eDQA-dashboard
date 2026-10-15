@@ -113,7 +113,7 @@ not depend on `Ingestion` or `Validation` models (architecture test).
 | `QuarantineResolved` | debounced `RequestRescoreJob` for the round → `RescoreRound` |
 | `RuleVersionPublished` | debounced `RequestRescoreJob` per **open** round (D-32) → `RescoreRound` |
 | `AssessmentCorrected` | debounced `RequestRescoreJob` for the round → `RescoreRound` |
-| `RoundClosed` | refresh materialised view, snapshot |
+| `RoundClosed` | none yet: `CloseRound` refreshes the view itself before dispatching (digest, snapshot exports later) |
 | `PullFailed` | admin alert, digest entry |
 
 **Queues:** `default` (pull, process), `rescore`, `exports`, `low` (attachments).
@@ -200,8 +200,20 @@ Implement once in `App\Domain\Round\MonthSlot::label(int $quarter, int $slot)` a
 - **open** — submissions whose visit date falls in the window bind to it.
 - **closed** — no new submissions bind; aggregates are snapshotted into `round_aggregates`.
   A submission for a closed round quarantines under `ROUND_WINDOW` with detail "round closed".
-- **reopen** — requires typed reason, audited, triggers rescore on next close.
-- Windows must not overlap between rounds (validated on create/edit).
+- **close** (`CloseRound`) — pins the version the round is scored under (`rule_version_id`, D-32),
+  refreshes `round_aggregates` at once (the snapshot), dispatches `RoundClosed`, audited. Refused
+  while any counted assessment has no scores under that version (a rescore still running).
+- **reopen** (`ReopenRound`) — requires typed reason, audited, sets `reopened_reason`; the pin is
+  left until the next close re-pins. An open round reads the current version, so the round is
+  rescored at once when asked (`rescore: true`) and always when its pin is no longer current
+  (Q-29).
+- **create / edit window** (`CreateRound`, `UpdateRoundWindow`) — one round per year and quarter;
+  the window starts inside the quarter and ends by its last day plus
+  `edqa.rounds.window_grace_days` (45; past the quarter is allowed with a warning); windows of two
+  rounds never share a day; an edit never leaves an accepted visit outside the window, and a
+  closed round's window cannot be edited. All audited (`created`, `window_updated`).
+- Windows must not overlap between rounds (validated on create/edit, under a table lock; not a
+  database constraint, so ROUND_WINDOW's "two windows" check still guards older data).
 
 > The PRD also mentions a "publish state" (PRD §5) and "published rounds" (PRD §8). v1 treats **closed =
 > published**. See §11 Decisions D-07.
@@ -582,7 +594,11 @@ test (Pest `arch()`) asserts `App\Domain\Reporting` does not depend on
 3. Changing a rule never mutates history: it creates a new version and triggers a rescore; old
    scores stay readable for closed rounds.
 4. Aggregates are SQL over `assessment_scores` (and the `round_aggregates` view), cached, and
-   invalidated by round.
+   invalidated by round. `RoundCache` hides the store: with tags (Redis, array) entries carry
+   `edqa` and `round:{id}` tags; without (database, file) a per-round generation number is folded
+   into the key and a flush bumps it. Entries expire after six hours as a safety net; the flushes
+   (`AssessmentScored`, `QuarantineResolved`, a publish, a round saved, a finished rescore) do the
+   real work. Only the aggregators' DTOs and enums may be unserialized from the cache (D-36).
 5. Store full precision (`numeric(5,2)`); round **only** at presentation.
 
 ### Computation (`ScoreCalculator`)
@@ -638,7 +654,9 @@ All take a `ReportFilter` DTO (year, quarter, lga, level, owner) built from the 
 > dimension values are unrounded (e.g. 74.7/61.9/83.8) or it truncates. Test against the
 > **unrounded** figures from a known client round, and confirm the display rounding rule
 > (half-up vs truncate) with the client. See §11 Decisions Q-09.
-> Also: (2000×87.67 + 219×73.67)/2219 ≈ 86.29, not 86.5 — still displays 86.
+> Also: (2000×87.67 + 219×73.67)/2219 ≈ 86.29, not 86.5 — still displays 86. From the unrounded
+> means (263/3 and 221/3) it is 574399/6657 = 86.28496, which is what `ReferenceFiguresTest`
+> asserts (1 dp display 86.3, headline 86).
 
 ### Bands
 
@@ -656,13 +674,35 @@ Changing a band never changes a stored score. Band logic lives server-side
 (`App\Domain\Scoring\Bands`); the frontend receives the band key with each number and never
 recomputes it.
 
+`Bands::classify` bands the value **as displayed**: rounded to 1 dp in the configured mode, so a
+cell showing "90.0" is always Strong (Q-26, default built). The thresholds come from the rule
+version the number was read under (D-32).
+
+### Presentation (`ScoreValue`)
+
+Every number leaves the server as one shape, `ScoreValue` `{ value, display, headline, band,
+bandLabel }`: `value` at full precision (null for no data), `display` to 1 dp (tables),
+`headline` to 0 dp (hero figures), `band` and its translated label. `App\Domain\Scoring\Presentation`
+is the only place rounding happens: `edqa.presentation.rounding` = `half_up` (default) or
+`truncate` (the live tool's 73, Q-09). No data is `—` / "No data", never zero.
+
 ### Rule versions
 
 - `scoring_rule_versions.config` jsonb: `{ bands, item_weights, na_policy, choice_map }`.
-- Edit → new **draft** version. **Publish** requires a typed reason and shows a **preview**:
-  number of facilities and LGAs that would change band, per round. Then dispatches rescore.
-- Current version = highest published. Closed rounds keep their existing scores readable; the
-  dashboard reads the current version by default.
+- Edit → new **draft** version (one at a time; only the four config keys change, and a config the
+  calculator cannot apply is refused). **Publish** requires a typed reason and shows a
+  **preview** (`RuleVersionPreviewAggregator`): facilities and LGAs that would change band, per
+  open round, computed from item responses and writing nothing. Then `RuleVersionPublished`
+  rescores every open round (debounced, §7 Rescore).
+- Current version = highest published. Which version a round is read and written under is
+  decided in one place, `RuleVersionForRound` (D-32): an **open** round the current version, a
+  **closed** round the version pinned when it closed. SQL that needs the same answer
+  (`FacilityScoresSql`, `round_aggregates`, the SCORE_JUMP prior query) applies the same rule.
+- Flow: ingest and rescore write under the round's version → `CloseRound` pins it (refused while
+  any counted assessment lacks scores under it) → a later publish rescores open rounds only, the
+  closed round's scores and figures untouched → `ReopenRound` (reason required) puts it back on
+  the current version, rescoring it at once when the pin is no longer current (Q-29) → the next
+  close re-pins.
 
 ### Rescore
 
@@ -703,9 +743,11 @@ No public API, no API tokens in v1.
 | GET | `/api/aggregates` | Scores by scope, honouring all five filters |
 | GET | `/api/facilities` | Paginated (50), sortable, filterable facility scores |
 | GET | `/api/facilities/{id}` | Detail: item responses, history, attachments, audit |
-| GET | `/api/rounds` | Rounds and status |
-| POST | `/api/rounds/{id}/close` | Close round, snapshot aggregates |
-| POST | `/api/rounds/{id}/reopen` | Reopen (reason required) |
+| GET | `/api/rounds` | Rounds and status, window, pinned version and the version read now |
+| POST | `/api/rounds` | Create `{ year, quarter, window_start, window_end }`; 201 with `warnings` |
+| PATCH | `/api/rounds/{id}` | Move the window `{ window_start, window_end }`; returns `warnings` |
+| POST | `/api/rounds/{id}/close` | Close round, pin version, snapshot aggregates |
+| POST | `/api/rounds/{id}/reopen` | Reopen `{ reason, rescore? }` (reason required); returns the `rescore` run if one started |
 | POST | `/api/rounds/{id}/rescore` | Rescore (reason required, audited); 202 with `{ batch_id, run_id, … }`; 409 for a closed round |
 | GET | `/api/rescores/{batchId}` | Progress: chunks (total, processed, failed), assessments, changed scores and flags, status |
 | POST | `/api/odk/pull` | Manual pull; returns `{ run_id }` |
@@ -884,9 +926,11 @@ blocks use Inertia deferred props; charts are `React.lazy`; fonts self-hosted wi
 | D-29 | For `ASSESSOR_VOLUME` an assessor is the name (case and spacing ignored) plus the device ID when present. A visit with no device ID is matched to other no-device visits under that name only. Counted: distinct facilities per local day across accepted assessments, the batch's accepted submissions and the visit being checked. Soft-rule thresholds are never written into rule text: the "why" strings take `:points`, `:minutes`, `:maximum` from `edqa.validation.soft_rules` | Owner spec, 2026-10-08. Two people with the same name on different phones are counted apart; the same facility twice in a day counts once |
 | D-30 | The Postgres session runs in the app time zone (`config/database.php` `timezone` = `APP_TIMEZONE`, Africa/Lagos), and `ProcessParsedSubmission` converts ODK's times to that zone before writing | Bug found in Phase 2A step 6: Laravel writes timestamps without an offset, and the session was UTC, so every stored time (every `now()`, every visit) was an hour off and a 23:30 visit landed on the next local day. Residual risk: any other code that writes a Carbon in a different zone through Eloquent or the query builder must convert it first. Dev data written before this fix is off by an hour: `make fresh` |
 | D-31 | Quarantine resolution: a rejected record is `status = resolved, resolution = rejected` (the schema's CHECK has no `rejected` status); soft flags are overridden on the assessment (`POST /api/assessments/{id}/flags/{code}/override`), not through `/api/quarantine/{id}/resolve`, which takes `correct` or `reject`; bulk resolution needs every record to have the same set of hard-failure codes; corrections are snake_case keys of the parsed snapshot (`lga_ref`, `ward_ref`, `facility_ref`, `raw_start`, `raw_end`, `round_year`, `round_quarter`) and a corrected start or end is re-parsed. Each action writes one explicit audit entry (event, old, new, reason) and suppresses the model's own | Phase 2A step 8. A quarantined record never has soft flags to override: flags live on accepted assessments |
-| D-32 | **Rule versions are pinned to rounds.** An open round uses the current published version; closing a round pins the version it was scored with (`rounds.rule_version_id`, CHECK `rounds_closed_has_rule_version`); a closed round is never rescored unless it is reopened (with a reason); `RuleVersionPublished` therefore asks for a rescore of **open** rounds only. Every read or write of a score goes through `RuleVersionForRound` (or, in SQL, the per-round version in `round_aggregates_v2.sql` and the SCORE_JUMP prior query), never "the highest published version" directly. One draft at a time (`scoring_rule_versions_one_draft`) | Owner decision, Phase 3 step 1 (requested as "D-18", which was already taken). Supersedes §7's "the dashboard reads the current version by default" for closed rounds. Without the per-round read, publishing v2 would drop every closed round out of the aggregates and blind SCORE_JUMP. Until `RescoreRoundJob` exists, a publish leaves open rounds with no scores under the new version |
+| D-32 | **Rule versions are pinned to rounds.** An open round uses the current published version; closing a round pins the version it was scored with (`rounds.rule_version_id`, CHECK `rounds_closed_has_rule_version`); a closed round is never rescored unless it is reopened (with a reason); `RuleVersionPublished` therefore asks for a rescore of **open** rounds only. Every read or write of a score goes through `RuleVersionForRound` (or, in SQL, the per-round version in `round_aggregates_v2.sql` and the SCORE_JUMP prior query), never "the highest published version" directly. One draft at a time (`scoring_rule_versions_one_draft`) | Owner decision, Phase 3 step 1 (requested as "D-18", which was already taken). Supersedes §7's "the dashboard reads the current version by default" for closed rounds. Without the per-round read, publishing v2 would drop every closed round out of the aggregates and blind SCORE_JUMP. Refined in Phase 3: `RescoreRound` (step 5) rescores open rounds after a publish and refuses a closed one; `CloseRound` (step 6) pins the version and is refused while any counted assessment lacks scores under it; `ReopenRound` returns the round to the current version and rescores it when the pin is no longer current (Q-29, D-35) |
 | D-33 | **`round_aggregates` is a cache of the aggregators, reconciled to 1e-9.** v3 counts accepted/flagged assessments only (v2 counted every status, so a withdrawn visit inflated `facility_count`). Aggregators read the view for one round when the filter maps onto a view row, and their own SQL otherwise. The view is refreshed by a debounced `RefreshRoundAggregatesJob` (unique per round, 60 s), so a dashboard answer can lag a new score by up to about a minute, then the round cache flushes. `edqa.aggregation.read_view=false` turns the view path off. In tests the job is faked globally (`tests/Pest.php`), because on the sync queue it would rebuild the view on every score | Phase 3 step 4. The aggregators are the specification; the view is an optimisation that must agree with them |
 | D-34 | **Rescore is chunked, idempotent and debounced.** `RescoreRound` refuses closed rounds (D-32); progress is kept in `rescore_runs` (the admin history; `job_batches` is the queue's own and is pruned). A chunk writes only rows whose value changes and audits each one (inserted or changed; Q-20 still open on volume). Score-based soft flags are recomputed by the same pure checks the rules use (`ScoreFlags`); an administrator's override, found by its `flag_overridden` audit entry, is permanent. Automatic triggers are collapsed per round by `RequestRescoreJob`; a manual request needs a reason. An assessment a new version can no longer score loses that version's rows instead of keeping stale ones. **Known limit:** after a publish each open round is rescored on its own, so a later open round's SCORE_JUMP may compare against an earlier open round not yet rescored under the new version (no prior score, so no flag); rescoring that round again settles it | Phase 3 step 5. Measured: 2,200 assessments in 4.0 s |
+| D-35 | **Round lifecycle actions.** `CreateRound`, `UpdateRoundWindow`, `CloseRound`, `ReopenRound` each write one explicit audit entry (`created`, `window_updated`, `closed`, `reopened` with the reason) and suppress the model's own. Close pins the version and refreshes `round_aggregates` synchronously (the snapshot; the Round::saved hook that queued a refresh is gone) and is refused while any counted assessment lacks scores under that version, so a round is never pinned to scores it does not have. Window edits are refused on a closed round. Overlap is enforced in the actions under a table lock, not by an exclusion constraint, because older data and ROUND_WINDOW's ambiguity test rely on overlapping windows being representable | Phase 3 step 6 |
+| D-36 | **The report cache unserializes only an allow-list.** Laravel 13 refuses to unserialize any class from the cache unless listed (`cache.serializable_classes`, against gadget chains). The list is `RoundCache::SERIALIZABLE`: the aggregators’ readonly DTOs and the enums inside them, never an Eloquent model (`RoundSelection` caches each round’s raw columns and hydrates them, no query). Found by `make fresh` on Redis: the array store the tests use never serializes, so `SerializingCacheTest` now runs every aggregator through the file store | Phase 3 step 7. Before this, every cached dashboard answer on Redis or the database store came back as `__PHP_Incomplete_Class` |
 
 Add new decisions here with the next ID. Any new Composer/npm package needs a line.
 
@@ -929,7 +973,7 @@ real month names for single-quarter views, LGA tile grid, Data issues "why it ex
 | Q-06 | Who owns and signs off the facility master list, by when? | Phase 2+ |
 | Q-07 | VPS acceptable (Postgres ≥ 14)? Who pays? | Deployment |
 | Q-08 | How many administrator logins? (> 3 → revisit roles before launch) | Launch |
-| Q-09 | Display rounding: half-up or truncate? (explains 73 vs 74) **Built as a switch:** `edqa.presentation.rounding`, default `half_up`; `truncate` reproduces the live tool's 73. `App\Domain\Scoring\Presentation` is the only place it is applied, so the answer is one config line | Phase 3 tests |
+| Q-09 | Display rounding: half-up or truncate? (explains 73 vs 74) **Built as a switch:** `edqa.presentation.rounding`, default `half_up`; `truncate` reproduces the live tool's 73. `App\Domain\Scoring\Presentation` is the only place it is applied, so the answer is one config line. **Decide together with Q-26** (banding on the displayed value): this switch also moves band edges, since 89.95 is Strong under half-up and Acceptable under truncate | Phase 3 tests, bands |
 | Q-10 | Round assessment windows for historical quarters — exact dates? | Backfill |
 | Q-11 | Webhooks available on their ODK Central host? | Optional latency |
 | Q-12 | Standard action texts and default owners for the plan — confirm wording | Phase 6 |
@@ -949,6 +993,7 @@ real month names for single-quarter views, LGA tile grid, Data issues "why it ex
 | Q-26 | Is a score banded on its full-precision value or on the value people see? **Default built:** on the value as the table shows it, rounded to 1 dp in the Q-09 mode (`Bands::classify`). Why: on full precision, 89.96 displays as "90.0" yet would be labelled Acceptable, a contradiction on screen; banding the shown value means a "90.0" is always Strong. The cost: a facility at 89.95 is Strong under half-up but Acceptable under truncate, so Q-09's answer also moves band edges. Confirm, or band on full precision and accept the occasional "90.0 Acceptable" | Bands, implementation plan (which LGAs enter it) |
 | Q-27 | What does `edqa.aggregation.weighting = 'facility_count'` mean? The reference figures define `unweighted` as every facility counting once (state ≈ 86.29). Weighting LGA or owner means by their facility count gives exactly that same number, so the alternative must be something else, most likely each LGA counting equally (state = mean of the 23 LGA means) or each owner type equally ((87.67 + 73.67) / 2 = 80.67 for the state). **Built:** `unweighted` only; `facility_count` is refused (`UnsupportedWeighting`) until this is answered | Every aggregate (refines Q-04) |
 | Q-28 | When a filter spans several rounds (a year with no quarter), what is a facility's score? **Default built:** the mean of its accepted assessments in those rounds (the single-round rule, generalised), then unweighted upward; banded under the latest round's rule version. With no filter the summaries show the latest round, and the trend and Visuals show every round | Home, LGA, Facility and Monitor pages with a year-only filter |
+| Q-29 | When a closed round is reopened after a newer rule version was published, which version should it use? **Default built:** D-32 as written: an open round reads the current version, so reopening rescores it under that version at once (otherwise it would read a version it has no scores under and show no data), and the next close pins the current version. The alternative keeps the reopened round on its pinned version, so a late correction does not also apply new rules to an old quarter. That changes the old quarter's published figures, so the client should choose | Round reopen, closed-round figures |
 
 
 ### 11.5 Deferred until credentials
@@ -963,6 +1008,8 @@ for credentials or infrastructure. Each starts once its blocker is supplied:
 | Historical backfill and backfill report | The ODK connection above, and round windows for past quarters (Q-10, Q-16) | 14 |
 | DevOps: the CI pipeline (tests in the `ci` image, Trivy, image push), the `edqa-infra` project, server provisioning | Hosting decision and server access (Q-07), CI and registry accounts | 1 (CI part), go-live |
 | Deploys to staging and production, and the server-side checks in `SECURITY.md` §15 | The servers above | Go-live |
+| Validate aggregates against a real published client round (step 9 acceptance: "aggregates match a known client round"). Phase 3 proves the aggregators against the §7 reference figures and reconciles the view with them; it cannot prove them against the client's own numbers | The ODK connection above, one round the client has published with its Looker figures, and answers to Q-09, Q-26 and Q-27 | 9 (re-run), 14 |
 
-Until then the local stack runs on synthetic seed data (`DemoAssessmentSeeder`), and nothing in
+Until then the local stack runs on synthetic seed data (`DemoAssessmentSeeder`, scored by the real
+rescore in `DemoScoringSeeder`; `edqa:report:summary` prints its figures), and nothing in
 the code assumes a live ODK host.

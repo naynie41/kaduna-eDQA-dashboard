@@ -2,8 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Domain\Reporting\Aggregators\LgaTableAggregator;
+use App\Domain\Reporting\Aggregators\OwnerSplitAggregator;
+use App\Domain\Reporting\Aggregators\StateSummaryAggregator;
+use App\Domain\Reporting\DTOs\LgaRow;
+use App\Domain\Reporting\DTOs\ReportFilter;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoAssessmentSeeder;
+use Database\Seeders\DemoScoringSeeder;
 use Database\Seeders\LgaSeeder;
 use Database\Seeders\Synthetic\SyntheticFacilityList;
 use Illuminate\Support\Facades\DB;
@@ -97,8 +103,8 @@ it('seeds a demo dataset whose item responses approximate the published means', 
             ->map(fn (object $r): string => "{$r->year}-Q{$r->quarter} {$r->status}")->all())
         ->toBe(['2025-Q3 closed', '2025-Q4 closed', '2026-Q1 closed', '2026-Q2 open'])
         ->and(DB::table('assessments')->count())->toBeGreaterThan(1000)
-        // Scoring arrives in Phase 3: item responses only, no scores.
-        ->and(DB::table('assessment_scores')->count())->toBe(0);
+        // Every demo assessment is scored from its items (DemoScoringSeeder), nine slots each.
+        ->and(DB::table('assessment_scores')->count())->toBe(DB::table('assessments')->count() * 9);
 
     // Every facility sits in a ward of its own LGA.
     expect(DB::table('facilities')->join('wards', 'wards.id', '=', 'facilities.ward_id')
@@ -126,4 +132,43 @@ it('seeds a demo dataset whose item responses approximate the published means', 
     foreach ($targets as $key => $target) {
         expect($means[$key])->toBeGreaterThan($target - 2.5, $key)->toBeLessThan($target + 2.5, $key);
     }
+
+    // ---- The scored picture (Phase 3 step 7): what the dashboard will show for the open round.
+    $v1 = (int) DB::table('scoring_rule_versions')->where('version', 1)->value('id');
+    expect(DB::table('rounds')->where('status', 'closed')->pluck('rule_version_id')->unique()->all())->toBe([$v1])
+        ->and(DB::table('assessment_scores')->where('rule_version_id', '<>', $v1)->exists())->toBeFalse()
+        ->and(DB::table('rescore_runs')->where('status', 'succeeded')->count())->toBe(4)
+        ->and(DB::selectOne("select ispopulated from pg_matviews where matviewname = 'round_aggregates'")->ispopulated)->toBeTrue();
+
+    $open = new ReportFilter(year: 2026, quarter: 2);
+    $owners = app(OwnerSplitAggregator::class)->split($open);
+    $published = [
+        [$owners->public, [92, 79, 92], 3.0],
+        [$owners->private, [75, 62, 84], 5.0], // ~45 private facilities a round: a noisier mean
+    ];
+    foreach ($published as [$group, $targets, $tolerance]) {
+        foreach (['availability', 'consistency', 'validity'] as $i => $dimension) {
+            expect($group->{$dimension}->value)->toBeGreaterThan($targets[$i] - $tolerance)->toBeLessThan($targets[$i] + $tolerance);
+        }
+    }
+
+    $state = app(StateSummaryAggregator::class)->summary($open);
+    $lgas = collect(app(LgaTableAggregator::class)->rows($open));
+    expect($state->overall->value)->toBeGreaterThan(84.5)->toBeLessThan(87.5)
+        ->and($lgas->filter(fn (LgaRow $l): bool => $l->overall->value !== null && $l->overall->value < 80)->count())->toBeGreaterThanOrEqual(2)
+        ->and($state->facilitiesWeak)->toBeGreaterThanOrEqual(3);
+
+    // A few of each score-based flag across the four rounds, never a flood.
+    foreach (['ALL_PERFECT', 'SCORE_JUMP'] as $flag) {
+        expect(DB::table('assessments')->whereJsonContains('flags', $flag)->count())->toBeBetween(2, 40, $flag);
+    }
+});
+
+it('never scores demo data in production', function (): void {
+    expect(fn () => runSeedersAs('production', DemoScoringSeeder::class))
+        ->toThrow(RuntimeException::class, 'DemoScoringSeeder');
+
+    runSeedersAs('production', DatabaseSeeder::class);
+    expect(DB::table('assessment_scores')->exists())->toBeFalse()
+        ->and(DB::table('rescore_runs')->exists())->toBeFalse();
 });

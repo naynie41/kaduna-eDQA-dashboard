@@ -5,8 +5,6 @@ declare(strict_types=1);
 use App\Domain\Assessment\Events\AssessmentScored;
 use App\Domain\Reporting\Jobs\RefreshRoundAggregatesJob;
 use App\Domain\Reporting\RoundCache;
-use App\Domain\Round\Enums\RoundStatus;
-use App\Domain\Round\Models\Round;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Support\Facades\DB;
@@ -51,23 +49,11 @@ it('queues one refresh for a burst of scores in the same round', function (): vo
     Queue::assertPushed(RefreshRoundAggregatesJob::class, fn (RefreshRoundAggregatesJob $job): bool => $job->roundId === 4);
 });
 
-it('can be dispatched directly, as rescore and round close will', function (): void {
+it('can be dispatched directly, as a finished rescore does', function (): void {
     Queue::fake();
 
     RefreshRoundAggregatesJob::debounced(9);
     RefreshRoundAggregatesJob::debounced(9);
 
     Queue::assertPushed(RefreshRoundAggregatesJob::class, 1);
-});
-
-it('queues a refresh when a round closes, not on other round saves', function (): void {
-    $f = ReportingFixture::build();
-    Queue::fake();
-    $round = Round::query()->findOrFail($f->q2);
-
-    $round->update(['window_end' => '2026-07-01']);
-    Queue::assertNothingPushed();
-
-    $round->update(['status' => RoundStatus::Closed, 'rule_version_id' => $f->v2, 'closed_at' => now()]);
-    Queue::assertPushed(RefreshRoundAggregatesJob::class, fn (RefreshRoundAggregatesJob $job): bool => $job->roundId === $f->q2);
 });

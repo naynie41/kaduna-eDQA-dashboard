@@ -25,6 +25,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable $window_end
  * @property RoundStatus $status
  * @property int|null $rule_version_id
+ * @property CarbonImmutable|null $closed_at
+ * @property string|null $reopened_reason
  */
 #[UseFactory(RoundFactory::class)]
 final class Round extends Model

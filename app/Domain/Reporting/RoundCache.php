@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domain\Reporting;
 
+use App\Domain\Facility\Enums\FacilityLevel;
+use App\Domain\Facility\Enums\Ownership;
+use App\Domain\Scoring\DTOs\ScoreValue;
+use App\Domain\Scoring\Enums\Band;
+use App\Domain\Scoring\Enums\Dimension;
 use Closure;
 use Illuminate\Cache\TaggableStore;
 use Illuminate\Contracts\Cache\Repository;
@@ -18,6 +23,35 @@ use Illuminate\Support\Facades\Cache;
 final class RoundCache
 {
     public const TTL = 21_600; // six hours: a safety net; flushes do the real work
+
+    /**
+     * The only classes the cache may unserialize (config cache.serializable_classes): the
+     * aggregators' readonly DTOs and the enums inside them, none with magic methods, so the cache
+     * cannot be turned into a gadget chain. Never an Eloquent model: RoundSelection caches ids.
+     * SerializingCacheTest fails if an aggregator returns anything not listed here.
+     */
+    public const SERIALIZABLE = [
+        DTOs\AssessmentWindow::class,
+        DTOs\Coverage::class,
+        DTOs\DimensionScores::class,
+        DTOs\FacilityPage::class,
+        DTOs\FacilityRow::class,
+        DTOs\GroupScores::class,
+        DTOs\LevelCoverage::class,
+        DTOs\LgaCount::class,
+        DTOs\LgaRow::class,
+        DTOs\LgaScore::class,
+        DTOs\MonthSlotPoint::class,
+        DTOs\OwnerSplit::class,
+        DTOs\StateSummary::class,
+        DTOs\TrendPoint::class,
+        Enums\Metric::class,
+        ScoreValue::class,
+        Band::class,
+        Dimension::class,
+        FacilityLevel::class,
+        Ownership::class,
+    ];
 
     private const PREFIX = 'edqa:reporting:';
 

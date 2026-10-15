@@ -27,6 +27,12 @@ beforeEach(function (): void {
     $round = Rows::round(['year' => 2026, 'quarter' => 2, 'window_start' => '2026-04-01', 'window_end' => '2026-06-30']);
     bulkAssessments($round, $version, 'public', 2000, [92, 79, 92]);
     bulkAssessments($round, $version, 'private', 219, [75, 62, 84]);
+
+    // A live database has statistics for tables this size (autovacuum). These rows sit in the
+    // test's own transaction, which autovacuum never sees, so without this the planner works from
+    // whatever an earlier test left behind and, under parallel load, can choose a nested-loop plan
+    // that takes minutes. ANALYZE inside the transaction counts the rows it inserted.
+    DB::statement('ANALYZE facilities, assessments, assessment_scores, submissions');
 });
 
 /**

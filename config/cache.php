@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domain\Reporting\RoundCache;
 use Illuminate\Support\Str;
 
 return [
@@ -133,6 +134,7 @@ return [
     |
     */
 
-    'serializable_classes' => false,
+    // Only the report aggregators' DTOs and enums (RoundCache::SERIALIZABLE); never a model.
+    'serializable_classes' => RoundCache::SERIALIZABLE,
 
 ];
