@@ -7,6 +7,8 @@ export type DataTableColumn = {
     header: string;
     align?: 'start' | 'end';
     sortable?: boolean;
+    /** Read after the header by screen readers only, e.g. "of the quarter" after "Month 1". */
+    srSuffix?: string;
 };
 
 export type DataTableSort = {
@@ -84,11 +86,27 @@ function HeaderCell({ column, sort, onSort }: HeaderCellProps) {
         >
             {sortable ? (
                 <button type="button" onClick={() => onSort(column.key)} className={`inline-flex items-center gap-1 hover:text-ink ${end ? 'flex-row-reverse' : ''}`}>
-                    {column.header}
+                    <span>
+                        {column.header}
+                        {column.srSuffix !== undefined && (
+                            <>
+                                {' '}
+                                <VisuallyHidden>{column.srSuffix}</VisuallyHidden>
+                            </>
+                        )}
+                    </span>
                     <span aria-hidden="true">{arrow}</span>
                 </button>
             ) : (
-                column.header
+                <>
+                    {column.header}
+                    {column.srSuffix !== undefined && (
+                            <>
+                                {' '}
+                                <VisuallyHidden>{column.srSuffix}</VisuallyHidden>
+                            </>
+                        )}
+                </>
             )}
         </th>
     );

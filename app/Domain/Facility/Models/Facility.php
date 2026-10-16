@@ -17,6 +17,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A master-list facility: the validation authority. Deactivate, never delete.
+ *
+ * @property FacilityLevel $level
+ * @property Ownership $ownership
  */
 #[UseFactory(FacilityFactory::class)]
 final class Facility extends Model

@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\TwoFactorSetupController;
 use App\Http\Controllers\Dashboard;
 use App\Http\Controllers\Dashboard\DashboardRedirectController;
 use App\Http\Controllers\DevComponentsController;
+use App\Http\Controllers\Facilities\FacilityDetailController;
 use App\Http\Controllers\OdkWebhookController;
 use App\Http\Controllers\Quarantine\BulkResolveQuarantineController;
 use App\Http\Controllers\Quarantine\OverrideSoftFlagController;
@@ -63,6 +64,7 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
     // JSON for admin interactivity (ARCHITECTURE.md §8): same session, same guard. 120/min per
     // user (SECURITY.md §8).
     Route::prefix('api')->name('api.')->middleware('throttle:120,1')->group(function (): void {
+        Route::get('facilities/{facility}', FacilityDetailController::class)->whereNumber('facility')->name('facilities.show');
         Route::get('quarantine', QuarantineIndexController::class)->name('quarantine.index');
         Route::post('quarantine/bulk-resolve', BulkResolveQuarantineController::class)->name('quarantine.bulk-resolve');
         Route::post('quarantine/{record}/resolve', ResolveQuarantineController::class)->whereNumber('record')->name('quarantine.resolve');

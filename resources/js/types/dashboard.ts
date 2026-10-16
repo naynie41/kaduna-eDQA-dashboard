@@ -62,10 +62,116 @@ export type WardScore = { wardId: number; name: string; facilities: number; over
 
 export type Weakest = { scope: 'lgas'; rows: LgaScore[] } | { scope: 'wards'; rows: WardScore[] };
 
+export type LgaRow = {
+    lgaId: number;
+    code: string;
+    name: string;
+    facilities: number;
+    availability: ScoreValue;
+    consistency: ScoreValue;
+    validity: ScoreValue;
+    m1: ScoreValue;
+    m2: ScoreValue;
+    m3: ScoreValue;
+    overall: ScoreValue;
+};
+
+export type RoundRef = { year: number; quarter: number };
+
+export type LgaProps = {
+    /** The rounds the table covers: real month names when they share one quarter. */
+    rounds: RoundRef[];
+    /** Every LGA (the LGA filter left out), for the grid; not deferred, so it stays mounted. */
+    tiles: LgaRow[];
+    /** The table, in the filter's scope. */
+    lgas?: LgaRow[];
+};
+
+export type Metric = Dimension | 'overall';
+
+export type FacilitySortColumn = 'facility' | 'lga' | 'ward' | 'owner' | 'assessed' | 'm1' | 'm2' | 'm3' | 'score' | 'overall';
+
+export type FacilityRow = {
+    facilityId: number;
+    code: string;
+    name: string;
+    lga: string;
+    ward: string;
+    ownership: 'public' | 'private';
+    level: 'primary' | 'secondary' | 'tertiary';
+    roundLabel: string;
+    /** Local date of the latest visit, "2026-05-04". */
+    assessedOn: string;
+    /** The month cells and the score, for the chosen metric. */
+    m1: ScoreValue;
+    m2: ScoreValue;
+    m3: ScoreValue;
+    score: ScoreValue;
+    overall: ScoreValue;
+};
+
+export type FacilityPage = { rows: FacilityRow[]; total: number; page: number; perPage: number };
+
+export type FacilityTableState = {
+    page: FacilityPage;
+    /** What the server applied (an unknown value in the URL falls back to the default). */
+    metric: Metric;
+    sort: { column: FacilitySortColumn; direction: 'asc' | 'desc' };
+    quarters: number[];
+};
+
+export type FacilityProps = {
+    facilities?: FacilityTableState;
+};
+
 export type HomeProps = {
     hero: StateSummary;
     dimensions: DimensionScores;
     owners?: OwnerSplit;
     trend?: Trend;
     weakest?: Weakest;
+};
+
+/** GET /api/facilities/{id} (FacilityDetailAggregator), snake_case as the JSON API serves it. */
+export type ItemResult = 'pass' | 'fail' | 'na';
+
+export type FacilityDetail = {
+    facility: {
+        id: number;
+        code: string;
+        name: string;
+        lga: string;
+        ward: string;
+        level: string;
+        level_label: string;
+        ownership: 'public' | 'private';
+        ownership_label: string;
+        active: boolean;
+    };
+    round: { id: number; label: string; year: number; quarter: number } | null;
+    assessment: { id: number; assessed_on: string; assessor: string; status: string } | null;
+    scores: { availability: ScoreValue; consistency: ScoreValue; validity: ScoreValue; overall: ScoreValue };
+    items: {
+        dimension: Dimension;
+        dimension_label: string;
+        slot: number;
+        month: string;
+        score: ScoreValue;
+        /** result is null only when no rule version can be read. */
+        items: { code: string; label: string | null; result: ItemResult | null }[];
+    }[];
+    history: { round_id: number; label: string; overall: ScoreValue; selected: boolean }[];
+    flags: { code: string; label: string; overridden: { by: string | null; at: string; reason: string | null } | null }[];
+    attachments: { id: number; filename: string; mime: string; size: number; status: string }[];
+    activity: {
+        id: number;
+        at: string;
+        actor: string | null;
+        event: string;
+        subject: 'assessment' | 'item';
+        item_code: string | null;
+        changes: { field: string; old: string | null; new: string | null }[];
+        reason: string | null;
+    }[];
+    odk: { instance_id: string | null; url: string | null };
 };

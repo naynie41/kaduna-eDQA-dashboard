@@ -8,6 +8,7 @@ use App\Domain\Facility\Models\Facility;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Round\Models\Round;
 use App\Support\Audit\Audited;
+use Carbon\CarbonImmutable;
 use Database\Factories\AssessmentFactory;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * status has no enum yet: its values are an open question.
  *
+ * @property CarbonImmutable $started_at
+ * @property CarbonImmutable $ended_at
  * @property string $status accepted | flagged (Q-18)
  * @property list<string> $flags soft-rule codes and SLOT_ALL_NA notes
  */

@@ -15,6 +15,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * One scored question's answer. Scores are derived from these, never accepted from input
  * (CLAUDE.md hard rule 2).
+ *
+ * @property Dimension $dimension
+ * @property int $month_slot
+ * @property bool $is_applicable
  */
 #[UseFactory(ItemResponseFactory::class)]
 final class ItemResponse extends Model

@@ -44,6 +44,13 @@ return [
         'debounce_seconds' => 30,
     ],
 
+    'odk' => [
+        // ODK Central (ARCHITECTURE.md §5). The facility drawer links each assessment to its
+        // submission in Central; with no URL or project the link is left out (null), never guessed.
+        'base_url' => env('ODK_CENTRAL_URL') ?: null,
+        'project_id' => env('ODK_PROJECT_ID') ?: null,
+    ],
+
     'presentation' => [
         // Q-09: how a score is rounded for display, and therefore which band it shows (Q-26):
         // 'half_up' (default) or 'truncate'. The live tool shows the private overall 73.67 as
