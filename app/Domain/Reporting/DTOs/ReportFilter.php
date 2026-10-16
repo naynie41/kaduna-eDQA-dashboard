@@ -71,6 +71,12 @@ final readonly class ReportFilter
         return new self(lga: $this->lga, level: $this->level, owner: $this->owner);
     }
 
+    /** The same filter for one owner type: the Visuals Overall / Public / Private view. */
+    public function withOwner(?Ownership $owner): self
+    {
+        return new self($this->year, $this->quarter, $this->lga, $this->level, $owner);
+    }
+
     /**
      * Every filter key, null when not set: the shape the filter bar reads.
      *

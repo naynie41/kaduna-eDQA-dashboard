@@ -150,6 +150,60 @@ return [
         'weakest_note' => 'Facilities are listed weakest first by the chosen measure, so the ones that most need support come first. The previous report listed the best first, which hid them at the bottom.',
     ],
 
+    // Monitor (ARCHITECTURE.md §9.2.4).
+    'monitor' => [
+        'owners_title' => 'Public and private facilities',
+        'lgas_title' => 'Facilities visited by local government',
+        'lgas_description' => 'Coverage of the assessment exercise, most visited first. The line marks the state mean.',
+        'lgas_list' => 'Facilities visited, by local government',
+        'state_mean' => 'State mean: :mean facilities visited per local government',
+        'visited' => ':count facilities visited',
+        'levels_title' => 'Coverage by level',
+        'levels_description' => 'Facility tier reached in this selection, with each tier’s overall score.',
+        'levels_list' => 'Facilities visited, by level',
+        'levels_none' => 'No facilities visited in this selection.',
+        'lgas_none' => 'No local government in this selection.',
+        'window_title' => 'Assessment window',
+        'window_description' => 'Each round in view: its window, the first and last visit, and the assessments recorded.',
+        'round' => 'Round',
+        'window' => 'Window',
+        'window_range' => ':start to :end',
+        'first_visit' => 'First visit',
+        'last_visit' => 'Last visit',
+        'assessments' => 'Assessments recorded',
+        'no_visit' => 'No visits',
+        'windows_none' => 'No round in view.',
+    ],
+
+    // Visuals (ARCHITECTURE.md §9.2.5).
+    'visuals' => [
+        'view' => 'Facilities shown',
+        'views' => [
+            'all' => 'Overall',
+            'public' => 'Public',
+            'private' => 'Private',
+        ],
+        'locked' => 'The owner filter above is set to :owner facilities, so these charts show only them. Choose “Public and private” there to compare.',
+        'owners' => [
+            'public' => 'public',
+            'private' => 'private',
+        ],
+        'months_title' => 'Scores by month of the quarter',
+        'months_description' => 'Each chart is one month position across the quarters in view: the three dimensions and the overall.',
+        'slot_title' => 'Month :slot of the quarter',
+        'chart' => ':title: grouped bars of the three dimensions and the overall, by quarter',
+        'legend' => 'Series',
+        'overall' => 'Overall',
+        'quarter' => 'Quarter',
+        'no_scores' => 'No scores for this month in view.',
+        'ranks_title' => 'Scores by local government',
+        'ranks_title_owner' => 'Scores by local government: :owner facilities',
+        'ranks_description' => 'Every local government in view, highest first. Bars are coloured by band; the score and band are written beside each.',
+        'rank_list' => ':measure, by local government',
+        'ranks_none' => 'No local government in this selection.',
+        'announce' => 'Showing :view.',
+    ],
+
     // The facility detail drawer (ARCHITECTURE.md §9.2.7).
     'drawer' => [
         'loading_title' => 'Facility details',

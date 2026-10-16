@@ -14,6 +14,18 @@ return [
         7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
     ],
 
+    // The Visuals month charts' x axis: "April (Q2 2026)".
+    'month_chart_label' => ':month (Q:quarter :year)',
+
+    // A Visuals month chart's takeaway (MonthSlotAggregator::takeaways).
+    'month' => [
+        'takeaway' => ':month: overall :score.',
+        'takeaway_up' => ':month: overall :score, up :change points on :previous.',
+        'takeaway_down' => ':month: overall :score, down :change points on :previous.',
+        'takeaway_unchanged' => ':month: overall :score, unchanged on :previous.',
+        'weakest' => 'Lowest dimension: :dimension, at :score.',
+    ],
+
     // The trend chart's takeaway (QuarterTrendAggregator::takeaway).
     'trend' => [
         'takeaway_single' => ':round: :score.',

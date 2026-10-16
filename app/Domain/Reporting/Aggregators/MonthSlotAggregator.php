@@ -12,6 +12,9 @@ use App\Domain\Reporting\Support\RoundSelection;
 use App\Domain\Reporting\Support\Scores;
 use App\Domain\Reporting\Support\Weighting;
 use App\Domain\Round\MonthSlot;
+use App\Domain\Scoring\DTOs\ScoreValue;
+use App\Domain\Scoring\Enums\Dimension;
+use App\Domain\Scoring\Presentation;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -64,6 +67,11 @@ final class MonthSlotAggregator
                         slot: $slot,
                         month: MonthSlot::month($round->quarter, $slot),
                         label: MonthSlot::label($round->year, $round->quarter, $slot),
+                        chartLabel: (string) __('reporting.month_chart_label', [
+                            'month' => (string) __('reporting.months.'.MonthSlot::month($round->quarter, $slot)),
+                            'quarter' => (string) $round->quarter,
+                            'year' => (string) $round->year,
+                        ]),
                         availability: Scores::of($row?->{"availability_m{$slot}"}, $rules),
                         consistency: Scores::of($row?->{"consistency_m{$slot}"}, $rules),
                         validity: Scores::of($row?->{"validity_m{$slot}"}, $rules),
@@ -74,5 +82,55 @@ final class MonthSlotAggregator
 
             return $points;
         });
+    }
+
+    /**
+     * Each month chart's one-line takeaway (its Figure caption): the latest quarter's overall for
+     * that slot, its change on the quarter before when there is one, and the lowest dimension.
+     * A comparison of aggregates, so it is made here, never in a component (hard rule 5).
+     *
+     * @param  list<MonthSlotPoint>  $points  as series() returns them
+     * @return array<int, ?string> by slot 1–3; null when the slot has no score in view
+     */
+    public function takeaways(array $points): array
+    {
+        $takeaways = [];
+        foreach ([1, 2, 3] as $slot) {
+            $scored = array_values(array_filter($points, fn (MonthSlotPoint $p): bool => $p->slot === $slot && $p->overall->value !== null));
+            $latest = $scored[count($scored) - 1] ?? null;
+            $takeaways[$slot] = $latest === null ? null : self::takeaway($latest, $scored[count($scored) - 2] ?? null);
+        }
+
+        return $takeaways;
+    }
+
+    private static function takeaway(MonthSlotPoint $latest, ?MonthSlotPoint $previous): string
+    {
+        $score = (float) $latest->overall->value;
+        $sentence = (string) __('reporting.month.takeaway', ['month' => $latest->label, 'score' => $latest->overall->display]);
+        if ($previous !== null) {
+            $change = Presentation::round(abs($score - (float) $previous->overall->value), 1);
+            $key = $change === 0.0 ? 'unchanged' : ($score > (float) $previous->overall->value ? 'up' : 'down');
+            $sentence = (string) __("reporting.month.takeaway_{$key}", [
+                'month' => $latest->label,
+                'score' => $latest->overall->display,
+                'change' => ScoreValue::format($change, 1),
+                'previous' => $previous->label,
+            ]);
+        }
+
+        // The lowest of the three dimensions; a tie goes to the first in the fixed order.
+        $weakest = null;
+        foreach ([Dimension::Availability, Dimension::Consistency, Dimension::Validity] as $dimension) {
+            $value = $latest->{$dimension->value}->value;
+            if ($value !== null && ($weakest === null || $value < $latest->{$weakest->value}->value)) {
+                $weakest = $dimension;
+            }
+        }
+
+        return $weakest === null ? $sentence : $sentence.' '.__('reporting.month.weakest', [
+            'dimension' => $weakest->label(),
+            'score' => $latest->{$weakest->value}->display,
+        ]);
     }
 }

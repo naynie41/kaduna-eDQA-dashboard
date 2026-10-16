@@ -16,6 +16,7 @@ use App\Domain\Reporting\Support\RoundSelection;
 use App\Domain\Reporting\Support\Scores;
 use App\Domain\Reporting\Support\Weighting;
 use App\Domain\Round\Models\Round;
+use App\Domain\Scoring\DTOs\ScoreValue;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -42,10 +43,13 @@ final class CoverageAggregator
         return $this->cache->remember(RoundSelection::ids($rounds), self::class.':'.$filter->cacheKey(), function () use ($rounds, $filter): Coverage {
             $rules = $this->sql->config($rounds);
             [$perLga, $byLevel] = $this->view->covers($rounds) ? $this->fromView($rounds[0], $filter) : $this->fromSql($rounds, $filter);
+            $stateMean = $perLga === [] ? 0.0 : (float) $perLga[0]->state_mean;
 
             return new Coverage(
                 perLga: array_map(fn (object $row): LgaCount => new LgaCount((int) $row->id, (string) $row->code, (string) $row->name, Scores::int($row->facilities)), $perLga),
-                stateMean: $perLga === [] ? 0.0 : (float) $perLga[0]->state_mean,
+                stateMean: $stateMean,
+                // A mean count of facilities, not a score: plain half-up, whatever Q-09 decides.
+                stateMeanDisplay: ScoreValue::format(round($stateMean, 1), 1),
                 byLevel: array_map(fn (object $row): LevelCoverage => new LevelCoverage(
                     FacilityLevel::from((string) $row->level),
                     Scores::int($row->facilities),

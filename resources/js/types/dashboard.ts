@@ -175,3 +175,65 @@ export type FacilityDetail = {
     }[];
     odk: { instance_id: string | null; url: string | null };
 };
+
+/** Monitor (§9.2.4): CoverageAggregator and AssessmentWindowAggregator, as they serialise. */
+export type LgaCount = { lgaId: number; code: string; name: string; facilities: number };
+
+export type LevelCoverage = { level: 'primary' | 'secondary' | 'tertiary'; facilities: number; overall: ScoreValue };
+
+export type Coverage = {
+    perLga: LgaCount[];
+    /** Full precision, for the marker's position only. */
+    stateMean: number;
+    /** What a person reads. */
+    stateMeanDisplay: string;
+    byLevel: LevelCoverage[];
+};
+
+export type AssessmentWindow = {
+    roundId: number;
+    label: string;
+    windowStart: string;
+    windowEnd: string;
+    firstVisit: string | null;
+    lastVisit: string | null;
+    assessments: number;
+};
+
+export type MonitorProps = {
+    owners?: OwnerSplit;
+    coverage?: Coverage;
+    windows?: AssessmentWindow[];
+};
+
+/** Visuals (§9.2.5): MonthSlotAggregator's points and takeaways, the owner view. */
+export type MonthSlotPoint = {
+    roundId: number;
+    year: number;
+    quarter: number;
+    slot: 1 | 2 | 3;
+    month: number;
+    /** "April 2026" */
+    label: string;
+    /** The x axis: "April (Q2 2026)" */
+    chartLabel: string;
+    availability: ScoreValue;
+    consistency: ScoreValue;
+    validity: ScoreValue;
+    overall: ScoreValue;
+};
+
+export type MonthSlots = {
+    points: MonthSlotPoint[];
+    /** One sentence per slot, from the server; null when the slot has no score in view. */
+    takeaways: Record<'1' | '2' | '3', string | null>;
+};
+
+export type OwnerView = 'all' | 'public' | 'private';
+
+export type VisualsProps = {
+    /** locked: the global owner filter, which the view follows while it is set. */
+    ownerView: { value: OwnerView; locked: 'public' | 'private' | null };
+    monthSlots?: MonthSlots;
+    lgas?: LgaRow[];
+};
