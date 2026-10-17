@@ -53,7 +53,7 @@ export default tseslint.config(
         },
     },
     {
-        files: ['*.config.{js,ts}', 'scripts/**/*.mjs', 'tests/e2e/**/*.{ts,mjs}'],
+        files: ['*.config.{js,ts}', 'scripts/**/*.mjs', 'tests/e2e/**/*.{ts,mjs}', 'tests/Fixtures/**/*.mjs', 'tests/perf/**/*.mjs'],
         languageOptions: {
             globals: { ...globals.node },
         },

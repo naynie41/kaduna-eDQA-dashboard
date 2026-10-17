@@ -13,12 +13,13 @@ use App\Domain\Scoring\Enums\Dimension;
  * ScoreCalculator never throws).
  *
  * An all-N/A slot is present: the calculator excludes it. A dimension with no applicable item in
- * any of its present slots cannot be scored at all.
+ * any of its present slots cannot be scored at all. An answer the form does not allow ('invalid')
+ * is a missing answer: it covers no slot, and any one makes the set incomplete.
  */
 final class ItemCoverage
 {
     /**
-     * Slots with no item at all, as "consistency_m2", in dimension then month order.
+     * Slots with no valid item, as "consistency_m2", in dimension then month order.
      *
      * @param  list<ItemResponseData>  $items
      * @return list<string>
@@ -26,7 +27,7 @@ final class ItemCoverage
     public static function missingSlots(array $items): array
     {
         $present = [];
-        foreach ($items as $item) {
+        foreach (self::valid($items) as $item) {
             $present[self::slotName($item->dimension, $item->monthSlot)] = true;
         }
 
@@ -43,7 +44,7 @@ final class ItemCoverage
     }
 
     /**
-     * Dimensions that have items but not one applicable item (every present slot all N/A).
+     * Dimensions that have valid items but not one applicable item (every present slot all N/A).
      *
      * @param  list<ItemResponseData>  $items
      * @return list<Dimension>
@@ -52,7 +53,7 @@ final class ItemCoverage
     {
         $hasItems = [];
         $hasApplicable = [];
-        foreach ($items as $item) {
+        foreach (self::valid($items) as $item) {
             $hasItems[$item->dimension->value] = true;
             if ($item->isApplicable && $item->value !== 'na') {
                 $hasApplicable[$item->dimension->value] = true;
@@ -65,14 +66,34 @@ final class ItemCoverage
         ));
     }
 
+    /**
+     * Items whose answer the form does not allow, in the order they came.
+     *
+     * @param  list<ItemResponseData>  $items
+     * @return list<ItemResponseData>
+     */
+    public static function invalidItems(array $items): array
+    {
+        return array_values(array_filter($items, fn (ItemResponseData $item): bool => $item->value === ItemResponseData::INVALID));
+    }
+
     /** @param  list<ItemResponseData>  $items */
     public static function isComplete(array $items): bool
     {
-        return self::missingSlots($items) === [] && self::unscorableDimensions($items) === [];
+        return self::missingSlots($items) === [] && self::unscorableDimensions($items) === [] && self::invalidItems($items) === [];
     }
 
     public static function slotName(Dimension $dimension, int $month): string
     {
         return "{$dimension->value}_m{$month}";
+    }
+
+    /**
+     * @param  list<ItemResponseData>  $items
+     * @return list<ItemResponseData>
+     */
+    private static function valid(array $items): array
+    {
+        return array_values(array_filter($items, fn (ItemResponseData $item): bool => $item->value !== ItemResponseData::INVALID));
     }
 }

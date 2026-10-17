@@ -1,0 +1,79 @@
+{
+    "__id": "uuid:fx-clean-visit",
+    "__system": {
+        "submissionDate": "2026-04-14T08:50:00.000Z",
+        "updatedAt": null,
+        "submitterId": "17",
+        "submitterName": "hauwa.ibrahim",
+        "attachmentsPresent": 0,
+        "attachmentsExpected": 0,
+        "status": null,
+        "reviewState": null,
+        "deviceId": "collect:hauwa01",
+        "edits": 0,
+        "formVersion": "2026.1"
+    },
+    "meta": {
+        "instanceID": "uuid:fx-clean-visit"
+    },
+    "start": "2026-04-14T09:00:00.000+01:00",
+    "end": "2026-04-14T09:45:00.000+01:00",
+    "assessor_name": "Hauwa Ibrahim",
+    "round_year": 2026,
+    "round_quarter": 2,
+    "facility": {
+        "lga": "CHK",
+        "ward": "CHK-KUJ",
+        "facility_code": "FX-0001"
+    },
+    "gps": {
+        "type": "Point",
+        "coordinates": [
+            7.4302,
+            10.4806,
+            612.3
+        ]
+    },
+    "availability": {
+        "avail_m1_nhmis_summary": "yes",
+        "avail_m1_register_present": "yes",
+        "avail_m1_tally_sheet": "yes",
+        "avail_m1_reporting_rate": "no",
+        "avail_m2_nhmis_summary": "yes",
+        "avail_m2_register_present": "yes",
+        "avail_m2_tally_sheet": "yes",
+        "avail_m2_reporting_rate": "no",
+        "avail_m3_nhmis_summary": "yes",
+        "avail_m3_register_present": "yes",
+        "avail_m3_tally_sheet": "yes",
+        "avail_m3_reporting_rate": "no"
+    },
+    "consistency": {
+        "consist_m1_nhmis_summary": "yes",
+        "consist_m1_register_present": "yes",
+        "consist_m1_tally_sheet": "yes",
+        "consist_m1_reporting_rate": "no",
+        "consist_m2_nhmis_summary": "yes",
+        "consist_m2_register_present": "yes",
+        "consist_m2_tally_sheet": "yes",
+        "consist_m2_reporting_rate": "no",
+        "consist_m3_nhmis_summary": "yes",
+        "consist_m3_register_present": "yes",
+        "consist_m3_tally_sheet": "yes",
+        "consist_m3_reporting_rate": "no"
+    },
+    "validity": {
+        "valid_m1_nhmis_summary": "yes",
+        "valid_m1_register_present": "yes",
+        "valid_m1_tally_sheet": "yes",
+        "valid_m1_reporting_rate": "no",
+        "valid_m2_nhmis_summary": "yes",
+        "valid_m2_register_present": "yes",
+        "valid_m2_tally_sheet": "yes",
+        "valid_m2_reporting_rate": "no",
+        "valid_m3_nhmis_summary": "yes",
+        "valid_m3_register_present": "yes",
+        "valid_m3_tally_sheet": "yes",
+        "valid_m3_reporting_rate": "no"
+    }
+}

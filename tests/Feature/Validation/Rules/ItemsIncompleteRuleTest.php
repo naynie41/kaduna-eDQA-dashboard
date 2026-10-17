@@ -75,3 +75,25 @@ it('quarantines a legacy form with typed scores and no items (Q-16)', function (
     expect($failures)->toHaveCount(1)
         ->and($failures[0]->detail)->toBe('no item responses: this form recorded typed scores, which the portal never accepts as scores');
 });
+
+// Phase 2B: an answer the form does not allow (the parser's 'invalid') is a missing answer. One
+// among valid answers still fails: otherwise it would silently score as a fail.
+it('treats an answer the form does not allow as missing, even among valid answers', function (): void {
+    $submission = ParsedSubmissionBuilder::new()->withItemValue(Dimension::Availability, 1, 'tally_sheet', 'invalid')->build();
+
+    $failures = checkRule(ItemsIncompleteRule::class, $submission);
+
+    expect($failures)->toHaveCount(1)
+        ->and($failures[0]->detail)->toBe('an answer the form does not allow: availability_m1 tally_sheet');
+});
+
+it('reports a slot answered only with invalid answers as missing too', function (): void {
+    $builder = ParsedSubmissionBuilder::new();
+    foreach (ParsedSubmissionBuilder::ITEM_CODES as $code) {
+        $builder->withItemValue(Dimension::Validity, 2, $code, 'invalid');
+    }
+
+    $failures = checkRule(ItemsIncompleteRule::class, $builder->build());
+
+    expect($failures[0]->detail)->toStartWith('missing validity_m2; an answer the form does not allow: validity_m2 register_present, validity_m2 summary_form');
+});

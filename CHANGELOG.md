@@ -7,6 +7,26 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- ODK parsing (Phase 2B step 1, D-48): `App\Domain\Ingestion\Odk\FieldMap` (an additive version
+  over the default, dot paths, renames, never a fallback for an unknown version) and
+  `SubmissionParser`, which reads one ODK Central OData entry into a `ParsedSubmission` and never
+  throws on bad data. Answers map through the published rule version's `choice_map`; an unknown
+  answer is `invalid`, and a number in a scored question is a typed score (Q-16).
+- `config/edqa_field_maps.php`: a full `2026.1` map following ARCHITECTURE.md §5.1 and a
+  fictional additive `2025.2`, every path marked `CONTRACT-ASSUMED`.
+- Golden ODK fixtures in `tests/Fixtures`: 23 cases, each a raw OData entry, its parsed form and
+  its expected outcome, against `Tests\Support\FixtureWorld`, written by `generate.mjs`. These
+  are Phase 2A's cases, which 2A had built in code. A 500-payload property test checks that the
+  parser never throws.
+
+### Changed
+
+- ITEMS_INCOMPLETE quarantines any answer the form does not allow (`invalid`), even among valid
+  answers, which would otherwise score as a fail.
+- The field map no longer carries `choices`: answers map through the rule version (Q-25).
+
 ## [0.4.0] - 2026-10-17
 
 Phase 4 (Dashboard): step 10 of `CLAUDE.md` §6. The six dashboard pages and the facility detail

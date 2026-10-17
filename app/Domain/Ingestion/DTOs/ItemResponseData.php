@@ -9,12 +9,15 @@ use App\Support\Data\ArrayReader;
 use InvalidArgumentException;
 
 /**
- * One scored question as the parser reads it: the raw ODK choice already mapped through the
- * form version's `choices` to pass, fail or na.
+ * One scored question as the parser reads it: the raw ODK choice mapped through the scoring rule
+ * version's choice_map to pass, fail or na. An answer the map does not know is 'invalid': kept so
+ * ITEMS_INCOMPLETE can quarantine it (an invalid answer is a missing one), never scored.
  */
 final readonly class ItemResponseData
 {
-    public const VALUES = ['pass', 'fail', 'na'];
+    public const INVALID = 'invalid';
+
+    public const VALUES = ['pass', 'fail', 'na', self::INVALID];
 
     public function __construct(
         public Dimension $dimension,
@@ -27,7 +30,7 @@ final readonly class ItemResponseData
             throw new InvalidArgumentException("Month slot must be 1 to 3, got {$monthSlot}.");
         }
         if (! in_array($value, self::VALUES, true)) {
-            throw new InvalidArgumentException("Item value must be pass, fail or na, got '{$value}'.");
+            throw new InvalidArgumentException("Item value must be pass, fail, na or invalid, got '{$value}'.");
         }
     }
 

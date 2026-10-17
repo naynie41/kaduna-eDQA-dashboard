@@ -13,8 +13,9 @@ use Carbon\CarbonImmutable;
  * not resolved IDs: resolving them is the validation rules' job.
  *
  * Unparseable dates are null in startedAt/endedAt; rawStart/rawEnd keep what ODK sent, so
- * COLUMN_DRIFT can name the bad value. rawNumericScores is set only by legacy numeric-entry
- * forms, keyed "availability_m1" etc.; it is checked (SCORE_RANGE) but never used as a score.
+ * COLUMN_DRIFT can name the bad value. rawNumericScores holds a number found in a scored question
+ * (a legacy typed score, Q-16), keyed by the question's name in the default form ("avail_m1_score");
+ * it is checked (SCORE_RANGE) but never used as a score.
  */
 final readonly class ParsedSubmission
 {

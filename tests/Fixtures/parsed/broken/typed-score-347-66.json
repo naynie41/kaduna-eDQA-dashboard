@@ -1,0 +1,279 @@
+{
+    "instance_id": "uuid:fx-typed-score-347-66",
+    "deprecated_id": null,
+    "form_version": "2026.1",
+    "form_version_known": true,
+    "submitted_at": "2026-04-14T08:50:00+00:00",
+    "started_at": "2026-04-14T09:00:00+01:00",
+    "ended_at": "2026-04-14T09:45:00+01:00",
+    "raw_start": "2026-04-14T09:00:00.000+01:00",
+    "raw_end": "2026-04-14T09:45:00.000+01:00",
+    "lga_ref": "CHK",
+    "ward_ref": "CHK-KUJ",
+    "facility_ref": "FX-0001",
+    "round_year": 2026,
+    "round_quarter": 2,
+    "assessor_name": "Hauwa Ibrahim",
+    "device_id": "collect:hauwa01",
+    "gps": {
+        "lat": 10.4806,
+        "lng": 7.4302
+    },
+    "items": [
+        {
+            "dimension": "availability",
+            "month_slot": 1,
+            "item_code": "nhmis_summary",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 1,
+            "item_code": "register_present",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 1,
+            "item_code": "tally_sheet",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 1,
+            "item_code": "reporting_rate",
+            "value": "fail",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 2,
+            "item_code": "nhmis_summary",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 2,
+            "item_code": "register_present",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 2,
+            "item_code": "tally_sheet",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 2,
+            "item_code": "reporting_rate",
+            "value": "fail",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 3,
+            "item_code": "nhmis_summary",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 3,
+            "item_code": "register_present",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 3,
+            "item_code": "tally_sheet",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "availability",
+            "month_slot": 3,
+            "item_code": "reporting_rate",
+            "value": "fail",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 1,
+            "item_code": "nhmis_summary",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 1,
+            "item_code": "register_present",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 1,
+            "item_code": "tally_sheet",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 1,
+            "item_code": "reporting_rate",
+            "value": "fail",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 2,
+            "item_code": "nhmis_summary",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 2,
+            "item_code": "register_present",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 2,
+            "item_code": "tally_sheet",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 2,
+            "item_code": "reporting_rate",
+            "value": "fail",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 3,
+            "item_code": "nhmis_summary",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 3,
+            "item_code": "register_present",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 3,
+            "item_code": "tally_sheet",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "consistency",
+            "month_slot": 3,
+            "item_code": "reporting_rate",
+            "value": "fail",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 1,
+            "item_code": "nhmis_summary",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 1,
+            "item_code": "register_present",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 1,
+            "item_code": "tally_sheet",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 1,
+            "item_code": "reporting_rate",
+            "value": "fail",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 2,
+            "item_code": "nhmis_summary",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 2,
+            "item_code": "register_present",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 2,
+            "item_code": "tally_sheet",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 2,
+            "item_code": "reporting_rate",
+            "value": "fail",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 3,
+            "item_code": "nhmis_summary",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 3,
+            "item_code": "register_present",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 3,
+            "item_code": "tally_sheet",
+            "value": "pass",
+            "is_applicable": true
+        },
+        {
+            "dimension": "validity",
+            "month_slot": 3,
+            "item_code": "reporting_rate",
+            "value": "fail",
+            "is_applicable": true
+        }
+    ],
+    "raw_numeric_scores": {
+        "avail_m1_score": 347.66
+    }
+}

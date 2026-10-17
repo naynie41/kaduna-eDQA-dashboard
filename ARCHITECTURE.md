@@ -420,8 +420,8 @@ Choice mapping (configurable per form version): `yes` → pass, `no` → fail, `
 | `PullSubmissionsJob` | Incremental pull. Same job for scheduler, Pull now and webhook |
 | `BackfillOdkSubmissionsJob` | Cursor-from-zero pull, checkpointed per page, throttled |
 | `FetchAttachmentsJob` | Low-priority queue; downloads deferred attachments |
-| `SubmissionParser` | Payload + `FieldMap` → `ParsedSubmission` DTO |
-| `FieldMap` | Resolves logical names → question paths for a form version |
+| `SubmissionParser` | Payload + `FieldMap` → `ParsedSubmission` DTO; never throws on bad data (built, D-48) |
+| `FieldMap` | Resolves logical names → question paths for a form version, additive over the default (built, D-48) |
 | `ProcessSubmissionAction` | Parse → validate → create assessment / quarantine, in one transaction |
 
 ### 5.3 Pull mechanics
@@ -458,21 +458,22 @@ Every submission records `form_version` (`__system/formVersion`). The parser res
 return [
     'default' => '2026.1',
     'versions' => [
-        '2026.1' => [ /* full map — current form */
-            'facility_code' => 'facility/facility_code',
-            'lga_code'      => 'facility/lga',
-            'ward_code'     => 'facility/ward',
+        '2026.1' => [ /* full map — current form; dot paths through nested groups */
+            'facility_code' => 'facility.facility_code',
+            'lga_code'      => 'facility.lga',
+            'ward_code'     => 'facility.ward',
             'round_year'    => 'round_year',
             'round_quarter' => 'round_quarter',
             'started_at'    => 'start',
             'ended_at'      => 'end',
             'assessor'      => 'assessor_name',
+            'gps'           => 'gps',
             'scored_prefix_pattern' => '/^(avail|consist|valid)_m([1-3])_([a-z0-9_]+)$/',
-            'choices'       => ['yes' => 'pass', 'no' => 'fail', 'na' => 'na'],
+            'renames'       => [],
         ],
-        '2021.3' => [ /* additive: only names that differ */
-            'facility_code' => 'grp_fac/fac_id',
-            'renames' => ['avail_m1_nhmis_summary' => 'avail_m1_nhmis_form'],
+        '2025.2' => [ /* additive: only what differs */
+            'facility_code' => 'fac.fac_code',
+            'renames' => ['avail_m1_nhmis_form' => 'avail_m1_nhmis_summary'], // this version's name => the default's
         ],
     ],
 ];
@@ -480,6 +481,24 @@ return [
 
 **Rule:** a `form_version` with no entry quarantines under `UNKNOWN_FORM_VERSION`. Never fall
 back to the default map for an unknown version. Silent misparsing is the worst outcome.
+
+Built (Phase 2B step 1, D-48):
+
+- **Paths and renames.** `FieldMap::resolve()` merges an additive version over the default, and
+  paths are dot paths into the OData entry. `renames` map a version's question name to the
+  default's.
+- **Scored questions** are every leaf whose name, after renames, matches the pattern, wherever
+  its group sits.
+- **Answers** are mapped with the published rule version's `choice_map` (Q-25); the field map has
+  no `choices`.
+- **What the parser does with bad data.** `SubmissionParser` never throws:
+  - an unknown version gives minimal fields;
+  - a time is read only when it is strict ISO 8601, with the raw text kept;
+  - an answer the map does not know is `invalid`, which ITEMS_INCOMPLETE quarantines;
+  - a number in a scored question is a typed score, kept in `rawNumericScores` by question name
+    (Q-16).
+- **Fixtures:** `tests/Fixtures`. Every map path is `CONTRACT-ASSUMED` until the real form is
+  audited.
 
 **Phase 0 task:** list every form version in ODK Central (`GET /v1/projects/{p}/forms/{f}/versions`),
 download each XLSForm, diff question names. That diff *is* the field map.
@@ -990,6 +1009,7 @@ over the 3 s target (Q-31).
 | D-45 | **Implementation plan, read-only (Phase 4 step 8).** `ImplementationPlanAggregator` works from `LgaTableAggregator`'s rows (the LGA view's figures) for the plan's round, the latest in view. An LGA whose overall is below the lower bound of the band in `edqa.plan.action_below` (default `acceptable`; the bound read from the rule version, compared on the displayed value as `Bands::classify` does, so a row never shows "Acceptable" with an action) gets the standard action for its weakest dimension; a tie goes to the first in alphabetical order (availability, consistency, validity), compared on full precision. At or above the bound: "No action needed"; no score in view: neither. Stored `plan_actions` rows for the round replace the generated row for that LGA, every stored dimension listed, even for an LGA now above the bound, marked "Saved plan" and reviewed on their stored date; generated rows review "After {round}". Action texts and meanings are in `lang/en/plan.php`; default owners are role keys in `edqa.plan.default_owners`, labelled there (hard rule 10). "Actions by type" counts the rows in the aggregator. Not cached: stored rows change outside the round cache. The prototype gave every LGA an action; the threshold is the Phase 4 brief's. Editing, statuses and the Excel workplan: Phase 6 | Phase 4 step 8 |
 | D-46 | **Server performance (Phase 4 step 9).** `edqa:seed:perf` (local and testing only; `Database\Seeders\PerformanceSeeder`) fills every quarter of five years ending at the latest round with one scored assessment per active facility (~44,000), in set-based SQL, keeping what exists. Its scores are derived from the generated items in SQL with ScoreCalculator's formula, so it refuses a weighted or non-standard rule version (use `edqa:rescore`), and `SeedPerformanceDataTest` re-scores every assessment with the real calculator to prove they agree; bulk SQL bypasses the audit log (synthetic local data). `ServerTimingTest` (slow group) times every dashboard page's first response and deferred reload, and the GET API endpoints, over ten filter combinations each on that dataset: in-process, warm classes, cold round cache. Before: every p95 within 1.5 s, the Visuals deferred load at 1,263 ms (the month series recomputed every round from 391k score rows; sorts spilled to disk). Fix: `round_aggregates` v4 adds `{dimension}_m{slot}` (A8), reconciled with `MonthSlotAggregator`'s SQL to 1e-9, and the month series reads the view for any number of rounds: 48 ms. Raising `work_mem` gained ~20% and was not adopted (a role setting is a server-contract change for little). Report: `storage/app/perf/server-timing.md` | Phase 4 step 9 |
 | D-47 | **Client performance measurement (Phase 4 step 9).** `lighthouse` 13.5 and `chrome-launcher` 1.2 (dev only), run by `make lighthouse` in the playwright service with its Chromium against a production build: Vite stopped and `public/hot` removed, PHP as in production for the run (`opcache.validate_timestamps=0`, config and routes cached; the dev setting re-checks every file on the Windows bind mount, ~6 s a request, which Lighthouse would charge to the page), then restored. Slow 3G is simulated at 400 ms RTT, 400 Kbps, CPU ×4, 360 × 740; median of three runs. Report: `storage/app/perf/lighthouse.md`. Charts are shown to load after numbers in `tests/e2e/audit.spec.ts` (page clock: figures paint before any chart; the chart code is fetched only after the data) | Phase 4 step 9 |
+| D-48 | **ODK parser, field maps and fixtures (Phase 2B step 1).** `App\Domain\Ingestion\Odk\FieldMap` merges an additive version over the default (`array_replace`, the version's own `renames`); an unknown, blank or near-miss version is null, never the default. Paths are dot paths through the OData entry's nested groups; `__id`, `__system` and `meta` are ODK's own and read directly. `renames` are [this version's name => the default's]. `SubmissionParser::parse()` never throws on bad data (a 500-payload property test): an unknown version gives minimal fields (identity, version, submission time, device); a time is read only when strict ISO 8601 with in-range parts (a lenient parse reads "FEBRUARY" as a date and hides COLUMN_DRIFT), with `rawStart`/`rawEnd` keeping the text; an unreadable submission time becomes 1970-01-01 UTC, which ROUND_WINDOW holds; scored questions are found by the pattern after renames, wherever their group; answers map through the published rule version's `choice_map` (Q-25), and the field map no longer has `choices`; an unknown answer is `invalid` (`ItemResponseData::INVALID`, not applicable), and ITEMS_INCOMPLETE quarantines **any** invalid answer, since one among valid answers would otherwise score as a fail; a null answer is skipped (missing); a number or numeric text in a scored question is a typed score, kept in `rawNumericScores` keyed by question name and never an item (Q-16). Fixtures: Phase 2A built its cases in code, so its JSON fixtures were created here: `tests/Fixtures/{odk,parsed}/{valid,broken}`, 23 cases, written by `generate.mjs` from a spec and never by the parser, run against `Tests\Support\FixtureWorld`. Every map path is `CONTRACT-ASSUMED`. Checked against the ODK Central OData docs: geopoints are GeoJSON (lon, lat, alt) and Central omits GPS accuracy (read only if present); the docs name only some `__system` keys (submitterId, submissionDate, updatedAt, reviewState), so `deviceId` and `formVersion` under `__system` are assumed from Central's `$metadata` until checked on a live server | Phase 2B step 1. The real maps wait for the form XML (§11.5) |
 
 Add new decisions here with the next ID. Any new Composer/npm package needs a line.
 
@@ -1048,7 +1068,7 @@ real month names for single-quarter views, LGA tile grid, Data issues "why it ex
 | Q-22 | The password policy checks new passwords against Have I Been Pwned (`uncompromised()`), which needs outbound HTTPS from the server to `api.pwnedpasswords.com`. Does the hosting allow it? If not, creating an admin and changing a password fail | Hosting, `edqa:admin:create` on the server |
 | Q-23 | Does the client ever need an administrator account deleted (for example a data protection request), or is disabling enough? Disabling keeps the audit trail attributable; deleting would leave audit entries without a named actor. Only `edqa:admin:disable` exists | `SECURITY.md` §2 wording, data protection statement |
 | Q-24 | Which decides a visit's round: the visit date (the round whose window holds it, as `ROUND_WINDOW` reads) or the form's own `round_year` / `round_quarter` answers? And when both exist and disagree, quarantine or trust one? **Answered (owner, 2026-10-08): the visit date decides; a disagreeing declared round quarantines. See D-28** | — |
-| Q-25 | Where does the raw-choice mapping live, and what does `item_responses.value` hold? The field map has `choices` (yes→pass) and so does each scoring rule version (`choice_map`). Processing stores the parser's mapped outcome (`pass` / `fail` / `na`), so a `choice_map` change in a new rule version could not be re-applied on rescore; the factories and demo seed store raw `yes` / `no` / `na`. Proposed: store the raw choice, map with the rule version's `choice_map` at scoring time, and drop `choices` from the field map. **Interim (Phase 3 step 1):** `RuleConfig::outcome()` reads either form: a value in the version's `choice_map` is mapped, otherwise an outcome passes through, and anything else is refused. The map wins on `na` (both a choice and an outcome), so a version that remaps N/A applies to every stored N/A; applicability follows the mapped outcome | Rescore (Phase 3), item storage |
+| Q-25 | Where does the raw-choice mapping live, and what does `item_responses.value` hold? The field map has `choices` (yes→pass) and so does each scoring rule version (`choice_map`). Processing stores the parser's mapped outcome (`pass` / `fail` / `na`), so a `choice_map` change in a new rule version could not be re-applied on rescore; the factories and demo seed store raw `yes` / `no` / `na`. Proposed: store the raw choice, map with the rule version's `choice_map` at scoring time, and drop `choices` from the field map. **Interim (Phase 3 step 1):** `RuleConfig::outcome()` reads either form: a value in the version's `choice_map` is mapped, otherwise an outcome passes through, and anything else is refused. The map wins on `na` (both a choice and an outcome), so a version that remaps N/A applies to every stored N/A; applicability follows the mapped outcome. **Phase 2B step 1:** the parser maps with the published rule version's `choice_map` and the field map's `choices` is gone (D-48); what `item_responses.value` stores (still the mapped outcome) is unchanged and still open | Rescore (Phase 3), item storage |
 | Q-26 | Is a score banded on its full-precision value or on the value people see? **Default built:** on the value as the table shows it, rounded to 1 dp in the Q-09 mode (`Bands::classify`). Why: on full precision, 89.96 displays as "90.0" yet would be labelled Acceptable, a contradiction on screen; banding the shown value means a "90.0" is always Strong. The cost: a facility at 89.95 is Strong under half-up but Acceptable under truncate, so Q-09's answer also moves band edges. Confirm, or band on full precision and accept the occasional "90.0 Acceptable" | Bands, implementation plan (which LGAs enter it) |
 | Q-27 | What does `edqa.aggregation.weighting = 'facility_count'` mean? The reference figures define `unweighted` as every facility counting once (state ≈ 86.29). Weighting LGA or owner means by their facility count gives exactly that same number, so the alternative must be something else, most likely each LGA counting equally (state = mean of the 23 LGA means) or each owner type equally ((87.67 + 73.67) / 2 = 80.67 for the state). **Built:** `unweighted` only; `facility_count` is refused (`UnsupportedWeighting`) until this is answered | Every aggregate (refines Q-04) |
 | Q-28 | When a filter spans several rounds (a year with no quarter), what is a facility's score? **Default built:** the mean of its accepted assessments in those rounds (the single-round rule, generalised), then unweighted upward; banded under the latest round's rule version. With no filter the summaries show the latest round, and the trend and Visuals show every round | Home, LGA, Facility and Monitor pages with a year-only filter |

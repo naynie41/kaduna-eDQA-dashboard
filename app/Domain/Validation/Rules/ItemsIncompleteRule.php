@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Validation\Rules;
 
+use App\Domain\Ingestion\DTOs\ItemResponseData;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\Enums\Severity;
@@ -47,6 +48,15 @@ final class ItemsIncompleteRule implements ValidationRule
         $missing = ItemCoverage::missingSlots($submission->items);
         if ($missing !== []) {
             $parts[] = $this->text('detail', ['slots' => implode(', ', $missing)]);
+        }
+        // An answer outside the choice list is a missing answer: one is enough, or it would
+        // score as a fail.
+        $invalid = array_map(fn (ItemResponseData $item): string => $this->text('item', [
+            'slot' => ItemCoverage::slotName($item->dimension, $item->monthSlot),
+            'code' => $item->itemCode,
+        ]), ItemCoverage::invalidItems($submission->items));
+        if ($invalid !== []) {
+            $parts[] = $this->text('detail_invalid', ['items' => implode($this->text('list_separator'), $invalid)]);
         }
         foreach (ItemCoverage::unscorableDimensions($submission->items) as $dimension) {
             $parts[] = $this->text('detail_all_na', ['dimension' => $dimension->value]);

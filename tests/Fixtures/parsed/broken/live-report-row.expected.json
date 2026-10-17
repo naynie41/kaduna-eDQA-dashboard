@@ -1,0 +1,9 @@
+{
+    "status": "quarantined",
+    "codes": [
+        "COLUMN_DRIFT",
+        "LGA_UNKNOWN",
+        "FACILITY_UNKNOWN",
+        "SCORE_RANGE"
+    ]
+}

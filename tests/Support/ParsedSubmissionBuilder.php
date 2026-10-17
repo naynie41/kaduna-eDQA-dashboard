@@ -234,7 +234,7 @@ final class ParsedSubmissionBuilder
                 }
                 foreach (self::ITEM_CODES as $i => $code) {
                     $value = $this->itemValues["{$dimension->value}:{$slot}:{$code}"] ?? ($i === 3 ? 'fail' : 'pass');
-                    $items[] = new ItemResponseData($dimension, $slot, $code, $value, $value !== 'na');
+                    $items[] = new ItemResponseData($dimension, $slot, $code, $value, in_array($value, ['pass', 'fail'], true));
                 }
             }
         }

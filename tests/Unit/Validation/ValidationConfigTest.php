@@ -44,8 +44,10 @@ it('has a default form version with a full field map', function (): void {
     expect($default)->toBe('2026.1')
         ->and(config('edqa_field_maps.versions')[$default] ?? null)->toHaveKeys([
             'facility_code', 'lga_code', 'ward_code', 'round_year', 'round_quarter', 'started_at',
-            'ended_at', 'assessor', 'scored_prefix_pattern', 'choices',
-        ]);
+            'ended_at', 'assessor', 'gps', 'scored_prefix_pattern', 'renames',
+        ])
+        // Answers map through the rule version's choice_map (Q-25), never the field map.
+        ->and(config('edqa_field_maps.versions')[$default])->not->toHaveKey('choices');
 });
 
 it('names, explains and words a detail for every rule', function (string $code): void {

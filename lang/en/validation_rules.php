@@ -68,6 +68,10 @@ return [
         'detail' => 'missing :slots',
         'detail_all_na' => ':dimension has no applicable item in any month',
         'detail_typed_scores' => 'no item responses: this form recorded typed scores, which the portal never accepts as scores',
+        // An answer outside the scoring rule version's choice list (the parser's 'invalid').
+        'detail_invalid' => 'an answer the form does not allow: :items',
+        'item' => ':slot :code',
+        'list_separator' => ', ',
         'separator' => '; ',
     ],
 
