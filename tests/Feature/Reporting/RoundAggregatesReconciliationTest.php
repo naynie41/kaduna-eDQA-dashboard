@@ -77,6 +77,10 @@ it('agrees with the aggregators on every row', function (int $seed): void {
                     assertNear($state->overall, $dims->overall, "{$at} state overall");
                     foreach ([1, 2, 3] as $slot) {
                         assertNear($state->{"m{$slot}"}, $months[$slot - 1]->overall, "{$at} state m{$slot}");
+                        // v4: each dimension per month slot, for the Visuals month charts.
+                        foreach (['availability', 'consistency', 'validity'] as $dimension) {
+                            assertNear($state->{"{$dimension}_m{$slot}"}, $months[$slot - 1]->{$dimension}, "{$at} state {$dimension}_m{$slot}");
+                        }
                     }
                     $checked++;
                 }
@@ -93,6 +97,12 @@ it('agrees with the aggregators on every row', function (int $seed): void {
                     expect((int) $row->facility_count)->toBe($lga->facilities);
                     foreach (['availability', 'consistency', 'validity', 'm1', 'm2', 'm3', 'overall'] as $measure) {
                         assertNear($row->{$measure}, $lga->{$measure}, "{$at} LGA {$lga->code} {$measure}");
+                    }
+                    $lgaMonths = app(MonthSlotAggregator::class)->series(new ReportFilter(year: 2026, quarter: $quarter, lga: $lga->code, level: $level, owner: $owner));
+                    foreach ([1, 2, 3] as $slot) {
+                        foreach (['availability', 'consistency', 'validity'] as $dimension) {
+                            assertNear($row->{"{$dimension}_m{$slot}"}, $lgaMonths[$slot - 1]->{$dimension}, "{$at} LGA {$lga->code} {$dimension}_m{$slot}");
+                        }
                     }
                     $checked++;
                 }

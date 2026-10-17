@@ -34,7 +34,7 @@ export default function LgaTile({ lga, pressed, onToggle }: LgaTileProps) {
             aria-pressed={pressed}
             aria-label={t('dashboard.lga.tile_name', { lga: lga.name, score: lga.overall.display, band: lga.overall.bandLabel, count: facilities })}
             onClick={() => onToggle(lga.code)}
-            className={`block min-h-11 w-full border-0 border-l-[3px] px-2.75 pt-2.5 pb-2.75 text-left ${tone.border} ${pressed ? 'bg-wash' : 'bg-panel hover:bg-paper'}`}
+            className={`block min-h-11 w-full border-0 border-l-[3px] px-2.75 pt-2.5 pb-2.75 text-left ${tone.border} ${pressed ? 'bg-wash forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]' : 'bg-panel hover:bg-paper'}`}
         >
             <span className="block text-[12.5px] leading-tight">{lga.name}</span>
             <span className={`mt-1 block font-display text-[17px] font-semibold tabular-nums ${tone.text}`}>{lga.overall.display}</span>

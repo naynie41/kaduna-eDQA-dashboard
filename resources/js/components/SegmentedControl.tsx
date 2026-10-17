@@ -28,7 +28,7 @@ export default function SegmentedControl<T extends string>({ label, options, val
         <div role="group" aria-label={label} aria-describedby={describedBy} className="inline-flex max-w-full flex-wrap gap-px overflow-hidden rounded-[7px] border border-rule bg-rule">
             {options.map((option) => {
                 const pressed = option.value === value;
-                const tone = pressed ? 'bg-deep font-medium text-panel' : disabled ? 'bg-paper text-ink-2' : 'bg-panel text-ink-2 hover:text-ink';
+                const tone = pressed ? 'bg-deep font-medium text-panel forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]' : disabled ? 'bg-paper text-ink-2' : 'bg-panel text-ink-2 hover:text-ink';
 
                 return (
                     <button

@@ -8,7 +8,7 @@ APP_DB_USER     := edqa_app
 APP_DB_PASSWORD := edqa_app_dev
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e size
+.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e size lighthouse
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-13s %s\n", $$1, $$2}'
@@ -48,7 +48,7 @@ npm: ## Run npm in the vite container: make npm c="run build"
 test: ## Pest against edqa_test (parallel)
 	$(EXEC) composer test
 
-test-slow: ## The slow group only (rescore performance, ARCHITECTURE.md §10)
+test-slow: ## The slow group only (rescore time, server p95 on the perf dataset: ARCHITECTURE.md §10)
 	$(EXEC) vendor/bin/pest --group=slow
 
 lint: ## Pint (test mode) and Larastan
@@ -77,6 +77,20 @@ grants-check: ## Prove the least-privilege grants: tests/Grants act as edqa_app 
 e2e: ## Playwright against the running dev stack (seeds the local e2e admin first)
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
 	$(COMPOSE) --profile e2e run --rm playwright $(c)
+
+lighthouse: ## Lighthouse on Slow 3G (Home, Facility view, Visuals) against a production build; Vite restarts after
+	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
+	$(COMPOSE) stop vite
+	$(EXEC) rm -f public/hot  # vite runs under sh -c, so it never gets to remove it: Laravel would keep using the dev server
+	$(COMPOSE) run --rm --no-deps -e WAYFINDER_SKIP=1 vite npm run build
+	# PHP as in production for the run (opcache.ini: no file re-checks; config and routes cached):
+	# the dev setting re-checks every file on the Windows bind mount, ~6 s a request.
+	$(COMPOSE) exec -T -u root app sh -c 'echo "opcache.validate_timestamps = 0" > /usr/local/etc/php/conf.d/zz-lighthouse.ini && kill -USR2 1'
+	$(EXEC) sh -c 'php artisan config:cache -q && php artisan route:cache -q'
+	-$(COMPOSE) --profile e2e run --rm --no-deps --entrypoint sh playwright tests/perf/run-lighthouse.sh
+	$(EXEC) sh -c 'php artisan config:clear -q && php artisan route:clear -q'
+	$(COMPOSE) exec -T -u root app sh -c 'rm -f /usr/local/etc/php/conf.d/zz-lighthouse.ini && kill -USR2 1'
+	$(COMPOSE) start vite
 
 size: ## Bundle budget: gzipped JS on first visit to /dashboard/home must stay under 300 KB
 	$(COMPOSE) exec -T vite npm run size

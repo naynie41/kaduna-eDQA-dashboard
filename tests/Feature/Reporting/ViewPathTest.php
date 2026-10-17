@@ -7,6 +7,7 @@ use App\Domain\Facility\Enums\Ownership;
 use App\Domain\Reporting\Aggregators\CoverageAggregator;
 use App\Domain\Reporting\Aggregators\DimensionAggregator;
 use App\Domain\Reporting\Aggregators\LgaTableAggregator;
+use App\Domain\Reporting\Aggregators\MonthSlotAggregator;
 use App\Domain\Reporting\Aggregators\OwnerSplitAggregator;
 use App\Domain\Reporting\Aggregators\QuarterTrendAggregator;
 use App\Domain\Reporting\Aggregators\WeakestLgasAggregator;
@@ -60,6 +61,8 @@ function viewCapableAnswers(ReportFilter $filter): array
         'weakest' => app(WeakestLgasAggregator::class)->weakest($filter),
         'trend' => app(QuarterTrendAggregator::class)->trend($filter),
         'coverage' => app(CoverageAggregator::class)->coverage($filter),
+        // Read from the view for any number of rounds (v4 dimension × month columns).
+        'month slots' => app(MonthSlotAggregator::class)->series($filter),
     ];
 }
 
@@ -105,7 +108,7 @@ it('really reads the view when it can', function (): void {
 it('falls back to SQL while the view has never been populated', function (): void {
     RandomReportingDataset::build(6);
     DB::statement('DROP MATERIALIZED VIEW round_aggregates');
-    DB::statement((string) file_get_contents(database_path('sql/round_aggregates_v3.sql')));  // WITH NO DATA
+    DB::statement((string) file_get_contents(database_path('sql/round_aggregates_v4.sql')));  // WITH NO DATA
     config(['edqa.aggregation.read_view' => true]);
 
     expect(app(RoundAggregatesView::class)->usable())->toBeFalse()

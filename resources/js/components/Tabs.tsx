@@ -28,8 +28,8 @@ export default function Tabs({ label, items }: TabsProps) {
                         <Link
                             href={item.href}
                             aria-current={item.current ? 'page' : undefined}
-                            className={`inline-flex items-center rounded-t-[5px] border-b-[2.5px] px-3 pt-2 pb-2.5 text-[13.5px] whitespace-nowrap ${
-                                item.current ? 'border-deep font-semibold text-deep' : 'border-transparent text-ink-2 hover:bg-paper hover:text-ink'
+                            className={`inline-flex items-center rounded-t-[5px] border-b-[2.5px] px-3 pt-2 pb-2.5 text-[13.5px] whitespace-nowrap forced-colors:forced-color-adjust-none forced-colors:bg-[Canvas] forced-colors:text-[LinkText] ${
+                                item.current ? 'border-deep font-semibold text-deep forced-colors:border-[Highlight]' : 'border-transparent text-ink-2 hover:bg-paper hover:text-ink'
                             }`}
                         >
                             {item.label}

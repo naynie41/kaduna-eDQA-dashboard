@@ -148,9 +148,10 @@ make up                                  # start the dev stack (app, web :8080, 
 make sh                                  # shell in the app container
 make check                               # pint --test, phpstan, pest
 make test                                # pest --parallel against edqa_test (slow group excluded)
-make test-slow                           # the slow group: rescore of 2,200 assessments < 5 min
+make test-slow                           # the slow group: rescore of 2,200 assessments < 5 min; server p95 on ~44k
 make e2e                                 # Playwright + axe against the running dev stack (c="shell" to pick specs)
 make size                                # bundle budget: first-visit gzipped JS < 300 KB
+make lighthouse                          # Lighthouse, Slow 3G, against a production build (stops and restarts vite)
 make npm c="test"                        # Vitest (also c="run typecheck", c="run lint")
 make fresh                               # drop, migrate and seed the dev database
 make grants-check                        # prove edqa_app's least-privilege grants
@@ -159,6 +160,7 @@ make routes                              # regenerate Wayfinder route helpers
 make artisan c="edqa:pull"               # one ODK pull, synchronous
 make artisan c="edqa:backfill"           # resumable historical backfill
 make artisan c="edqa:rescore"
+make artisan c="edqa:seed:perf"          # local only: five years of scored assessments (~44k), for budgets
 make artisan c="edqa:admin:create"
 docker compose -f compose.dev.yml --profile scheduler up -d scheduler   # opt-in scheduler
 ```

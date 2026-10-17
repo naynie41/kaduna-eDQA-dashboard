@@ -35,7 +35,7 @@ export default function Rail() {
                                 href={item.href}
                                 aria-current={item.current ? 'page' : undefined}
                                 className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-sm whitespace-nowrap ${
-                                    item.current ? 'bg-rail-active font-medium text-panel shadow-[inset_2px_0_0_var(--color-rail-accent)]' : 'hover:bg-white/5 hover:text-panel'
+                                    item.current ? 'bg-rail-active font-medium text-panel shadow-[inset_2px_0_0_var(--color-rail-accent)] forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]' : 'hover:bg-white/5 hover:text-panel'
                                 }`}
                             >
                                 {item.label}
