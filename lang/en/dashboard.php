@@ -204,6 +204,37 @@ return [
         'announce' => 'Showing :view.',
     ],
 
+    // Implementation plan, read-only (ARCHITECTURE.md §9.2.6).
+    'plan' => [
+        'title' => 'Implementation plan',
+        'description' => 'Generated from the results for :round. Each local government scoring below :band (:value) gets an action on its weakest dimension, with an owner and a review point.',
+        'description_none' => 'No round in view, so there is no plan.',
+        'read_only' => 'Read-only for now: owners, review dates and statuses become editable in a later release.',
+        'lga' => 'LGA',
+        'overall' => 'Overall',
+        'weakest' => 'Weakest dimension',
+        'score' => 'Score',
+        'action' => 'Recommended action',
+        'owner' => 'Owner',
+        'review' => 'Review',
+        'review_after' => 'After :round',
+        'saved' => 'Saved plan',
+        'none' => 'No local government in view needs an action.',
+        'clear_title' => 'No action needed',
+        'clear_description' => 'At or above :band (:value).',
+        'clear_list' => 'Local governments needing no action',
+        'clear_none' => 'None in view.',
+        'types_title' => 'Actions by type',
+        'types_description' => 'How the plan breaks down by the dimension acted on.',
+        'type' => 'Action',
+        'count' => 'Local governments',
+        'for_dimension' => 'Weakest dimension: :dimension',
+        'meanings_title' => 'What each action means',
+        'meanings_description' => 'The standard response attached to each dimension.',
+        'dimension' => 'Dimension',
+        'response' => 'Standard action',
+    ],
+
     // The facility detail drawer (ARCHITECTURE.md §9.2.7).
     'drawer' => [
         'loading_title' => 'Facility details',

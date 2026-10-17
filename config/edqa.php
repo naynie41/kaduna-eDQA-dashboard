@@ -51,6 +51,21 @@ return [
         'project_id' => env('ODK_PROJECT_ID') ?: null,
     ],
 
+    'plan' => [
+        // ARCHITECTURE.md §9.2.6: an LGA whose overall is below this band's lower bound (read
+        // from the rule version, on the displayed value as bands are) gets an action; at or
+        // above it, "No action needed". strong | acceptable | review.
+        'action_below' => 'acceptable',
+
+        // The default owner of each dimension's standard action: a key of lang/en/plan.php
+        // owners. Phase 6 makes the owner editable per row (plan_actions).
+        'default_owners' => [
+            'availability' => 'lga_me_officer',
+            'consistency' => 'state_me_team',
+            'validity' => 'programme_manager',
+        ],
+    ],
+
     'presentation' => [
         // Q-09: how a score is rounded for display, and therefore which band it shows (Q-26):
         // 'half_up' (default) or 'truncate'. The live tool shows the private overall 73.67 as

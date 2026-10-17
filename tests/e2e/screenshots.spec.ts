@@ -15,6 +15,7 @@ const PAGES = [
     { name: 'facility', path: '/dashboard/facility?year=2026&quarter=2', loaded: null, prototypeTab: 'Facility view' },
     { name: 'monitor', path: '/dashboard/monitor?year=2026&quarter=2', loaded: null, prototypeTab: 'Monitor' },
     { name: 'visuals', path: '/dashboard/visuals?year=2026&quarter=2', loaded: /April 2026: grouped bars/, prototypeTab: 'Visuals' },
+    { name: 'plan', path: '/dashboard/plan?year=2026&quarter=2', loaded: null, prototypeTab: 'Implementation plan' },
 ] as const;
 
 test.describe.configure({ mode: 'serial' });

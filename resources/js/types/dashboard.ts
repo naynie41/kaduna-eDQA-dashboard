@@ -237,3 +237,32 @@ export type VisualsProps = {
     monthSlots?: MonthSlots;
     lgas?: LgaRow[];
 };
+
+/** Implementation plan (§9.2.6), read-only: ImplementationPlanAggregator as it serialises. */
+export type PlanRow = {
+    lgaId: number;
+    code: string;
+    name: string;
+    overall: ScoreValue;
+    dimension: Dimension;
+    score: ScoreValue;
+    action: string;
+    owner: string;
+    /** A stored row's review date (YYYY-MM-DD); null for a generated row. */
+    reviewDate: string | null;
+    /** A generated row reviews "after" this round. */
+    reviewRound: string | null;
+    stored: boolean;
+};
+
+export type PlanSummary = { dimension: Dimension; action: string; meaning: string; owner: string; count: number };
+
+export type Plan = {
+    round: string | null;
+    threshold: { band: string; label: string; value: string } | null;
+    actions: PlanRow[];
+    clear: LgaScore[];
+    summary: PlanSummary[];
+};
+
+export type PlanProps = { plan?: Plan };

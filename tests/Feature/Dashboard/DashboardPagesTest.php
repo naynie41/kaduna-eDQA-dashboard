@@ -24,7 +24,7 @@ const DASHBOARD_PAGES = [
     'lga' => ['lgas'],
     'monitor' => ['owners', 'coverage', 'windows'],
     'visuals' => ['monthSlots', 'lgas'],
-    'plan' => ['lgas'],
+    'plan' => ['plan'],
 ];
 
 it('sends /dashboard and / to the home page, keeping the filters', function (string $from): void {
