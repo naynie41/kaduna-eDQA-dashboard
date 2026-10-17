@@ -21,11 +21,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are Phase 2A's cases, which 2A had built in code. A 500-payload property test checks that the
   parser never throws.
 
+- ODK Central client (Phase 2B step 2, D-49): the `SubmissionSource` contract with
+  `OdkCentralSource` over `OdkCentralClient`. It has an encrypted session token refreshed 30
+  minutes before expiry and once on a 401, https only with TLS verified, 10 s and 60 s timeouts,
+  and retries with backoff (Retry-After honoured) on 429, 5xx and connection errors only. Errors
+  are typed, carry no secrets, and are logged on the `edqa` channel without passwords, tokens or
+  payloads.
+- `edqa:odk:check [--json]`: the first command when credentials arrive. It signs in, reads the
+  project and form, and lists the published form versions, marking those without a field map.
+
 ### Changed
 
 - ITEMS_INCOMPLETE quarantines any answer the form does not allow (`invalid`), even among valid
   answers, which would otherwise score as a fail.
 - The field map no longer carries `choices`: answers map through the rule version (Q-25).
+- `config/edqa.php` `odk`: `base_url` is now `url`, beside the email, password, project, form,
+  page size, timeouts and retry settings (all from the existing `ODK_*` env keys).
 
 ## [0.4.0] - 2026-10-17
 

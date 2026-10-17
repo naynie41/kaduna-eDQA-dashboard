@@ -7,6 +7,10 @@ namespace App\Providers;
 use App\Domain\Assessment\Events\AssessmentCorrected;
 use App\Domain\Assessment\Events\AssessmentScored;
 use App\Domain\Facility\Models\Lga;
+use App\Domain\Ingestion\Contracts\SubmissionSource;
+use App\Domain\Ingestion\Odk\OdkCentralSource;
+use App\Domain\Ingestion\Odk\OdkConfig;
+use App\Domain\Ingestion\Odk\SessionTokenCache;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Domain\Reporting\Listeners\FlushRoundCache;
 use App\Domain\Reporting\Listeners\RefreshAggregatesAfterScore;
@@ -33,7 +37,11 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // ODK (ARCHITECTURE.md §5.2): settings read from config each time, so nothing stale is
+        // held; the source behind the contract is ODK Central (another adapter if Q-01 says so).
+        $this->app->bind(OdkConfig::class, fn (): OdkConfig => OdkConfig::fromConfig());
+        $this->app->bind(SessionTokenCache::class, fn ($app): SessionTokenCache => new SessionTokenCache($app->make(OdkConfig::class)->refreshMinutes));
+        $this->app->bind(SubmissionSource::class, OdkCentralSource::class);
     }
 
     /**

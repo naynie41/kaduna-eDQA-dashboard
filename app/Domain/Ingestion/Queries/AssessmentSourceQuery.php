@@ -20,7 +20,7 @@ use Illuminate\Container\Attributes\Config;
 final class AssessmentSourceQuery
 {
     public function __construct(
-        #[Config('edqa.odk.base_url')] private readonly ?string $baseUrl,
+        #[Config('edqa.odk.url')] private readonly ?string $baseUrl,
         #[Config('edqa.odk.project_id')] private readonly int|string|null $projectId,
     ) {}
 

@@ -45,10 +45,28 @@ return [
     ],
 
     'odk' => [
-        // ODK Central (ARCHITECTURE.md §5). The facility drawer links each assessment to its
-        // submission in Central; with no URL or project the link is left out (null), never guessed.
-        'base_url' => env('ODK_CENTRAL_URL') ?: null,
+        // ODK Central (ARCHITECTURE.md §5, SECURITY.md §6), read only here: the client never reads
+        // env. Any of the five missing (or a URL that is not https) means "not configured": every
+        // caller says so plainly instead of failing. The service account is a Project Viewer.
+        // The facility drawer's link to a submission uses url and project_id too.
+        'url' => env('ODK_CENTRAL_URL') ?: null,
+        'email' => env('ODK_CENTRAL_EMAIL') ?: null,
+        'password' => env('ODK_CENTRAL_PASSWORD') ?: null,
         'project_id' => env('ODK_PROJECT_ID') ?: null,
+        'form_id' => env('ODK_FORM_ID') ?: null,
+
+        // Submissions per OData page (§5.3).
+        'page_size' => (int) (env('ODK_PULL_PAGE_SIZE') ?: 500),
+
+        // Seconds: connect, and the whole request (one page).
+        'timeouts' => ['connect' => 10, 'total' => 60],
+
+        // Per request: 3 attempts on 429, 5xx and connection errors, waiting base × 2^n ms (or
+        // the server's Retry-After), at most max_ms. No retry on any other 4xx.
+        'retry' => ['attempts' => 3, 'base_ms' => 1000, 'max_ms' => 30000],
+
+        // The session token is refreshed this many minutes before it expires.
+        'token_refresh_minutes' => 30,
     ],
 
     'plan' => [
