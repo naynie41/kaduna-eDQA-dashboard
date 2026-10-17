@@ -30,6 +30,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `edqa:odk:check [--json]`: the first command when credentials arrive. It signs in, reads the
   project and form, and lists the published form versions, marking those without a field map.
 
+- Mock ODK Central for local development and e2e (Phase 2B step 3, D-50). It lives in
+  `docker/odk-mock/` and runs as the compose service `odk-mock` (profile `odk`), started with
+  `make odk-mock-up`. `edqa:odk-mock:generate` (`make odk-mock-seed n=200`) writes realistic
+  raw submissions for the seeded facilities: broken, flagged, edited and valid visits, plus two
+  photos. Edits are served as Central serves them.
+- `ODK_ALLOW_INSECURE_LOCAL`: allows an http ODK URL for the mock, only when `APP_ENV=local`.
+  Set anywhere else, it is refused.
+
 ### Changed
 
 - ITEMS_INCOMPLETE quarantines any answer the form does not allow (`invalid`), even among valid

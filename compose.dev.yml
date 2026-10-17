@@ -66,6 +66,18 @@ services:
     profiles: [scheduler]            # opt-in locally, so ODK isn't pulled every 10 minutes
     depends_on: [app]
 
+  # A mock ODK Central for local development and e2e (docker/odk-mock/README.md), opt-in:
+  # `make odk-mock-up`, then `make odk-mock-seed n=200`. PHP's built-in server on the app image,
+  # serving storage/app/odk-mock. Plain http: the app accepts it only with
+  # ODK_ALLOW_INSECURE_LOCAL=true and APP_ENV=local.
+  odk-mock:
+    <<: *php
+    command: ["php", "-S", "0.0.0.0:8080", "docker/odk-mock/router.php"]
+    profiles: [odk]
+    environment:
+      ODK_MOCK_DATA: /var/www/html/storage/app/odk-mock
+    ports: ["127.0.0.1:8090:8080"]   # local only: curl it from the host
+
   # Playwright end-to-end tests (`make e2e`), opt-in. The image's browsers match @playwright/test
   # 1.64.1 in package.json: bump both together. It reuses the vite service's node_modules and
   # forwards its own localhost:8080 / :5173 to web and vite (tests/e2e/run.sh), so the

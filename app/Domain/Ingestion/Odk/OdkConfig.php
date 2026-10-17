@@ -7,6 +7,10 @@ namespace App\Domain\Ingestion\Odk;
 /**
  * ODK Central settings from config/edqa.php 'odk' (env is read there only). Configured means all
  * five values are present and the URL is https (SECURITY.md §6: https only, fail closed).
+ *
+ * The one exception is the local mock server (docker/odk-mock): plain http is accepted when
+ * ODK_ALLOW_INSECURE_LOCAL is true **and** the app runs in the local environment. The flag set in
+ * any other environment is itself a problem, so a production misconfiguration fails loudly.
  */
 final readonly class OdkConfig
 {
@@ -23,10 +27,12 @@ final readonly class OdkConfig
         public int $baseMs,
         public int $maxMs,
         public int $refreshMinutes,
+        public bool $allowInsecureLocal,
+        public string $environment,
     ) {}
 
     /** @param  array<array-key, mixed>  $odk  config('edqa.odk') */
-    public static function fromArray(array $odk): self
+    public static function fromArray(array $odk, string $environment = 'production'): self
     {
         $text = fn (string $key): ?string => is_scalar($odk[$key] ?? null) && trim((string) $odk[$key]) !== '' ? trim((string) $odk[$key]) : null;
         $int = fn (mixed $value, int $default): int => is_numeric($value) && (int) $value > 0 ? (int) $value : $default;
@@ -47,6 +53,8 @@ final readonly class OdkConfig
             baseMs: $int($retry['base_ms'] ?? null, 1000),
             maxMs: $int($retry['max_ms'] ?? null, 30000),
             refreshMinutes: $int($odk['token_refresh_minutes'] ?? null, 30),
+            allowInsecureLocal: ($odk['allow_insecure_local'] ?? false) === true,
+            environment: $environment,
         );
     }
 
@@ -54,12 +62,13 @@ final readonly class OdkConfig
     {
         $odk = config('edqa.odk');
 
-        return self::fromArray(is_array($odk) ? $odk : []);
+        return self::fromArray(is_array($odk) ? $odk : [], (string) app()->environment());
     }
 
     /**
-     * What stops the client: env keys to set, in .env.example order, and "ODK_CENTRAL_URL (https)"
-     * for a URL that is not https. Empty when configured. Never the values themselves.
+     * What stops the client: env keys to set, in .env.example order; "ODK_CENTRAL_URL (https)" for a
+     * URL that is not https (unless the local mock is allowed); "ODK_ALLOW_INSECURE_LOCAL (local
+     * only)" when that flag is set outside local. Empty when configured. Never the values themselves.
      *
      * @return list<string>
      */
@@ -71,7 +80,13 @@ final readonly class OdkConfig
                 $problems[] = $key;
             }
         }
-        if ($this->url !== null && ! str_starts_with(strtolower($this->url), 'https://')) {
+        $local = $this->environment === 'local';
+        if ($this->allowInsecureLocal && ! $local) {
+            $problems[] = 'ODK_ALLOW_INSECURE_LOCAL (local only)';
+        }
+        $https = $this->url !== null && str_starts_with(strtolower($this->url), 'https://');
+        $localHttp = $this->url !== null && $this->allowInsecureLocal && $local && str_starts_with(strtolower($this->url), 'http://');
+        if ($this->url !== null && ! $https && ! $localHttp) {
             $problems[] = 'ODK_CENTRAL_URL (https)';
         }
 

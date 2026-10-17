@@ -67,6 +67,14 @@ return [
 
         // The session token is refreshed this many minutes before it expires.
         'token_refresh_minutes' => 30,
+
+        // Local development only: lets ODK_CENTRAL_URL be plain http, for the mock server
+        // (docker/odk-mock, `make odk-mock-up`). Honoured only when APP_ENV=local; set in any other
+        // environment it is refused and ODK counts as not configured (SECURITY.md §6: https only).
+        'allow_insecure_local' => filter_var(env('ODK_ALLOW_INSECURE_LOCAL', false), FILTER_VALIDATE_BOOL),
+
+        // Where edqa:odk-mock:generate writes the mock's data (the odk-mock service reads it).
+        'mock_path' => storage_path('app/odk-mock'),
     ],
 
     'plan' => [

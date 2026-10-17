@@ -161,6 +161,9 @@ make artisan c="edqa:pull"               # one ODK pull, synchronous
 make artisan c="edqa:backfill"           # resumable historical backfill
 make artisan c="edqa:rescore"
 make artisan c="edqa:seed:perf"          # local only: five years of scored assessments (~44k), for budgets
+make odk-mock-up                         # mock ODK Central (profile odk); see docker/odk-mock/README.md
+make odk-mock-seed n=200                 # raw submissions for the mock, from the seeded facilities
+make artisan c="edqa:odk:check"          # sign in to ODK (real or mock) and list form versions
 make artisan c="edqa:admin:create"
 docker compose -f compose.dev.yml --profile scheduler up -d scheduler   # opt-in scheduler
 ```

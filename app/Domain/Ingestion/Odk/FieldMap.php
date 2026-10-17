@@ -114,6 +114,14 @@ final readonly class FieldMap
         return $this->renames[$name] ?? $name;
     }
 
+    /** The reverse: what this version calls a default-form question (for the mock generator). */
+    public function questionName(string $canonical): string
+    {
+        $name = array_search($canonical, $this->renames, true);
+
+        return is_string($name) ? $name : $canonical;
+    }
+
     /**
      * A scored question's dimension, month slot, item code and default-form name; null when the
      * name (after renames) is not a scored question.

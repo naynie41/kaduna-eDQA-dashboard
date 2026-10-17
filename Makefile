@@ -8,7 +8,7 @@ APP_DB_USER     := edqa_app
 APP_DB_PASSWORD := edqa_app_dev
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e size lighthouse
+.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e size lighthouse odk-mock-up odk-mock-seed
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-13s %s\n", $$1, $$2}'
@@ -78,7 +78,13 @@ e2e: ## Playwright against the running dev stack (seeds the local e2e admin firs
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
 	$(COMPOSE) --profile e2e run --rm playwright $(c)
 
-lighthouse: ## Lighthouse on Slow 3G (Home, Facility view, Visuals) against a production build; Vite restarts after
+odk-mock-up: ## Start the mock ODK Central (odk-mock:8080 in the stack, 127.0.0.1:8090 on the host)
+	$(COMPOSE) --profile odk up -d odk-mock
+
+odk-mock-seed: ## Write raw submissions for the mock: make odk-mock-seed n=200
+	$(EXEC) php artisan edqa:odk-mock:generate --count=$(or $(n),200)
+
+lighthouse: ##Lighthouse on Slow 3G (Home, Facility view, Visuals) against a production build; Vite restarts after
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
 	$(COMPOSE) stop vite
 	$(EXEC) rm -f public/hot  # vite runs under sh -c, so it never gets to remove it: Laravel would keep using the dev server

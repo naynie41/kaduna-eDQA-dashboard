@@ -31,4 +31,13 @@ return [
         'unmapped_summary' => ':count published version(s) have no field map: add them to config/edqa_field_maps.php before the first pull.',
     ],
 
+    // edqa:odk-mock:generate (docker/odk-mock).
+    'mock' => [
+        'local_only' => 'The mock ODK Central is for local development only.',
+        'written' => 'Wrote :valid valid, :flagged to be flagged and :broken to be quarantined, plus :edited edits (staged) and :attachments photo(s), to :path.',
+        'edits_applied' => 'Edits applied: the next pull sees the edited versions.',
+        'bad_round' => 'Give the round as 2026Q2, not ":round".',
+        'no_round' => 'There is no round :round.',
+    ],
+
 ];
