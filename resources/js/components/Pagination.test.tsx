@@ -20,7 +20,7 @@ const translations = {
 
 describe('Pagination', () => {
     it('says the range in words and offers labelled page buttons, the current one marked', async () => {
-        const { container } = renderUi(<Pagination page={2} perPage={50} total={2184} onPage={() => undefined} />, translations);
+        const { container } = renderUi(<Pagination page={2} lastPage={44} from={51} to={100} total={2184} onPage={() => undefined} />, translations);
 
         expect(screen.getByText('Showing 51–100 of 2,184 facilities')).toBeTruthy();
         const nav = screen.getByRole('navigation', { name: 'Facility pages' });
@@ -33,7 +33,7 @@ describe('Pagination', () => {
 
     it('asks for the neighbouring pages and cannot go before the first', async () => {
         const onPage = vi.fn();
-        renderUi(<Pagination page={1} perPage={50} total={120} onPage={onPage} />, translations);
+        renderUi(<Pagination page={1} lastPage={3} from={1} to={50} total={120} onPage={onPage} />, translations);
 
         expect((screen.getByRole('button', { name: 'Previous' }) as HTMLButtonElement).disabled).toBe(true);
         await userEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -42,7 +42,7 @@ describe('Pagination', () => {
     });
 
     it('has no page buttons for a single page, and says when nothing matches', () => {
-        renderUi(<Pagination page={1} perPage={50} total={0} onPage={() => undefined} />, translations);
+        renderUi(<Pagination page={1} lastPage={1} from={0} to={0} total={0} onPage={() => undefined} />, translations);
 
         expect(screen.getByText('No facilities match these filters.')).toBeTruthy();
         expect(screen.queryByRole('navigation')).toBeNull();

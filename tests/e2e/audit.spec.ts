@@ -43,12 +43,16 @@ async function open(page: Page, target: { name: string; path: string; heading: s
         if (project !== undefined) {
             await audit(page, 'confirm-password', project);
         }
-        await page.getByLabel('Password').fill(E2E_PASSWORD);
-        await page.getByRole('button', { name: 'Continue' }).click();
-        await expect(confirm).toBeHidden({ timeout: 60_000 });
-        // The two projects share one server session (the saved sign-in), so the other may have
-        // taken the "intended" URL: open the page again, now confirmed.
-        await page.goto(target.path);
+        // The two projects share one server session (the saved sign-in) and may confirm at the
+        // same moment: one session write can drop the other's confirmation, or take its
+        // "intended" URL. So confirm until it holds, then open the page again.
+        for (let attempt = 0; attempt < 3 && (await confirm.isVisible()); attempt++) {
+            await page.getByLabel('Password').fill(E2E_PASSWORD);
+            await page.getByRole('button', { name: 'Continue' }).click();
+            await expect(confirm).toBeHidden({ timeout: 20_000 }).catch(() => undefined);
+            await page.goto(target.path);
+            await expect(page.getByRole('heading', { level: 1, name: target.heading }).or(confirm)).toBeVisible({ timeout: 60_000 });
+        }
     }
     await ready(page, target.heading);
 }

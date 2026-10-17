@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domain\Reporting\DTOs\FacilityPage;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -38,6 +39,8 @@ it('lists facilities weakest first by overall by default, 50 a page', function (
         ->and($facilities['sort'])->toBe(['column' => 'score', 'direction' => 'asc'])
         ->and($facilities['page']['perPage'])->toBe(50)
         ->and($facilities['page']['total'])->toBe(7)
+        // The pagination's figures come from the server: the browser does no arithmetic.
+        ->and([$facilities['page']['from'], $facilities['page']['to'], $facilities['page']['lastPage']])->toBe([1, 7, 1])
         ->and(array_column($facilities['page']['rows'], 'name'))->toBe([
             'Facility F5', 'Facility F2', 'Facility F7', 'Facility F1', 'Facility F3', 'Facility F6', 'Facility F4',
         ]);
@@ -85,7 +88,15 @@ it('caps the page size at 50 whatever is asked for, and pages past the end are e
     expect($big['page']['perPage'])->toBe(50)
         ->and($past['page']['rows'])->toBe([])
         ->and($past['page']['total'])->toBe(7)
-        ->and($past['page']['page'])->toBe(99);
+        ->and($past['page']['page'])->toBe(99)
+        ->and([$past['page']['from'], $past['page']['to'], $past['page']['lastPage']])->toBe([0, 0, 1]);
+});
+
+it('gives the range and last page for a middle page', function (): void {
+    $page = new FacilityPage([], 2184, 2, 50);
+
+    expect([$page->from, $page->to, $page->lastPage])->toBe([51, 100, 44])
+        ->and([(new FacilityPage([], 2184, 44, 50))->to, (new FacilityPage([], 0, 1, 50))->from])->toBe([2184, 0]);
 });
 
 it('lists the quarters in view, for the month headings', function (): void {

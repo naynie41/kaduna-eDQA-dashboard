@@ -816,6 +816,13 @@ Visual design tokens are in `CONVENTION.md` §6; accessibility rules in `ACCESSI
 - **Public vs Private** split panel: big overall + 3 dimension minis each.
 - **Quality score by quarter** line chart with dashed Strong line.
 - **Weakest local governments** — six lowest, value tags.
+- Built (Phase 4 step 2, D-39):
+  - The trend ignores the year and quarter filters: it always draws every round, so a quarter
+    is seen against its neighbours. It keeps the LGA, level and owner filters, and marks the
+    rounds the rest of the page covers ("in view"). Its one-line takeaway is computed on the
+    server (`QuarterTrendAggregator::takeaway`).
+  - With an LGA chosen, "Weakest local governments" becomes that LGA's six weakest **wards**
+    (`WeakestWardsAggregator`), since one LGA ranked against itself says nothing.
 
 #### 9.2.2 Facility view
 - Segmented metric switcher: Availability / Consistency / Validity / Overall.
@@ -858,15 +865,33 @@ Visual design tokens are in `CONVENTION.md` §6; accessibility rules in `ACCESSI
 - "Actions by type" summary + "What each action means" reference panel.
 - Export to Excel workplan.
 - Edits persist to `plan_actions` and are audited (prototype was read-only).
+- Built read-only (Phase 4 step 8, D-45); owner, date and status editing and the Excel workplan
+  are Phase 6. The threshold rule:
+  - An LGA gets an action when its overall is below the lower bound of the band in
+    `edqa.plan.action_below` (default Acceptable). The bound is read from the round's rule
+    version and compared on the displayed value, as bands are, so no row shows "Acceptable" with
+    an action.
+  - At or above the bound: "No action needed". No score in view: neither.
+  - The action is for the weakest dimension; a tie goes alphabetically (availability,
+    consistency, validity).
+  - A stored `plan_actions` row for the plan's round (the latest in view) replaces the
+    generated one.
+  - The prototype gave every LGA an action.
 
 #### 9.2.7 Facility detail drawer
 Right-side sheet: score card for current round, item-level responses grouped by dimension ×
 month (pass / fail / N/A), round-over-round sparkline, soft flags, attachments (authenticated
 URLs), correction audit trail, ODK instance ID with deep link.
-- Built (Phase 4 step 5, D-42): opened from any facility name (the Facility view table); the open
-  facility is `?facility={id}`, so the view can be shared. Full-screen sheet under 760px. The
-  sparkline has a sentence and a table with the same figures; item results are an icon and a word.
-  Attachments are listed without a download link until attachments are fetched (step 8).
+- Built (Phase 4 step 5, D-42): opened from any facility name (the Facility view table).
+  - The open facility is `?facility={id}`, added and removed on the client (`router.replace`, no
+    request), so the view can be shared and a shared link opens the drawer.
+  - The URL holds only the facility. The round comes from the page's `?year=&quarter=` filters,
+    which the drawer passes to `GET /api/facilities/{id}`: the latest round in view in which the
+    facility was assessed (the round its table row shows), else the latest round in view, with
+    no assessment. `?round=` on the API picks one explicitly.
+  - Full-screen sheet under 760px. The sparkline has a sentence and a table with the same
+    figures; item results are an icon and a word.
+  - Attachments are listed without a download link until attachments are fetched (step 8).
 
 ### 9.3 Administration pages (five)
 

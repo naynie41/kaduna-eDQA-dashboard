@@ -1,10 +1,10 @@
-import type { ScoreValue } from '@/types/score';
+import type { ScoreValue } from "@/types/score";
 
 /**
  * The dashboard pages' props, mirroring the Reporting DTOs as they serialise (public readonly
  * properties, camelCase). Every number arrives as a ScoreValue or a count: components render.
  */
-export type Dimension = 'availability' | 'consistency' | 'validity';
+export type Dimension = "availability" | "consistency" | "validity";
 
 export type StateSummary = {
     overall: ScoreValue;
@@ -56,11 +56,23 @@ export type Trend = {
     takeaway: string | null;
 };
 
-export type LgaScore = { lgaId: number; code: string; name: string; facilities: number; overall: ScoreValue };
+export type LgaScore = {
+    lgaId: number;
+    code: string;
+    name: string;
+    facilities: number;
+    overall: ScoreValue;
+};
 
-export type WardScore = { wardId: number; name: string; facilities: number; overall: ScoreValue };
+export type WardScore = {
+    wardId: number;
+    name: string;
+    facilities: number;
+    overall: ScoreValue;
+};
 
-export type Weakest = { scope: 'lgas'; rows: LgaScore[] } | { scope: 'wards'; rows: WardScore[] };
+export type Weakest =
+    { scope: "lgas"; rows: LgaScore[] } | { scope: "wards"; rows: WardScore[] };
 
 export type LgaRow = {
     lgaId: number;
@@ -87,9 +99,19 @@ export type LgaProps = {
     lgas?: LgaRow[];
 };
 
-export type Metric = Dimension | 'overall';
+export type Metric = Dimension | "overall";
 
-export type FacilitySortColumn = 'facility' | 'lga' | 'ward' | 'owner' | 'assessed' | 'm1' | 'm2' | 'm3' | 'score' | 'overall';
+export type FacilitySortColumn =
+    | "facility"
+    | "lga"
+    | "ward"
+    | "owner"
+    | "assessed"
+    | "m1"
+    | "m2"
+    | "m3"
+    | "score"
+    | "overall";
 
 export type FacilityRow = {
     facilityId: number;
@@ -97,8 +119,8 @@ export type FacilityRow = {
     name: string;
     lga: string;
     ward: string;
-    ownership: 'public' | 'private';
-    level: 'primary' | 'secondary' | 'tertiary';
+    ownership: "public" | "private";
+    level: "primary" | "secondary" | "tertiary";
     roundLabel: string;
     /** Local date of the latest visit, "2026-05-04". */
     assessedOn: string;
@@ -110,13 +132,22 @@ export type FacilityRow = {
     overall: ScoreValue;
 };
 
-export type FacilityPage = { rows: FacilityRow[]; total: number; page: number; perPage: number };
+export type FacilityPage = {
+    rows: FacilityRow[];
+    total: number;
+    page: number;
+    perPage: number;
+    /** From the server, so the browser does no arithmetic: 0 and 0 when the page has no rows. */
+    from: number;
+    to: number;
+    lastPage: number;
+};
 
 export type FacilityTableState = {
     page: FacilityPage;
     /** What the server applied (an unknown value in the URL falls back to the default). */
     metric: Metric;
-    sort: { column: FacilitySortColumn; direction: 'asc' | 'desc' };
+    sort: { column: FacilitySortColumn; direction: "asc" | "desc" };
     quarters: number[];
 };
 
@@ -133,7 +164,7 @@ export type HomeProps = {
 };
 
 /** GET /api/facilities/{id} (FacilityDetailAggregator), snake_case as the JSON API serves it. */
-export type ItemResult = 'pass' | 'fail' | 'na';
+export type ItemResult = "pass" | "fail" | "na";
 
 export type FacilityDetail = {
     facility: {
@@ -144,13 +175,23 @@ export type FacilityDetail = {
         ward: string;
         level: string;
         level_label: string;
-        ownership: 'public' | 'private';
+        ownership: "public" | "private";
         ownership_label: string;
         active: boolean;
     };
     round: { id: number; label: string; year: number; quarter: number } | null;
-    assessment: { id: number; assessed_on: string; assessor: string; status: string } | null;
-    scores: { availability: ScoreValue; consistency: ScoreValue; validity: ScoreValue; overall: ScoreValue };
+    assessment: {
+        id: number;
+        assessed_on: string;
+        assessor: string;
+        status: string;
+    } | null;
+    scores: {
+        availability: ScoreValue;
+        consistency: ScoreValue;
+        validity: ScoreValue;
+        overall: ScoreValue;
+    };
     items: {
         dimension: Dimension;
         dimension_label: string;
@@ -158,17 +199,40 @@ export type FacilityDetail = {
         month: string;
         score: ScoreValue;
         /** result is null only when no rule version can be read. */
-        items: { code: string; label: string | null; result: ItemResult | null }[];
+        items: {
+            code: string;
+            label: string | null;
+            result: ItemResult | null;
+        }[];
     }[];
-    history: { round_id: number; label: string; overall: ScoreValue; selected: boolean }[];
-    flags: { code: string; label: string; overridden: { by: string | null; at: string; reason: string | null } | null }[];
-    attachments: { id: number; filename: string; mime: string; size: number; status: string }[];
+    history: {
+        round_id: number;
+        label: string;
+        overall: ScoreValue;
+        selected: boolean;
+    }[];
+    flags: {
+        code: string;
+        label: string;
+        overridden: {
+            by: string | null;
+            at: string;
+            reason: string | null;
+        } | null;
+    }[];
+    attachments: {
+        id: number;
+        filename: string;
+        mime: string;
+        size: number;
+        status: string;
+    }[];
     activity: {
         id: number;
         at: string;
         actor: string | null;
         event: string;
-        subject: 'assessment' | 'item';
+        subject: "assessment" | "item";
         item_code: string | null;
         changes: { field: string; old: string | null; new: string | null }[];
         reason: string | null;
@@ -177,9 +241,18 @@ export type FacilityDetail = {
 };
 
 /** Monitor (§9.2.4): CoverageAggregator and AssessmentWindowAggregator, as they serialise. */
-export type LgaCount = { lgaId: number; code: string; name: string; facilities: number };
+export type LgaCount = {
+    lgaId: number;
+    code: string;
+    name: string;
+    facilities: number;
+};
 
-export type LevelCoverage = { level: 'primary' | 'secondary' | 'tertiary'; facilities: number; overall: ScoreValue };
+export type LevelCoverage = {
+    level: "primary" | "secondary" | "tertiary";
+    facilities: number;
+    overall: ScoreValue;
+};
 
 export type Coverage = {
     perLga: LgaCount[];
@@ -226,14 +299,14 @@ export type MonthSlotPoint = {
 export type MonthSlots = {
     points: MonthSlotPoint[];
     /** One sentence per slot, from the server; null when the slot has no score in view. */
-    takeaways: Record<'1' | '2' | '3', string | null>;
+    takeaways: Record<"1" | "2" | "3", string | null>;
 };
 
-export type OwnerView = 'all' | 'public' | 'private';
+export type OwnerView = "all" | "public" | "private";
 
 export type VisualsProps = {
     /** locked: the global owner filter, which the view follows while it is set. */
-    ownerView: { value: OwnerView; locked: 'public' | 'private' | null };
+    ownerView: { value: OwnerView; locked: "public" | "private" | null };
     monthSlots?: MonthSlots;
     lgas?: LgaRow[];
 };
@@ -255,7 +328,13 @@ export type PlanRow = {
     stored: boolean;
 };
 
-export type PlanSummary = { dimension: Dimension; action: string; meaning: string; owner: string; count: number };
+export type PlanSummary = {
+    dimension: Dimension;
+    action: string;
+    meaning: string;
+    owner: string;
+    count: number;
+};
 
 export type Plan = {
     round: string | null;

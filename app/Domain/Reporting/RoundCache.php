@@ -59,7 +59,7 @@ final class RoundCache
      * so a deploy never serves an object cached by the previous code: an older StateSummary
      * would unserialize without its new properties (seen in Phase 4 step 2 as "NaN" thresholds).
      */
-    public const SCHEMA = 4;
+    public const SCHEMA = 5;
 
     private const PREFIX = 'edqa:reporting:v'.self::SCHEMA.':';
 
