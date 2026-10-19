@@ -8,6 +8,7 @@ use App\Domain\Ingestion\Actions\ProcessParsedSubmission;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Ingestion\DTOs\ProcessOutcome;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
+use App\Domain\Ingestion\Odk\SubmissionParser;
 use App\Domain\Validation\Enums\QuarantineResolution;
 use App\Domain\Validation\Enums\QuarantineStatus;
 use App\Domain\Validation\Events\QuarantineResolved;
@@ -24,8 +25,10 @@ use InvalidArgumentException;
 
 /**
  * "Correct and reprocess" (ARCHITECTURE.md §6): an administrator's corrections to mapped fields
- * are merged into quarantined_records.corrections, the submission is rebuilt from the parsed
- * snapshot plus every correction so far, and it runs through the full pipeline again.
+ * are merged into quarantined_records.corrections, the submission is rebuilt from its raw ODK
+ * payload (submissions.payload, through the parser, as the pull reads it) plus every correction so
+ * far, and it runs through the full pipeline again. The parsed snapshot on the record is kept for
+ * audit and debugging only; for the same payload the two agree (CorrectAndReprocessTest).
  *
  * The raw payload and the parsed snapshot are never touched (CLAUDE.md hard rule 8). Only the
  * fields in CORRECTABLE can change: never items or scores (hard rule 2). Accepted or flagged →
@@ -47,6 +50,7 @@ final class CorrectAndReprocess
     public function __construct(
         private readonly ValidationContextFactory $contexts,
         private readonly ProcessParsedSubmission $process,
+        private readonly SubmissionParser $parser,
     ) {}
 
     /** @param  array<string, mixed>  $corrections */
@@ -60,13 +64,9 @@ final class CorrectAndReprocess
             if ($record->status !== QuarantineStatus::Open) {
                 throw QuarantineActionRefused::alreadyResolved();
             }
-            if ($record->parsed === null) {
-                throw QuarantineActionRefused::noParsedSnapshot();
-            }
-
             $before = $record->corrections;
             $after = array_replace($before, $corrections);
-            $parsed = self::rebuild($record->parsed, $after);
+            $parsed = self::rebuild($this->parser->parse($record->submission->payload)->toArray(), $after);
 
             $context = $this->contexts->forBatch([$parsed]);
             $outcome = $this->process->execute($record->submission, $parsed, $context, reprocessing: $record);

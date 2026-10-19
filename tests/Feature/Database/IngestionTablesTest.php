@@ -88,10 +88,24 @@ it('rejects an unknown pull trigger', function (): void {
     expectCheckViolation(fn () => Rows::pullRun(['trigger_type' => 'cron']), 'odk_pull_runs_trigger_type_valid');
 });
 
+it('accepts every pull outcome, and none yet', function (?string $outcome): void {
+    expect(DB::table('odk_pull_runs')->where('id', Rows::pullRun(['outcome' => $outcome]))->value('outcome'))->toBe($outcome);
+})->with(['succeeded', 'failed', 'skipped_not_configured', null]);
+
+it('rejects an unknown pull outcome', function (): void {
+    expectCheckViolation(fn () => Rows::pullRun(['outcome' => 'partial']), 'odk_pull_runs_outcome_valid');
+});
+
+it('allows one sync row per project and form', function (): void {
+    DB::table('odk_form_syncs')->insert(['project_id' => 7, 'form_id' => 'dqa', 'created_at' => now(), 'updated_at' => now()]);
+
+    expectUniqueViolation(fn () => DB::table('odk_form_syncs')->insert(['project_id' => 7, 'form_id' => 'dqa', 'created_at' => now(), 'updated_at' => now()]), 'odk_form_syncs_project_id_form_id_unique');
+});
+
 it('starts pull-run counters at zero', function (): void {
     $run = DB::table('odk_pull_runs')->where('id', Rows::pullRun())->first();
 
-    expect([$run->fetched, $run->accepted, $run->quarantined, $run->duplicates])->toBe([0, 0, 0, 0]);
+    expect([$run->fetched, $run->accepted, $run->flagged, $run->quarantined, $run->duplicates])->toBe([0, 0, 0, 0, 0]);
 });
 
 it('keeps a pull cursor per form', function (): void {
@@ -115,4 +129,29 @@ it('records attachments against a submission', function (): void {
     ]);
 
     expect($id)->toBeInt();
+});
+
+it('records a pending attachment before its type and size are known', function (): void {
+    $id = DB::table('odk_attachments')->insertGetId(['submission_id' => Rows::submission(), 'filename' => 'trace.geojson', 'status' => 'pending']);
+
+    expect(DB::table('odk_attachments')->where('id', $id)->first(['mime', 'size', 'reason']))->toEqual((object) ['mime' => null, 'size' => null, 'reason' => null]);
+});
+
+it('accepts every attachment status', function (string $status): void {
+    expect(DB::table('odk_attachments')->insertGetId(['submission_id' => Rows::submission(), 'filename' => 'a.png', 'status' => $status]))->toBeInt();
+})->with(['pending', 'fetched', 'rejected', 'failed']);
+
+it('rejects an unknown attachment status', function (): void {
+    expectCheckViolation(fn () => DB::table('odk_attachments')->insert(['submission_id' => Rows::submission(), 'filename' => 'a.png', 'status' => 'quarantined']), 'odk_attachments_status_valid');
+});
+
+it('rejects a negative attachment size', function (): void {
+    expectCheckViolation(fn () => DB::table('odk_attachments')->insert(['submission_id' => Rows::submission(), 'filename' => 'a.png', 'status' => 'fetched', 'size' => -1]), 'odk_attachments_size_nonnegative');
+});
+
+it('records each file of a submission once', function (): void {
+    $submission = Rows::submission();
+    DB::table('odk_attachments')->insert(['submission_id' => $submission, 'filename' => 'a.png', 'status' => 'pending']);
+
+    expectUniqueViolation(fn () => DB::table('odk_attachments')->insert(['submission_id' => $submission, 'filename' => 'a.png', 'status' => 'pending']), 'odk_attachments_submission_id_filename_unique');
 });

@@ -220,12 +220,15 @@ export type FacilityDetail = {
             reason: string | null;
         } | null;
     }[];
+    /** url is set once a file is fetched: the authenticated attachment route. */
     attachments: {
         id: number;
         filename: string;
-        mime: string;
-        size: number;
-        status: string;
+        mime: string | null;
+        size: number | null;
+        status: 'pending' | 'fetched' | 'rejected' | 'failed';
+        reason: string | null;
+        url: string | null;
     }[];
     activity: {
         id: number;

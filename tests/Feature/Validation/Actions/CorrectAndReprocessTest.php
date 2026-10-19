@@ -6,16 +6,22 @@ use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Assessment\Models\AssessmentScore;
 use App\Domain\Facility\Models\Facility;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
+use App\Domain\Ingestion\Odk\SubmissionParser;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
 use App\Domain\Validation\Actions\CorrectAndReprocess;
+use App\Domain\Validation\DTOs\RuleFailure;
 use App\Domain\Validation\Enums\QuarantineResolution;
 use App\Domain\Validation\Enums\QuarantineStatus;
 use App\Domain\Validation\Events\QuarantineResolved;
 use App\Domain\Validation\Exceptions\QuarantineActionRefused;
+use App\Domain\Validation\ValidationContextFactory;
+use App\Domain\Validation\ValidationPipeline;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Spatie\Activitylog\Models\Activity;
+use Tests\Support\BrokenSubmissions;
 use Tests\Support\ParsedSubmissionBuilder;
 
 beforeEach(function (): void {
@@ -145,4 +151,44 @@ it('refuses a record that is already resolved', function (): void {
 
     expect(fn () => app(CorrectAndReprocess::class)->execute($record->refresh(), ['lga_ref' => 'X'], $this->admin, GOOD_REASON))
         ->toThrow(QuarantineActionRefused::class, __('quarantine.errors.already_resolved'));
+});
+
+it('rebuilds from the raw payload exactly as from the parsed snapshot, for every broken fixture', function (string $name): void {
+    [$parsed, $expected] = BrokenSubmissions::build($name);
+    $record = quarantineThrough($parsed);
+
+    $fromPayload = app(SubmissionParser::class)->parse($record->submission->payload);
+    $context = app(ValidationContextFactory::class)->forBatch([$fromPayload]);
+    $codes = array_map(fn (RuleFailure $f): string => $f->code, app(ValidationPipeline::class)->validate($fromPayload, $context)->failures());
+
+    expect($codes)->toBe($expected)
+        ->and(array_column($record->failures, 'code'))->toBe($expected);
+    // An unknown form version is never read past its identity, so only its outcome can agree.
+    if ($parsed->formVersionKnown) {
+        // jsonb keeps keys in its own order, so items parse back in another order: compare them as a set.
+        // A builder that moved started_at / ended_at alone left raw strings no parser would pair with
+        // them; the payload carries the times, so only the raw text can differ there.
+        $raw = fn (string $field, string $time): bool => $record->parsed[$time] === null || CarbonImmutable::parse($record->parsed[$field])->equalTo(CarbonImmutable::parse($record->parsed[$time]));
+        $keepRaw = $raw('raw_start', 'started_at') && $raw('raw_end', 'ended_at');
+        $sorted = function (array $parsed) use ($keepRaw): array {
+            if (! $keepRaw) {
+                unset($parsed['raw_start'], $parsed['raw_end']);
+            }
+            usort($parsed['items'], fn (array $a, array $b): int => [$a['dimension'], $a['month_slot'], $a['item_code']] <=> [$b['dimension'], $b['month_slot'], $b['item_code']]);
+
+            return $parsed;
+        };
+        expect($sorted($fromPayload->toArray()))->toEqual($sorted($record->parsed));
+    }
+})->with(BrokenSubmissions::hardNames());
+
+it('reads the raw payload, not the snapshot, when it reprocesses', function (): void {
+    $record = quarantineThrough(ParsedSubmissionBuilder::new()->forFacility($this->facility)->withLga(null)->build());
+    // A snapshot that disagrees with the payload: the payload wins.
+    DB::table('quarantined_records')->where('id', $record->id)->update(['parsed' => json_encode([...$record->parsed, 'facility_ref' => 'NOT-A-FACILITY'])]);
+
+    $outcome = app(CorrectAndReprocess::class)->execute($record->refresh(), ['lga_ref' => $this->facility->lga->code], $this->admin, GOOD_REASON);
+
+    expect($outcome->status)->toBe(SubmissionStatus::Accepted)
+        ->and(Assessment::query()->sole()->facility_id)->toBe($this->facility->id);
 });

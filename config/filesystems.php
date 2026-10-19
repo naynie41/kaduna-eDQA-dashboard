@@ -42,6 +42,18 @@ return [
             'report' => false,
         ],
 
+        // ODK attachments (SECURITY.md §7): storage/app/odk on the app-files volume, outside the
+        // web root, never served by Laravel itself: only the authenticated attachment route
+        // streams them.
+        'odk' => [
+            'driver' => 'local',
+            'root' => storage_path('app/odk'),
+            'serve' => false,
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

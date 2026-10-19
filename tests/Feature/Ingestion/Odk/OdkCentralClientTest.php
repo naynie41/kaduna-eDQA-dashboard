@@ -139,8 +139,8 @@ it('filters on __system/submissionDate in UTC and encodes every part of the quer
     odkSource()->submissionsPage(null, 500, 1000);
 
     $sent = odkSent('.svc/Submissions');
-    expect($sent[0]->url())->toBe(ODK_URL.'/v1/projects/7/forms/dqa%20form.svc/Submissions?%24filter=__system%2FsubmissionDate%20gt%202026-04-14T08%3A50%3A00.250Z&%24top=500&%24skip=0&%24count=true&%24expand=%2A')
-        ->and($sent[1]->url())->toBe(ODK_URL.'/v1/projects/7/forms/dqa%20form.svc/Submissions?%24top=500&%24skip=1000&%24count=true&%24expand=%2A');
+    expect($sent[0]->url())->toBe(ODK_URL.'/v1/projects/7/forms/dqa%20form.svc/Submissions?%24filter=__system%2FsubmissionDate%20gt%202026-04-14T08%3A50%3A00.250Z&%24orderby=__system%2FsubmissionDate%20asc&%24top=500&%24skip=0&%24count=true&%24expand=%2A')
+        ->and($sent[1]->url())->toBe(ODK_URL.'/v1/projects/7/forms/dqa%20form.svc/Submissions?%24orderby=__system%2FsubmissionDate%20asc&%24top=500&%24skip=1000&%24count=true&%24expand=%2A');
 });
 
 it('retries 5xx and 429 with exponential backoff, honouring Retry-After', function (): void {

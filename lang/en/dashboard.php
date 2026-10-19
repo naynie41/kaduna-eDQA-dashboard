@@ -281,7 +281,21 @@ return [
         'reason' => 'Reason: :reason',
         'someone' => 'an administrator',
         'attachments_title' => 'Attachments',
-        'attachments_none' => 'No attachments. Photos and files from ODK appear here once they are fetched.',
+        'attachments_none' => 'No attachments for this assessment.',
+        // Alt text of a photo thumbnail: what it is and where it comes from.
+        'attachment_alt' => 'Photo :filename from :facility, :round',
+        'attachment_open' => 'Open :filename full size',
+        'attachment_download' => 'Download :filename',
+        'attachment_status' => [
+            'pending' => 'Not fetched from ODK yet',
+            'failed' => 'Could not be fetched from ODK; it will be tried again',
+            'rejected' => 'Refused, not stored',
+        ],
+        'attachment_reasons' => [
+            'unsafe_name' => 'its file name is not allowed',
+            'too_large' => 'it is larger than the size limit',
+            'type_not_allowed' => 'its file type is not allowed',
+        ],
         'activity_title' => 'Changes',
         'activity_none' => 'No changes recorded for this facility’s assessments.',
         'system' => 'System',

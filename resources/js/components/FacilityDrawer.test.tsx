@@ -41,6 +41,11 @@ const translations = {
             reason: 'Reason: :reason',
             attachments_title: 'Attachments',
             attachments_none: 'No attachments.',
+            attachment_alt: 'Photo :filename from :facility, :round',
+            attachment_open: 'Open :filename full size',
+            attachment_download: 'Download :filename',
+            attachment_status: { pending: 'Not fetched from ODK yet', failed: 'Could not be fetched from ODK; it will be tried again', rejected: 'Refused, not stored' },
+            attachment_reasons: { type_not_allowed: 'its file type is not allowed' },
             activity_title: 'Changes',
             system: 'System',
             events: { updated: 'Updated', flag_overridden: 'Flag overridden' },
@@ -192,5 +197,37 @@ describe('HistorySparkline', () => {
         const table = screen.getByRole('table', { name: 'Overall by round' });
         expect(within(table).getAllByRole('rowheader').map((th) => th.textContent)).toEqual(['Q1 2026', 'Q2 2026 (shown above)']);
         expect(document.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    });
+});
+
+describe('FacilityDetailView attachments', () => {
+    const withAttachments: FacilityDetail = {
+        ...detail,
+        attachments: [
+            { id: 1, filename: 'register.jpg', mime: 'image/jpeg', size: 2048, status: 'fetched', reason: null, url: '/attachments/7/register.jpg' },
+            { id: 2, filename: 'trace.geojson', mime: 'application/geo+json', size: 120, status: 'fetched', reason: null, url: '/attachments/7/trace.geojson' },
+            { id: 3, filename: 'later.png', mime: null, size: null, status: 'pending', reason: null, url: null },
+            { id: 4, filename: 'evil.jpg', mime: null, size: null, status: 'rejected', reason: 'type_not_allowed', url: null },
+        ],
+    };
+
+    it('shows a fetched image as a thumbnail whose alt text names the file, facility and round', async () => {
+        const { container } = renderUi(<FacilityDetailView detail={withAttachments} />, translations);
+
+        const image = screen.getByRole('img', { name: 'Photo register.jpg from Facility F1, Q2 2026' });
+        expect(image.getAttribute('src')).toBe('/attachments/7/register.jpg');
+        expect(screen.getByRole('link', { name: 'Open register.jpg full size' }).getAttribute('href')).toBe('/attachments/7/register.jpg');
+        expect(await axeCheck(container)).toHaveNoViolations();
+    });
+
+    it('offers any other fetched file as a download, and says in words why a file is missing', () => {
+        renderUi(<FacilityDetailView detail={withAttachments} />, translations);
+
+        const download = screen.getByRole('link', { name: 'Download trace.geojson' });
+        expect(download.getAttribute('href')).toBe('/attachments/7/trace.geojson');
+        expect(download.hasAttribute('download')).toBe(true);
+        expect(screen.getByText(/later\.png/).textContent).toBe('later.png · Not fetched from ODK yet');
+        expect(screen.getByText(/evil\.jpg/).textContent).toBe('evil.jpg · Refused, not stored: its file type is not allowed');
+        expect(screen.queryByRole('img', { name: /evil|later/ })).toBeNull();
     });
 });

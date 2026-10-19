@@ -42,11 +42,6 @@ final class QuarantineActionRefused extends RuntimeException
         return new self('invalid_correction', ['field' => $field]);
     }
 
-    public static function noParsedSnapshot(): self
-    {
-        return new self('no_parsed_snapshot');
-    }
-
     public static function mixedRules(): self
     {
         return new self('mixed_rules');

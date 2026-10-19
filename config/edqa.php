@@ -75,6 +75,24 @@ return [
 
         // Where edqa:odk-mock:generate writes the mock's data (the odk-mock service reads it).
         'mock_path' => storage_path('app/odk-mock'),
+
+        // The pull (§5.3): one at a time under Cache::lock('odk-pull'), held at most lock_seconds;
+        // a second pull waits up to lock_wait_seconds for it, then goes back on the queue.
+        'pull' => ['lock_seconds' => 900, 'lock_wait_seconds' => 600],
+
+        // Attachments (§5.3, SECURITY.md §7): fetched on the low queue to the private odk disk. A
+        // file over max_bytes, or whose sniffed type is not in allowed_mimes, is rejected and
+        // deleted.
+        'attachments' => [
+            'disk' => 'odk',
+            'max_bytes' => 10 * 1024 * 1024,
+            'allowed_mimes' => ['image/jpeg', 'image/png', 'application/geo+json', 'text/csv', 'application/xml'],
+        ],
+    ],
+
+    'heartbeats' => [
+        // Pinged (GET) after each successful pull, for an external dead-man's switch; unset: skipped.
+        'odk_pull' => env('HEARTBEAT_ODK_PULL_URL') ?: null,
     ],
 
     'plan' => [

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Attachments\ShowAttachmentController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
 use App\Http\Controllers\Dashboard;
 use App\Http\Controllers\Dashboard\DashboardRedirectController;
@@ -58,6 +59,12 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
 
     // Component gallery for design review; 404 outside the local environment.
     Route::get('dev/components', DevComponentsController::class)->name('dev.components');
+
+    // ODK attachments, streamed from the private odk disk (SECURITY.md §7). The name is looked up
+    // exactly among the submission's fetched files; a slash never reaches the controller.
+    Route::get('attachments/{submission}/{filename}', ShowAttachmentController::class)
+        ->whereNumber('submission')->where('filename', '[^/]+')
+        ->middleware('throttle:120,1')->name('attachments.show');
 
     require __DIR__.'/settings.php';
 

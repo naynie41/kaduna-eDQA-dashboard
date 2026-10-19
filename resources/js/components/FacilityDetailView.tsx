@@ -117,10 +117,10 @@ export default function FacilityDetailView({ detail }: FacilityDetailViewProps) 
                 {detail.attachments.length === 0 ? (
                     <p className="text-[13px] text-ink-2">{t('dashboard.drawer.attachments_none')}</p>
                 ) : (
-                    <ul className="flex flex-col gap-1 text-[13px]">
+                    <ul className="flex flex-wrap gap-3 text-[13px]">
                         {detail.attachments.map((attachment) => (
-                            <li key={attachment.id}>
-                                {attachment.filename} <span className="text-ink-2">({attachment.mime})</span>
+                            <li key={attachment.id} className="min-w-0 max-w-full">
+                                <Attachment attachment={attachment} facility={facility.name} round={round?.label ?? ''} t={t} />
                             </li>
                         ))}
                     </ul>
@@ -229,5 +229,46 @@ function Result({ result, t }: { result: ItemResult | null; t: Translate }) {
             </svg>
             {t(`dashboard.drawer.results.${result}`)}
         </span>
+    );
+}
+
+const REASONS = ['unsafe_name', 'too_large', 'type_not_allowed'];
+
+/**
+ * One ODK attachment. A fetched image is a thumbnail (alt text: the file, facility and round)
+ * linking to the full size; any other fetched file is a download link; one not fetched says why
+ * in words, never by colour alone.
+ */
+function Attachment({ attachment, facility, round, t }: { attachment: FacilityDetail['attachments'][number]; facility: string; round: string; t: Translate }) {
+    const { filename, url, mime, status, reason } = attachment;
+
+    if (url !== null && mime !== null && mime.startsWith('image/')) {
+        return (
+            <figure className="flex w-32 flex-col gap-1">
+                <a href={url} target="_blank" rel="noreferrer" className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2" aria-label={t('dashboard.drawer.attachment_open', { filename })}>
+                    <img src={url} alt={t('dashboard.drawer.attachment_alt', { filename, facility, round })} loading="lazy" className="h-24 w-32 rounded-md border border-rule object-cover" />
+                </a>
+                <figcaption className="break-words text-[12px] text-ink-2">{filename}</figcaption>
+            </figure>
+        );
+    }
+
+    if (url !== null) {
+        return (
+            <a href={url} download={filename} className="inline-flex min-h-11 items-center break-all underline">
+                {t('dashboard.drawer.attachment_download', { filename })}
+            </a>
+        );
+    }
+
+    return (
+        <p className="break-words">
+            {filename}
+            <span className="text-ink-2">
+                {' · '}
+                {status === 'fetched' ? '' : t(`dashboard.drawer.attachment_status.${status}`)}
+                {status === 'rejected' && reason !== null && REASONS.includes(reason) ? `: ${t(`dashboard.drawer.attachment_reasons.${reason}`)}` : ''}
+            </span>
+        </p>
     );
 }

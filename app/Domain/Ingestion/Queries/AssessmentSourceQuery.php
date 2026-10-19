@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Domain\Ingestion\Queries;
 
 use App\Domain\Ingestion\DTOs\AssessmentSource;
+use App\Domain\Ingestion\Enums\AttachmentStatus;
 use App\Domain\Ingestion\Models\OdkAttachment;
 use App\Domain\Ingestion\Models\Submission;
 use Illuminate\Container\Attributes\Config;
 
 /**
  * Where an accepted assessment came from: its ODK instance ID, a link to the submission in ODK
- * Central, and its attachments (the facility drawer, ARCHITECTURE.md §9.2.7).
+ * Central, and its attachments (the facility drawer, ARCHITECTURE.md §9.2.7), each fetched one
+ * with the authenticated route that serves it (SECURITY.md §7).
  *
  * Lives in Ingestion because it reads submissions, which Reporting may not (CLAUDE.md hard rule 6).
  * It reads only the submission an assessment points at, which passed every hard rule: never a
@@ -34,13 +36,17 @@ final class AssessmentSourceQuery
         $attachments = OdkAttachment::query()
             ->where('submission_id', $submissionId)
             ->orderBy('id')
-            ->get(['id', 'filename', 'mime', 'size', 'status'])
+            ->get(['id', 'submission_id', 'filename', 'mime', 'size', 'status', 'reason'])
             ->map(fn (OdkAttachment $attachment): array => [
                 'id' => $attachment->id,
                 'filename' => (string) $attachment->filename,
-                'mime' => (string) $attachment->mime,
+                'mime' => $attachment->mime,
                 'size' => $attachment->size,
-                'status' => (string) $attachment->status,
+                'status' => $attachment->status->value,
+                'reason' => is_string($attachment->reason) ? $attachment->reason : null,
+                'url' => $attachment->status === AttachmentStatus::Fetched
+                    ? route('attachments.show', ['submission' => $submissionId, 'filename' => (string) $attachment->filename], absolute: false)
+                    : null,
             ])
             ->values()
             ->all();

@@ -126,7 +126,9 @@ function odk_mock_submissions(string $dataDir, array $config, array $query): arr
         }
         $rows = array_values(array_filter($rows, $test));
     }
-    usort($rows, fn (array $a, array $b): int => [$a['__system']['submissionDate'] ?? '', $a['__id']] <=> [$b['__system']['submissionDate'] ?? '', $b['__id']]);
+    // $orderby on __system/submissionDate (the default) or __system/updatedAt, ascending.
+    $order = preg_match('#^__system/(submissionDate|updatedAt)( asc)?$#', (string) ($query['$orderby'] ?? ''), $o) === 1 ? $o[1] : 'submissionDate';
+    usort($rows, fn (array $a, array $b): int => [$a['__system'][$order] ?? '', $a['__id']] <=> [$b['__system'][$order] ?? '', $b['__id']]);
 
     $total = count($rows);
     $skip = max(0, (int) ($query['$skip'] ?? 0));

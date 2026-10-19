@@ -54,15 +54,20 @@ final class OdkCentralSource implements SubmissionSource
         return $versions;
     }
 
-    public function submissionsPage(?CarbonImmutable $since, int $top, int $skip): SubmissionPage
+    public function submissionsPage(?CarbonImmutable $since, int $top, int $skip, bool $inclusive = false, string $by = 'submissionDate'): SubmissionPage
     {
+        $field = $by === 'updatedAt' ? 'updatedAt' : 'submissionDate';
         $path = $this->form().'.svc/Submissions';
         $query = [];
         if ($since !== null) {
-            // OData DateTimeOffset literal, UTC with milliseconds, as Central stores submissionDate.
-            $query['$filter'] = '__system/submissionDate gt '.$since->utc()->format('Y-m-d\TH:i:s.v\Z');
+            // OData DateTimeOffset literal, UTC with milliseconds, as Central stores its times.
+            $query['$filter'] = "__system/{$field} ".($inclusive ? 'ge' : 'gt').' '.$since->utc()->format('Y-m-d\TH:i:s.v\Z');
+        } elseif ($field === 'updatedAt') {
+            // Only edited submissions have an updatedAt.
+            $query['$filter'] = '__system/updatedAt ge 1970-01-01T00:00:00.000Z';
         }
-        $query += ['$top' => max(1, $top), '$skip' => max(0, $skip), '$count' => 'true', '$expand' => '*'];
+        // A cursor on a field is only safe if the feed is ordered by that field.
+        $query += ['$orderby' => "__system/{$field} asc", '$top' => max(1, $top), '$skip' => max(0, $skip), '$count' => 'true', '$expand' => '*'];
 
         $body = OdkCentralClient::json($this->client->get($path, $query), $path);
         $rows = $body['value'] ?? null;

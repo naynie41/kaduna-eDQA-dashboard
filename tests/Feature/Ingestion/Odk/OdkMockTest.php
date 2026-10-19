@@ -2,11 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Ingestion\Actions\ProcessParsedBatch;
+use App\Domain\Ingestion\Actions\PullSubmissions;
 use App\Domain\Ingestion\Contracts\SubmissionSource;
+use App\Domain\Ingestion\Enums\AttachmentStatus;
+use App\Domain\Ingestion\Enums\PullOutcome;
+use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Exceptions\OdkAuthFailed;
 use App\Domain\Ingestion\Exceptions\OdkUnexpectedResponse;
+use App\Domain\Ingestion\Models\OdkAttachment;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Ingestion\Odk\SubmissionParser;
 use App\Domain\Scoring\CurrentRuleVersion;
@@ -22,6 +28,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
 
 // The local mock ODK Central (docker/odk-mock) and its generator. Http::fake routes every request
@@ -37,6 +44,7 @@ beforeEach(function (): void {
         'url' => 'https://odk-mock.test', 'email' => 'mock@odk.local', 'password' => 'mock-password', 'project_id' => '1', 'form_id' => 'dqa', 'mock_path' => $this->mock,
     ]]);
     Sleep::fake();
+    Storage::fake('odk');
     $mock = $this->mock;
     Http::fake(function (Request $request) use ($mock) {
         $headers = [];
@@ -177,4 +185,34 @@ it('refuses outside local and testing, and a round it cannot read', function ():
     app()->detectEnvironment(fn (): string => 'production');
     $this->artisan('edqa:odk-mock:generate')->assertFailed();
     expect(is_dir($this->mock))->toBeFalse();
+});
+
+it('is pulled end to end: three pages, the broken ones quarantined, an edit applied in place, nothing twice', function (): void {
+    config(['edqa.odk.page_size' => 25]);
+    $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 10])->assertSuccessful();
+    $pull = fn () => app(PullSubmissions::class)->execute(PullTrigger::Scheduled)->refresh();
+
+    $first = $pull();
+    expect($first->outcome)->toBe(PullOutcome::Succeeded)
+        ->and($first->only(['fetched', 'duplicates', 'accepted', 'flagged', 'quarantined']))->toBe(['fetched' => 59, 'duplicates' => 0, 'accepted' => 47, 'flagged' => 2, 'quarantined' => 10])
+        ->and(Submission::query()->count())->toBe(59)
+        ->and(QuarantinedRecord::query()->count())->toBe(10);
+    // Its two photos: recorded by the pull, fetched (the sync test queue) as JPEGs.
+    $photos = OdkAttachment::query()->get();
+    expect($photos)->toHaveCount(2)
+        ->and($photos->every(fn (OdkAttachment $a): bool => $a->status === AttachmentStatus::Fetched && $a->mime === 'image/jpeg'))->toBeTrue();
+    foreach ($photos as $photo) {
+        Storage::disk('odk')->assertExists((string) $photo->path);
+    }
+    $assessments = Assessment::query()->count();
+
+    $this->artisan('edqa:odk-mock:generate', ['--apply-edits' => true])->assertSuccessful();
+    $second = $pull();
+    expect($second->accepted)->toBe(1)
+        ->and(Assessment::query()->count())->toBe($assessments)
+        ->and(Submission::query()->where('status', SubmissionStatus::Superseded)->count())->toBe(1);
+
+    $third = $pull();
+    expect([$third->accepted, $third->flagged, $third->quarantined])->toBe([0, 0, 0])
+        ->and(Submission::query()->count())->toBe(60);
 });

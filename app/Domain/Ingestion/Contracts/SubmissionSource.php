@@ -39,12 +39,13 @@ interface SubmissionSource
     public function formVersions(): array;
 
     /**
-     * One page of submissions received after $since (all when null), oldest first as the source
-     * serves them, with the total that matches.
+     * One page of submissions whose $by timestamp is after $since (at or after when $inclusive;
+     * all when null), ordered by that timestamp, oldest first, with the total that matches.
+     * $by is 'submissionDate' (new submissions) or 'updatedAt' (edits, Q-32).
      *
      * @throws OdkException
      */
-    public function submissionsPage(?CarbonImmutable $since, int $top, int $skip): SubmissionPage;
+    public function submissionsPage(?CarbonImmutable $since, int $top, int $skip, bool $inclusive = false, string $by = 'submissionDate'): SubmissionPage;
 
     /**
      * The attachments one submission expects, and whether each has arrived.

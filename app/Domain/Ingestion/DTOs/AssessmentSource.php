@@ -8,7 +8,7 @@ namespace App\Domain\Ingestion\DTOs;
 final readonly class AssessmentSource
 {
     /**
-     * @param  list<array{id: int, filename: string, mime: string, size: int, status: string}>  $attachments
+     * @param  list<array{id: int, filename: string, mime: ?string, size: ?int, status: string, reason: ?string, url: ?string}>  $attachments
      */
     public function __construct(
         public string $instanceId,

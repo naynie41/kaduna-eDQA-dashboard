@@ -14,7 +14,6 @@ return [
         'already_resolved' => 'This record has already been resolved.',
         'field_not_correctable' => 'The field :field cannot be corrected. Only the LGA, ward, facility, start, end and round can.',
         'invalid_correction' => 'The correction for :field is not a valid value.',
-        'no_parsed_snapshot' => 'This record has no parsed snapshot to correct. It has to be reprocessed from the raw submission.',
         'mixed_rules' => 'Bulk resolution needs every record to fail the same rules.',
         'unknown_action' => 'Unknown resolution: :action.',
         'empty_bulk' => 'Choose at least one record.',

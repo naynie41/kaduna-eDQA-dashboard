@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use PragmaRX\Google2FA\Google2FA;
+use Tests\Support\OdkPayload;
 use Tests\TestCase;
 
 // Feature tests boot the app and run against the edqa_test Postgres database (never SQLite).
@@ -79,7 +80,8 @@ function checkRule(string $rule, ParsedSubmission $submission): array
 }
 
 /**
- * The raw Submission row for a parsed submission, as the 2B ingestion step will store it.
+ * The raw Submission row for a parsed submission, as the pull stores it: a realistic ODK payload
+ * that the parser reads back into the same submission (OdkPayload).
  */
 function submissionRow(ParsedSubmission $parsed): Submission
 {
@@ -87,7 +89,7 @@ function submissionRow(ParsedSubmission $parsed): Submission
         'instance_id' => $parsed->instanceId,
         'deprecated_id' => $parsed->deprecatedId,
         'form_version' => $parsed->formVersion,
-        'payload' => ['__id' => $parsed->instanceId, 'meta' => ['instanceID' => $parsed->instanceId]],
+        'payload' => OdkPayload::fromParsed($parsed),
         'submitted_at' => $parsed->submittedAt,
         'status' => SubmissionStatus::Parsed,
     ]);

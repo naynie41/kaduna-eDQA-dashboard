@@ -38,6 +38,28 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `ODK_ALLOW_INSECURE_LOCAL`: allows an http ODK URL for the mock, only when `APP_ENV=local`.
   Set anywhere else, it is refused.
 
+- The ODK pull (Phase 2B step 4, D-51): `PullSubmissionsJob` runs every ten minutes once ODK is
+  configured, one pull at a time under a lock. It pulls new submissions, then edits, each with
+  its own cursor (`last_pulled_at`, and the new `last_edit_at`, Q-32). Each page commits as one
+  transaction with the cursor last: a crash replays the page, and re-running a pull inserts
+  nothing. Edits supersede the original and update its assessment in place, audited; an edit of a
+  quarantined submission resolves its record. Every attempt has a run row with counters
+  (now including `flagged`) and an outcome. A final failure sets the form's `last_error` and
+  raises `PullFailed`. A successful pull pings `HEARTBEAT_ODK_PULL_URL` if set.
+- ODK attachments (Phase 2B step 5, D-52): the pull records what Central expects for each new
+  submission and queues `FetchAttachmentsJob` on the `low` queue. Files are stored on the
+  private `odk` disk only after a size cap (10 MB) and a sniffed-type allow-list. Rejected files
+  are deleted with the reason; unsafe file names are refused without a download; a fetched file
+  is never fetched again.
+- `GET /attachments/{submission}/{filename}`, signed in only: streams a fetched file with
+  `nosniff` and a private cache, and audits each view. The facility drawer shows fetched photos
+  as thumbnails (alt text: file, facility, round) and other files as downloads.
+- `edqa:attachments:fetch-pending {--limit=500} {--sync}`: catch up on pending and failed
+  attachments, for example after a backfill.
+- `edqa:pull`: one manual pull now, audited. `edqa:pull --dry-run --limit=200` fetches, parses
+  and validates in memory, prints what would happen by rule code, and writes nothing: the safe
+  first run against real credentials.
+
 ### Changed
 
 - ITEMS_INCOMPLETE quarantines any answer the form does not allow (`invalid`), even among valid
@@ -45,6 +67,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The field map no longer carries `choices`: answers map through the rule version (Q-25).
 - `config/edqa.php` `odk`: `base_url` is now `url`, beside the email, password, project, form,
   page size, timeouts and retry settings (all from the existing `ODK_*` env keys).
+- Correct and reprocess rebuilds a quarantined submission from its raw ODK payload (through the
+  parser) plus the corrections, not from the parsed snapshot, which is kept for audit.
+- The queue's `retry_after` defaults to 960 s (was 90), longer than a pull may run (900 s).
 
 ## [0.4.0] - 2026-10-17
 

@@ -168,6 +168,12 @@ Plus:
   `X-Content-Type-Options: nosniff`.
 - MIME type sniffed on download from ODK and checked against an allow-list
   (`image/jpeg`, `image/png`, `application/geo+json`, `text/csv`, `application/xml`).
+- Built (D-52): the disk is `odk` (`serve: false`). A file is downloaded to `odk/.incoming`
+  and moves into place only after its checks: at most 10 MB (`edqa.odk.attachments.max_bytes`),
+  a sniffed type on the allow-list; otherwise it is deleted and its row `rejected`. A file name
+  that is not a plain safe name is refused before any download, never renamed. The route serves
+  the path stored on the row (never one built from the request) with the sniffed type, `nosniff`
+  and `Cache-Control: private`, and audits every view.
 - Exports are written to a private disk and downloaded via signed, time-limited URLs (30 min).
 - The facility cascade CSV served to ODK is generated to a private path and uploaded to ODK as
   form media; it is not publicly reachable on the portal.

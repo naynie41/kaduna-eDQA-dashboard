@@ -31,6 +31,26 @@ return [
         'unmapped_summary' => ':count published version(s) have no field map: add them to config/edqa_field_maps.php before the first pull.',
     ],
 
+    // edqa:pull (ARCHITECTURE.md §5.3).
+    'pull' => [
+        'dry_run_title' => 'Dry run: nothing was written (no submission, cursor or run row).',
+        'dry_run_summary' => 'Fetched :fetched; :stored already stored; of the rest :accepted would be accepted, :flagged flagged and :quarantined quarantined.',
+        'dry_run_no_rules' => 'No rule was hit.',
+        'rule' => 'Rule',
+        'severity' => 'Severity',
+        'submissions' => 'Submissions',
+        'busy' => 'Another pull is running and did not finish in time; try again shortly.',
+        'result' => 'Pull :outcome: fetched :fetched, :duplicates already stored, :accepted accepted, :flagged flagged, :quarantined quarantined.',
+        'skipped' => 'Skipped: :error',
+        'failed' => 'Pull failed: :error',
+    ],
+
+    // edqa:attachments:fetch-pending.
+    'attachments' => [
+        'queued' => 'Queued attachment fetches for :count submission(s) on the low queue.',
+        'fetched' => 'Fetched attachments for :count submission(s); for :failed of them ODK could not deliver every file, now marked failed.',
+    ],
+
     // edqa:odk-mock:generate (docker/odk-mock).
     'mock' => [
         'local_only' => 'The mock ODK Central is for local development only.',

@@ -147,8 +147,30 @@ it('gives the ODK instance ID, and a deep link only when ODK Central is configur
     expect(detail($this)['odk']['url'])->toBe('https://central.example.org/#/projects/7/forms/dqa/submissions/'.rawurlencode($instance));
 });
 
-it('lists attachments (none until ODK attachments are fetched)', function (): void {
+it('lists no attachments when the submission has none', function (): void {
     expect(detail($this)['attachments'])->toBe([]);
+});
+
+it('lists the attachments, each fetched one with the route that serves it', function (): void {
+    $submission = $this->assessment->submission_id;
+    $rows = [
+        ['filename' => 'register.jpg', 'status' => 'fetched', 'mime' => 'image/jpeg', 'size' => 2048, 'path' => 'x/register.jpg', 'reason' => null],
+        ['filename' => 'trace.geojson', 'status' => 'pending', 'mime' => null, 'size' => null, 'path' => null, 'reason' => null],
+        ['filename' => 'evil.jpg', 'status' => 'rejected', 'mime' => null, 'size' => null, 'path' => null, 'reason' => 'type_not_allowed'],
+    ];
+    foreach ($rows as $row) {
+        DB::table('odk_attachments')->insert(['submission_id' => $submission, ...$row]);
+    }
+
+    $attachments = detail($this)['attachments'];
+
+    expect(array_map(fn (array $a): array => [$a['filename'], $a['status'], $a['reason'], $a['url']], $attachments))->toBe([
+        ['register.jpg', 'fetched', null, "/attachments/{$submission}/register.jpg"],
+        ['trace.geojson', 'pending', null, null],
+        ['evil.jpg', 'rejected', 'type_not_allowed', null],
+    ])
+        ->and($attachments[0])->toMatchArray(['mime' => 'image/jpeg', 'size' => 2048])
+        ->and($attachments[0])->not->toHaveKey('path');
 });
 
 it('is 404 for an unknown facility, and 422 for a round that does not exist', function (): void {

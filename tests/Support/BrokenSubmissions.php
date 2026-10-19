@@ -121,7 +121,7 @@ final class BrokenSubmissions
 
     private static function typedScoresOnly(): ParsedSubmission
     {
-        $builder = ParsedSubmissionBuilder::new()->withRawNumericScore('availability_m1', 92.5);
+        $builder = ParsedSubmissionBuilder::new()->withRawNumericScore('avail_m1_score', 92.5);
         foreach (Dimension::cases() as $dimension) {
             foreach ([1, 2, 3] as $month) {
                 $builder->withoutSlot($dimension, $month);
@@ -133,7 +133,7 @@ final class BrokenSubmissions
 
     private static function typedScoreOutOfRange(): ParsedSubmission
     {
-        return ParsedSubmissionBuilder::new()->withRawNumericScore('availability_m1', 347.66)->build();
+        return ParsedSubmissionBuilder::new()->withRawNumericScore('avail_m1_score', 347.66)->build();
     }
 
     private static function endsBeforeStart(): ParsedSubmission
@@ -176,7 +176,7 @@ final class BrokenSubmissions
     private static function liveReportRow(): ParsedSubmission
     {
         return ParsedSubmissionBuilder::new()->withLga(null)->withWard('Quarterly')
-            ->withFacilityRef('2019.00')->withRawNumericScore('availability_m1', 347.66)->build();
+            ->withFacilityRef('2019.00')->withRawNumericScore('avail_m1_score', 347.66)->build();
     }
 
     private static function scoreJump(): ParsedSubmission

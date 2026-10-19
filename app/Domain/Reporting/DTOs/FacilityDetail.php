@@ -17,7 +17,7 @@ use App\Domain\Scoring\DTOs\ScoreValue;
  * @phpstan-type ItemGroup array{dimension: string, dimension_label: string, slot: int, month: string, score: ScoreValue, items: list<Item>}
  * @phpstan-type HistoryPoint array{round_id: int, label: string, overall: ScoreValue, selected: bool}
  * @phpstan-type Flag array{code: string, label: string, overridden: array{by: ?string, at: string, reason: ?string}|null}
- * @phpstan-type Attachment array{id: int, filename: string, mime: string, size: int, status: string}
+ * @phpstan-type Attachment array{id: int, filename: string, mime: ?string, size: ?int, status: string, reason: ?string, url: ?string}
  * @phpstan-type Change array{field: string, old: ?string, new: ?string}
  * @phpstan-type Activity array{id: int, at: string, actor: ?string, event: string, subject: string, item_code: ?string, changes: list<Change>, reason: ?string}
  */
