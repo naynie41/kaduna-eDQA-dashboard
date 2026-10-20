@@ -54,7 +54,9 @@ arch('only ingestion, validation and the Data issues endpoints touch quarantine 
 it('keeps AVG, SUM and COUNT in SQL inside App\Domain\Reporting', function (): void {
     // QuarantineQuery counts Data issues records per rule: an operational badge, never a score,
     // and Reporting may not read quarantine at all (hard rule 6), so it cannot move there.
-    $allowed = ['Domain/Validation/Queries/QuarantineQuery.php'];
+    // BackfillReportQuery counts raw submissions and quarantine records for the backfill report
+    // (D-53), for the same reason.
+    $allowed = ['Domain/Validation/Queries/QuarantineQuery.php', 'Domain/Ingestion/Queries/BackfillReportQuery.php'];
     $root = realpath(__DIR__.'/../../app');
     $offenders = [];
 

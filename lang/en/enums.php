@@ -55,6 +55,7 @@ return [
         'scheduled' => 'Scheduled',
         'manual' => 'Pull now',
         'webhook' => 'Webhook',
+        'backfill' => 'Backfill',
     ],
     'plan_action_status' => [
         'not_started' => 'Not started',

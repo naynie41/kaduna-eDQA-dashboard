@@ -57,14 +57,82 @@ final class MockSubmissionGenerator
         $round ??= Round::query()->where('status', 'open')->orderByDesc('year')->orderByDesc('quarter')->first()
             ?? Round::query()->orderByDesc('year')->orderByDesc('quarter')->first()
             ?? throw new RuntimeException('There is no round: seed the demo data first (make fresh).');
-        $map = FieldMap::resolve($version) ?? FieldMap::resolve((string) config('edqa_field_maps.default'));
-        if ($map === null) {
-            throw new RuntimeException('No field map to write with.');
+
+        return $this->generateSpan($count, $broken, [[$round, $version]], $seed);
+    }
+
+    /**
+     * The mix above over several periods (the backfill, §5.6): $count and $broken shared out
+     * evenly, oldest first, each period's visits in its own window through its own version's map.
+     * A period is a Round, saved or not: a quarter whose round does not exist yet is an unsaved
+     * Round with the quarter's dates, so the data can be surveyed before the rounds are created.
+     *
+     * @param  list<array{0: Round, 1: string}>  $periods  each with the form version it is submitted with
+     * @return array<string, int> entries written, by kind
+     */
+    public function generateSpan(int $count, int $broken, array $periods, int $seed = 2026): array
+    {
+        if ($periods === []) {
+            throw new RuntimeException('No period to write.');
         }
         mt_srand($seed);
 
-        $facilities = $this->freeFacilities($round);
+        File::deleteDirectory($this->dataDir);
+        foreach (['submissions', 'edits', 'attachments'] as $folder) {
+            File::ensureDirectoryExists("{$this->dataDir}/{$folder}");
+        }
+        $this->writeConfig($periods[array_key_last($periods)][1]);
+
+        $this->written = ['valid' => 0, 'flagged' => 0, 'broken' => 0, 'edited' => 0, 'attachments' => 0];
+        $photos = 2;
+        $index = 0;
         $broken = min($broken, $count);
+        foreach ($periods as $p => [$round, $version]) {
+            $map = FieldMap::resolve($version) ?? FieldMap::resolve((string) config('edqa_field_maps.default'));
+            if ($map === null) {
+                throw new RuntimeException('No field map to write with.');
+            }
+            $share = intdiv($count, count($periods)) + ($p < $count % count($periods) ? 1 : 0);
+            $brokenShare = intdiv($broken, count($periods)) + ($p < $broken % count($periods) ? 1 : 0);
+
+            $facilities = $this->freeFacilities($round);
+            $kinds = $this->kinds($share, min($brokenShare, $share));
+            if (count($kinds) > count($facilities)) {
+                throw new RuntimeException(sprintf('Only %d active facilities have no visit in Q%d %d: ask for fewer.', count($facilities), $round->quarter, $round->year));
+            }
+
+            $slots = $this->visitSlots($round, count($kinds));
+            foreach ($kinds as $i => $kind) {
+                $entry = $this->entry($map, $version, $round, $facilities[$i], $slots[$i], $kind, $facilities);
+                if ($kind === 'valid' && $photos > 0) {
+                    $photos--;
+                    $entry = $this->withPhoto($entry);
+                }
+                $this->write('submissions', $index, $entry);
+                $this->written[match (true) {
+                    in_array($kind, self::BROKEN, true) => 'broken',
+                    $kind === 'valid', $kind === 'edited' => 'valid',
+                    default => 'flagged',
+                }]++;
+                if ($kind === 'edited') {
+                    $this->write('edits', $index, $this->edited($entry, $map));
+                    $this->written['edited']++;
+                }
+                $index++;
+            }
+        }
+
+        return $this->written;
+    }
+
+    /**
+     * One period's kinds of visit, shuffled: broken ones in turn, about 4% flagged, one in fifty
+     * edited, the rest ordinary.
+     *
+     * @return list<string>
+     */
+    private function kinds(int $count, int $broken): array
+    {
         $flagged = (int) round($count * 0.04);
         $edits = max(1, intdiv($count, 50));
         $plain = $count - $broken - $flagged - 2 * $edits;
@@ -78,39 +146,8 @@ final class MockSubmissionGenerator
             ...array_fill(0, max(0, $plain), 'valid'),
         ];
         shuffle($kinds);
-        if (count($kinds) > count($facilities)) {
-            throw new RuntimeException(sprintf('Only %d active facilities have no visit in Q%d %d: ask for fewer.', count($facilities), $round->quarter, $round->year));
-        }
 
-        File::deleteDirectory($this->dataDir);
-        foreach (['submissions', 'edits', 'attachments'] as $folder) {
-            File::ensureDirectoryExists("{$this->dataDir}/{$folder}");
-        }
-        $this->writeConfig($version);
-
-        $slots = $this->visitSlots($round, count($kinds));
-        $this->written = ['valid' => 0, 'flagged' => 0, 'broken' => 0, 'edited' => 0, 'attachments' => 0];
-        $photos = 2;
-        foreach ($kinds as $i => $kind) {
-            $facility = $facilities[$i];
-            $entry = $this->entry($map, $version, $round, $facility, $slots[$i], $kind, $facilities);
-            if ($kind === 'valid' && $photos > 0) {
-                $photos--;
-                $entry = $this->withPhoto($entry);
-            }
-            $this->write('submissions', $i, $entry);
-            $this->written[match (true) {
-                in_array($kind, self::BROKEN, true) => 'broken',
-                $kind === 'valid', $kind === 'edited' => 'valid',
-                default => 'flagged',
-            }]++;
-            if ($kind === 'edited') {
-                $this->write('edits', $i, $this->edited($entry, $map));
-                $this->written['edited']++;
-            }
-        }
-
-        return $this->written;
+        return $kinds;
     }
 
     /** Lets the next pull see the edited versions (Central would show them once made). */
@@ -188,7 +225,8 @@ final class MockSubmissionGenerator
     {
         $start = $slot['start'];
         if ($kind === 'outside_round') {
-            $start = CarbonImmutable::parse($round->window_end->toDateString(), (string) config('app.timezone'))->addDays(20)->setTime(10, 0);
+            // Three years before the window: outside every round even when the data spans quarters.
+            $start = CarbonImmutable::parse($round->window_start->toDateString(), (string) config('app.timezone'))->subYears(3)->setTime(10, 0);
         }
         $minutes = match ($kind) {
             'short_visit' => 12,

@@ -28,7 +28,7 @@ dataset('enums', [
     'QuarantineResolution' => [QuarantineResolution::class, ['reprocessed', 'rejected', 'superseded']],
     'Ownership' => [Ownership::class, ['public', 'private']],
     'FacilityLevel' => [FacilityLevel::class, ['primary', 'secondary', 'tertiary']],
-    'PullTrigger' => [PullTrigger::class, ['scheduled', 'manual', 'webhook']],
+    'PullTrigger' => [PullTrigger::class, ['scheduled', 'manual', 'webhook', 'backfill']],
     'PlanActionStatus' => [PlanActionStatus::class, ['not_started', 'in_progress', 'done']],
 ]);
 

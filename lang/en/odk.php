@@ -58,6 +58,7 @@ return [
         'edits_applied' => 'Edits applied: the next pull sees the edited versions.',
         'bad_round' => 'Give the round as 2026Q2, not ":round".',
         'no_round' => 'There is no round :round.',
+        'bad_span' => 'Give the quarters as 2024Q1-2025Q2, oldest first, not ":span".',
     ],
 
 ];

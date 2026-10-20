@@ -27,8 +27,10 @@ final class ShellStatusAggregator
      */
     public function sync(): array
     {
-        $latest = DB::table('odk_pull_runs')->whereNotNull('finished_at')->orderByDesc('finished_at')->orderByDesc('id')->first(['finished_at', 'outcome', 'error']);
-        $success = DB::table('odk_pull_runs')->where('outcome', 'succeeded')->max('finished_at');
+        // The incremental pull only: a backfill (hours, once) says nothing about how fresh the data is.
+        $pulls = fn () => DB::table('odk_pull_runs')->where('trigger_type', '!=', 'backfill');
+        $latest = $pulls()->whereNotNull('finished_at')->orderByDesc('finished_at')->orderByDesc('id')->first(['finished_at', 'outcome', 'error']);
+        $success = $pulls()->where('outcome', 'succeeded')->max('finished_at');
         $lastSuccess = is_string($success) ? CarbonImmutable::parse($success) : null;
         $minutes = $lastSuccess === null ? null : (int) $lastSuccess->diffInMinutes(now());
 

@@ -54,6 +54,17 @@ return [
             'report' => false,
         ],
 
+        // Reports and exports written for administrators (SECURITY.md §7): storage/app/exports,
+        // private, never served by Laravel itself.
+        'exports' => [
+            'driver' => 'local',
+            'root' => storage_path('app/exports'),
+            'serve' => false,
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

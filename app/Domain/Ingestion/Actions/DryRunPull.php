@@ -16,9 +16,14 @@ use App\Domain\Validation\ValidationPipeline;
 use Illuminate\Support\Facades\DB;
 
 /**
- * `edqa:pull --dry-run` (ARCHITECTURE.md §5.3): the first pull against real credentials, made safe.
- * Fetches up to $limit new submissions from the stored cursor, parses and validates them in
- * memory against the live reference data, and reports what a real pull would do, by rule code.
+ * `edqa:pull --dry-run` and `edqa:backfill --dry-run` (ARCHITECTURE.md §5.3, §5.6): the first
+ * contact with real credentials, made safe. Fetches up to $limit submissions, from the stored
+ * cursor (a pull) or from the start of the form (a backfill, $fromStart), parses and validates
+ * them in memory against the live reference data, and reports what a real run would do, by rule.
+ *
+ * Page by page, as the real run: one ValidationContext a page, only the counts kept, so a dry run
+ * of the whole history fits in memory. Unlike the real run, nothing is stored between pages, so a
+ * second visit to a facility on a later page than the first is not caught as a duplicate here.
  *
  * Writes nothing: no submission, no cursor, no run row, no audit entry (reads only). The ODK
  * session token is cached as for any request.
@@ -33,51 +38,53 @@ final class DryRunPull
     ) {}
 
     /** @throws OdkException */
-    public function execute(int $limit): DryRunReport
+    public function execute(int $limit, bool $fromStart = false): DryRunReport
     {
         $limit = max(1, $limit);
         $config = OdkConfig::fromConfig();
-        $sync = $config->isConfigured()
+        $sync = $config->isConfigured() && ! $fromStart
             ? OdkFormSync::query()->where('project_id', (int) $config->projectId)->where('form_id', (string) $config->formId)->first()
             : null;
         $cursor = $sync?->last_pulled_at;
 
-        $rows = [];
+        $fetched = 0;
+        $stored = 0;
+        $outcomes = ['accepted' => 0, 'flagged' => 0, 'quarantined' => 0];
+        $rules = [];
         $skip = 0;
-        while (count($rows) < $limit) {
-            $page = $this->source->submissionsPage($cursor, min($limit - count($rows), $config->pageSize), $skip, inclusive: $cursor !== null);
-            $rows = [...$rows, ...$page->rows];
+        while ($fetched < $limit) {
+            $page = $this->source->submissionsPage($cursor, min($limit - $fetched, $config->pageSize), $skip, inclusive: $cursor !== null);
+            $fetched += count($page->rows);
             $skip += count($page->rows);
+
+            /** @var list<ParsedSubmission> $parsed */
+            $parsed = array_map(fn (array $row): ParsedSubmission => $this->parser->parse($row), $page->rows);
+            $known = $parsed === [] ? [] : DB::table('submissions')
+                ->whereIn('instance_id', array_map(fn (ParsedSubmission $p): string => $p->instanceId, $parsed))
+                ->pluck('instance_id')->flip()->all();
+            $fresh = array_values(array_filter($parsed, fn (ParsedSubmission $p): bool => ! isset($known[$p->instanceId])));
+            $stored += count($parsed) - count($fresh);
+
+            // As ProcessParsedBatch does it: one context, accepted ones registered as they pass.
+            $context = $this->contexts->forBatch($fresh);
+            foreach ($fresh as $submission) {
+                $result = $this->pipeline->validate($submission, $context);
+                $outcomes[! $result->passed() ? 'quarantined' : ($result->isFlagged() ? 'flagged' : 'accepted')]++;
+                if ($result->passed()) {
+                    $context->registerAccepted($submission);
+                }
+                foreach ($result->failures() as $failure) {
+                    $rules[$failure->code] ??= ['severity' => $failure->severity->value, 'count' => 0];
+                    $rules[$failure->code]['count']++;
+                }
+            }
+
             if (! $page->hasMore || $page->rows === []) {
                 break;
             }
         }
-
-        /** @var list<ParsedSubmission> $parsed */
-        $parsed = array_map(fn (array $row): ParsedSubmission => $this->parser->parse($row), $rows);
-        $stored = $parsed === [] ? [] : DB::table('submissions')
-            ->whereIn('instance_id', array_map(fn (ParsedSubmission $p): string => $p->instanceId, $parsed))
-            ->pluck('instance_id')->flip()->all();
-
-        // As ProcessParsedBatch does it: one context, accepted ones registered as they pass.
-        $fresh = array_values(array_filter($parsed, fn (ParsedSubmission $p): bool => ! isset($stored[$p->instanceId])));
-        $context = $this->contexts->forBatch($fresh);
-        $outcomes = ['accepted' => 0, 'flagged' => 0, 'quarantined' => 0];
-        $rules = [];
-        foreach ($fresh as $submission) {
-            $result = $this->pipeline->validate($submission, $context);
-            $outcome = ! $result->passed() ? 'quarantined' : ($result->isFlagged() ? 'flagged' : 'accepted');
-            $outcomes[$outcome]++;
-            if ($result->passed()) {
-                $context->registerAccepted($submission);
-            }
-            foreach ($result->failures() as $failure) {
-                $rules[$failure->code] ??= ['severity' => $failure->severity->value, 'count' => 0];
-                $rules[$failure->code]['count']++;
-            }
-        }
         ksort($rules);
 
-        return new DryRunReport(count($rows), count($parsed) - count($fresh), $outcomes, $rules);
+        return new DryRunReport($fetched, $stored, $outcomes, $rules);
     }
 }

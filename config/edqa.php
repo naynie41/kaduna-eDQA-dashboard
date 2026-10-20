@@ -80,6 +80,15 @@ return [
         // a second pull waits up to lock_wait_seconds for it, then goes back on the queue.
         'pull' => ['lock_seconds' => 900, 'lock_wait_seconds' => 600],
 
+        // The historical backfill (§5.6, D-53): seconds to wait between pages (ODK_BACKFILL_THROTTLE,
+        // default 5, so a first pass can run in working hours without loading Central), and how long
+        // one BackfillOdkSubmissionsJob runs before it queues the next from its checkpoint.
+        'backfill' => [
+            // Empty or unset means the default; an explicit 0 turns the throttle off.
+            'throttle_seconds' => is_numeric(env('ODK_BACKFILL_THROTTLE')) ? max(0, (int) env('ODK_BACKFILL_THROTTLE')) : 5,
+            'job_seconds' => 300,
+        ],
+
         // Attachments (§5.3, SECURITY.md §7): fetched on the low queue to the private odk disk. A
         // file over max_bytes, or whose sniffed type is not in allowed_mimes, is rejected and
         // deleted.

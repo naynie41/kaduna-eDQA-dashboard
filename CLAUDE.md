@@ -159,7 +159,9 @@ make prod-build                          # build the app, worker and web images 
 make routes                              # regenerate Wayfinder route helpers
 make artisan c="edqa:pull"               # one ODK pull, synchronous
 make artisan c="edqa:pull --dry-run"     # fetch, parse, validate up to --limit=200; writes nothing
-make artisan c="edqa:backfill"           # resumable historical backfill
+make artisan c="edqa:backfill --survey"  # submissions per quarter and form version, and quarters without a round; writes nothing
+make artisan c="edqa:backfill"           # resumable historical backfill (--from-page=, --throttle=, --dry-run)
+make artisan c="edqa:backfill-report"    # per round and per rule, to storage/app/exports (--format=md|csv)
 make artisan c="edqa:attachments:fetch-pending"  # queue pending/failed attachment fetches (--sync, --limit=)
 make artisan c="edqa:rescore"
 make artisan c="edqa:seed:perf"          # local only: five years of scored assessments (~44k), for budgets

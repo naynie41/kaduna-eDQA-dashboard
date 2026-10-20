@@ -56,6 +56,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as thumbnails (alt text: file, facility, round) and other files as downloads.
 - `edqa:attachments:fetch-pending {--limit=500} {--sync}`: catch up on pending and failed
   attachments, for example after a backfill.
+- Historical backfill (Phase 2B step 6, D-53): `edqa:backfill` loads every submission the form
+  has, oldest first, through the same page path as the pull (now `ProcessSubmissionsPage`). It
+  checkpoints `backfill_skip` after each page, resumes there after a stop (or `--from-page`),
+  throttles between pages (`ODK_BACKFILL_THROTTLE`, 5 s, or `--throttle`), records attachments
+  without fetching them, and keeps one run row (trigger `backfill`). It refuses to start until a
+  historical round exists. `--survey` counts submissions per quarter and form version and names
+  the quarters still without a round; `--dry-run` validates the whole history in memory. Neither
+  writes anything. `BackfillOdkSubmissionsJob` runs the same on the `low` queue in chunks.
+- `edqa:backfill-report {--format=md|csv}`: per round, what was pulled, accepted, flagged and
+  quarantined, then quarantined by rule × year and rule × form version, and the most frequent
+  details per rule; written to `storage/app/exports`.
+- The mock generator spreads data over quarters: `--quarters=2024Q1-2025Q2 --older-quarters=2`.
 - `edqa:pull`: one manual pull now, audited. `edqa:pull --dry-run --limit=200` fetches, parses
   and validates in memory, prints what would happen by rule code, and writes nothing: the safe
   first run against real credentials.
@@ -70,6 +82,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Correct and reprocess rebuilds a quarantined submission from its raw ODK payload (through the
   parser) plus the corrections, not from the parsed snapshot, which is kept for audit.
 - The queue's `retry_after` defaults to 960 s (was 90), longer than a pull may run (900 s).
+- The sync status bar reads only the incremental pull's runs, never a backfill's.
+- The pull's cursors only move forward and keep microseconds; `submission_count` is incremented
+  in SQL, so a pull and a backfill can both update the form's sync row.
+- The dry run validates page by page (one context a page), so a whole history fits in memory.
 
 ## [0.4.0] - 2026-10-17
 

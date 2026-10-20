@@ -216,3 +216,23 @@ it('is pulled end to end: three pages, the broken ones quarantined, an edit appl
     expect([$third->accepted, $third->flagged, $third->quarantined])->toBe([0, 0, 0])
         ->and(Submission::query()->count())->toBe(60);
 });
+
+it('spreads the data over a span of quarters, the oldest in an older version, before their rounds exist', function (): void {
+    $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 6, '--quarters' => '2025Q1-2025Q3', '--older-quarters' => 1])
+        ->assertSuccessful();
+
+    $byQuarter = [];
+    $parser = app(SubmissionParser::class);
+    foreach (glob($this->mock.'/submissions/*.json') ?: [] as $file) {
+        $parsed = $parser->parse(json_decode((string) file_get_contents($file), true));
+        $day = $parsed->visitDate();
+        $byQuarter["{$day->year}Q{$day->quarter}"][$parsed->formVersion] = ($byQuarter["{$day->year}Q{$day->quarter}"][$parsed->formVersion] ?? 0) + 1;
+    }
+
+    // 20 visits a quarter; the "outside every round" defect lands three years earlier.
+    expect(array_keys($byQuarter))->toContain('2025Q1', '2025Q2', '2025Q3')
+        ->and(array_keys($byQuarter['2025Q1']))->toBe(['2025.2'])
+        ->and(array_keys($byQuarter['2025Q2']))->toBe(['2026.1'])
+        ->and(array_sum(array_map('array_sum', $byQuarter)))->toBe(glob($this->mock.'/submissions/*.json') === false ? 0 : count(glob($this->mock.'/submissions/*.json')));
+    $this->artisan('edqa:odk-mock:generate', ['--quarters' => '2025Q3-2025Q1'])->expectsOutputToContain('Give the quarters as 2024Q1-2025Q2')->assertFailed();
+});
