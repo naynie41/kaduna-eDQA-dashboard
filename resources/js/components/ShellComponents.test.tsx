@@ -18,11 +18,13 @@ const translations = {
     common: {
         ...(testTranslations.common as Record<string, unknown>),
         sync: {
-            not_connected: 'ODK Central not connected yet.',
+            not_configured: 'ODK Central is not configured, so no submissions are being pulled.',
+            not_connected: 'ODK Central is configured; no pull has finished yet.',
             ok: 'Last pull :minutes min ago · :assessments assessments · :quarantined in quarantine',
             stale: 'Last successful pull :minutes min ago, more than :limit minutes · :assessments assessments · :quarantined in quarantine',
-            failed: 'Last pull failed at :time (:error) · :assessments assessments · :quarantined in quarantine',
-            failed_no_error: 'Last pull failed at :time · :assessments assessments · :quarantined in quarantine',
+            failed: 'Last pull failed at :time (:error); last success :success · :assessments assessments · :quarantined in quarantine',
+            failed_no_error: 'Last pull failed at :time; last success :success · :assessments assessments · :quarantined in quarantine',
+            never_succeeded: 'never',
         },
     },
     dashboard: {
@@ -38,15 +40,20 @@ const translations = {
 const sync = (overrides: Partial<SyncStatus>): ShellStatus => ({
     assessments: 2184,
     quarantined: 12,
-    sync: { state: 'ok', lastSuccessAt: null, minutesSinceSuccess: 4, lastFailedAt: null, lastError: null, staleAfterMinutes: 30, ...overrides },
+    sync: { state: 'ok', lastSuccessAt: null, minutesSinceSuccess: 4, lastFailedAt: null, lastError: null, lastErrorClass: null, staleAfterMinutes: 30, ...overrides },
 });
 
 describe('SyncStatusBar', () => {
     it.each([
-        [{ state: 'not_connected', minutesSinceSuccess: null }, 'ODK Central not connected yet.'],
+        [{ state: 'not_configured', minutesSinceSuccess: null }, 'ODK Central is not configured, so no submissions are being pulled.'],
+        [{ state: 'not_connected', minutesSinceSuccess: null }, 'ODK Central is configured; no pull has finished yet.'],
         [{ state: 'ok' }, 'Last pull 4 min ago · 2,184 assessments · 12 in quarantine'],
         [{ state: 'stale', minutesSinceSuccess: 45 }, 'Last successful pull 45 min ago, more than 30 minutes · 2,184 assessments · 12 in quarantine'],
-        [{ state: 'failed', lastFailedAt: '2026-10-15T08:05:00Z', lastError: 'HTTP 503' }, 'Last pull failed at 15 Oct 2026, 09:05 WAT (HTTP 503) · 2,184 assessments · 12 in quarantine'],
+        [
+            { state: 'failed', lastFailedAt: '2026-10-15T08:05:00Z', lastSuccessAt: '2026-10-15T07:40:00Z', lastError: 'OdkUnreachable: ODK Central could not be reached', lastErrorClass: 'OdkUnreachable' },
+            'Last pull failed at 15 Oct 2026, 09:05 WAT (OdkUnreachable); last success 15 Oct 2026, 08:40 WAT · 2,184 assessments · 12 in quarantine',
+        ],
+        [{ state: 'failed', lastFailedAt: '2026-10-15T08:05:00Z', minutesSinceSuccess: null }, 'Last pull failed at 15 Oct 2026, 09:05 WAT; last success never · 2,184 assessments · 12 in quarantine'],
     ] as const)('says the %o state in words, as a status', async (overrides, text) => {
         const { container } = renderUi(<SyncStatusBar status={sync(overrides)} />, translations);
 
@@ -54,10 +61,10 @@ describe('SyncStatusBar', () => {
         expect(await axeCheck(container)).toHaveNoViolations();
     });
 
-    it('shows "not connected" in the neutral style, not as a failure', () => {
-        renderUi(<SyncStatusBar status={sync({ state: 'not_connected', minutesSinceSuccess: null })} />, translations);
+    it.each(['not_configured', 'not_connected'] as const)('shows %s in the neutral style, not as a failure or a warning', (state) => {
+        renderUi(<SyncStatusBar status={sync({ state, minutesSinceSuccess: null })} />, translations);
 
-        expect(screen.getByRole('status').className).not.toContain('text-bad');
+        expect(screen.getByRole('status').className).not.toMatch(/text-(bad|warn)/);
     });
 });
 

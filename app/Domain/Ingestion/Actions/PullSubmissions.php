@@ -41,10 +41,16 @@ final class PullSubmissions
         private readonly ProcessSubmissionsPage $page,
     ) {}
 
-    public function execute(PullTrigger $trigger, ?int $userId = null): OdkPullRun
+    /** @param  int|null  $runId  a run row created when the pull was asked for (StartManualPull), still open */
+    public function execute(PullTrigger $trigger, ?int $userId = null, ?int $runId = null): OdkPullRun
     {
-        $run = OdkPullRun::query()->create(['trigger_type' => $trigger, 'triggered_by' => $userId, 'started_at' => now()]);
-        if ($trigger === PullTrigger::Manual) {
+        $run = $runId === null ? null : OdkPullRun::query()->whereKey($runId)->whereNull('finished_at')->first();
+        if ($run !== null) {
+            $run->update(['started_at' => now()]); // asked for earlier: the pull starts now
+        } else {
+            $run = OdkPullRun::query()->create(['trigger_type' => $trigger, 'triggered_by' => $userId, 'started_at' => now()]);
+        }
+        if ($trigger === PullTrigger::Manual && $runId === null) {
             // SECURITY.md §4: a manual pull is audited; from the console the causer is empty.
             AuditLog::record($run, $userId === null ? null : User::query()->find($userId), 'pull_requested', old: [], new: ['trigger' => $trigger->value]);
         }

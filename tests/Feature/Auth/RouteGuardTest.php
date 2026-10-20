@@ -73,8 +73,10 @@ it('has no registration routes', function (): void {
     $this->post('/register', ['email' => 'x@example.test'])->assertNotFound();
 });
 
-it('answers the ODK webhook stub with 501 until ingestion is built', function (): void {
-    $this->postJson('/webhooks/odk', [])->assertStatus(501);
+it('keeps the ODK webhook switched off (404) while no secret is configured', function (): void {
+    config(['edqa.odk.webhook.secret' => null]);
+
+    $this->postJson('/webhooks/odk', [])->assertNotFound();
 });
 
 // ---- Mandatory 2FA (SECURITY.md §2)

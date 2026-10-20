@@ -7,7 +7,10 @@ use App\Http\Controllers\Auth\TwoFactorSetupController;
 use App\Http\Controllers\Dashboard;
 use App\Http\Controllers\Dashboard\DashboardRedirectController;
 use App\Http\Controllers\DevComponentsController;
+use App\Http\Controllers\Facilities\CascadeExportController;
 use App\Http\Controllers\Facilities\FacilityDetailController;
+use App\Http\Controllers\Odk\OdkPullController;
+use App\Http\Controllers\Odk\OdkStatusController;
 use App\Http\Controllers\OdkWebhookController;
 use App\Http\Controllers\Quarantine\BulkResolveQuarantineController;
 use App\Http\Controllers\Quarantine\OverrideSoftFlagController;
@@ -72,6 +75,16 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
     // user (SECURITY.md §8).
     Route::prefix('api')->name('api.')->middleware('throttle:120,1')->group(function (): void {
         Route::get('facilities/{facility}', FacilityDetailController::class)->whereNumber('facility')->name('facilities.show');
+
+        // ODK (§5.3, §8): "Pull now" is 6 a minute per administrator on top of the group's 120 (SECURITY.md §8).
+        Route::post('odk/pull', [OdkPullController::class, 'store'])->middleware('throttle:odk-pull')->name('odk.pull.store');
+        Route::get('odk/pull/{run}', [OdkPullController::class, 'show'])->whereNumber('run')->name('odk.pull.show');
+        Route::get('odk/status', OdkStatusController::class)->name('odk.status');
+
+        // The ODK cascading-select media (§5.1): generated on request, fetched through a signed link.
+        Route::post('facility-list/export-cascade', [CascadeExportController::class, 'store'])->name('facility-list.cascade.store');
+        Route::get('facility-list/export-cascade/{file}', [CascadeExportController::class, 'download'])
+            ->middleware('signed')->where('file', '[A-Za-z0-9.-]+')->name('facility-list.cascade.download');
         Route::get('quarantine', QuarantineIndexController::class)->name('quarantine.index');
         Route::post('quarantine/bulk-resolve', BulkResolveQuarantineController::class)->name('quarantine.bulk-resolve');
         Route::post('quarantine/{record}/resolve', ResolveQuarantineController::class)->whereNumber('record')->name('quarantine.resolve');

@@ -7,8 +7,25 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-20
+
+Phase 2B (ODK ingestion): step 8 of `CLAUDE.md` §6, built and proven against a local mock ODK
+Central, since the client's Central is not yet available. Submissions arrive through one path: a
+read-only client behind the `SubmissionSource` contract, the field-map parser, and one shared page
+action that validates and scores every row, or quarantines it. The incremental pull runs every ten
+minutes, is resumable and idempotent, and applies ODK edits in place. The historical backfill is
+throttled, checkpointed and reported per round and rule. Attachments are fetched to a private
+disk and served signed-in only. The webhook only ever queues a pull. A dry run reads real data
+and writes nothing, for the first day with credentials (`docs/runbooks/odk-credentials-day.md`).
+
 ### Added
 
+- `docs/runbooks/odk-credentials-day.md`: the order of work the day ODK access arrives, from
+  `edqa:odk:check` to the scheduled pull, with how to undo each step and how to truncate the
+  ingestion tables safely outside production.
+- `docs/phase-2b-closeout.md`: the end-to-end run against the mock, test results and the exit-gate
+  evidence. `tests/e2e/odk-mock.spec.ts` checks Home, the LGA view and `GET /api/quarantine` after
+  a pull, given the expected figures.
 - ODK parsing (Phase 2B step 1, D-48): `App\Domain\Ingestion\Odk\FieldMap` (an additive version
   over the default, dot paths, renames, never a fallback for an unknown version) and
   `SubmissionParser`, which reads one ODK Central OData entry into a `ParsedSubmission` and never
@@ -56,6 +73,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as thumbnails (alt text: file, facility, round) and other files as downloads.
 - `edqa:attachments:fetch-pending {--limit=500} {--sync}`: catch up on pending and failed
   attachments, for example after a backfill.
+- ODK webhook (Phase 2B step 7, D-54): `POST /webhooks/odk` verifies an HMAC-SHA256 signature
+  (`X-Edqa-Signature`, over the timestamp and the raw body) and a timestamp within five minutes,
+  then only queues a pull (at most one a minute). It is off (404) while `ODK_WEBHOOK_SECRET` is unset.
+- `POST /api/odk/pull` ("Pull now", audited, 6 a minute) returns the run to follow, or the pull
+  already running; `GET /api/odk/pull/{run}` gives its progress; `GET /api/odk/status` says whether
+  ODK Central is configured and answering, the sync state, the cursors and the open rounds' counts.
+- The ODK cascading-select media: `POST /api/facility-list/export-cascade` writes `lgas.csv`,
+  `wards.csv` and `facilities.csv` (active facilities only) and returns a 30-minute signed
+  download. Uploading them to ODK Central is manual for now: `docs/odk-cascade-media.md`.
 - Historical backfill (Phase 2B step 6, D-53): `edqa:backfill` loads every submission the form
   has, oldest first, through the same page path as the pull (now `ProcessSubmissionsPage`). It
   checkpoints `backfill_skip` after each page, resumes there after a stop (or `--from-page`),
@@ -82,10 +108,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Correct and reprocess rebuilds a quarantined submission from its raw ODK payload (through the
   parser) plus the corrections, not from the parsed snapshot, which is kept for audit.
 - The queue's `retry_after` defaults to 960 s (was 90), longer than a pull may run (900 s).
-- The sync status bar reads only the incremental pull's runs, never a backfill's.
+- The sync status bar reads only the incremental pull's runs, never a backfill's. It now says when
+  ODK Central is not configured at all (neutral), and a failure names the error's class and the
+  time of the last successful pull.
 - The pull's cursors only move forward and keep microseconds; `submission_count` is incremented
   in SQL, so a pull and a backfill can both update the form's sync row.
 - The dry run validates page by page (one context a page), so a whole history fits in memory.
+
+### Known gaps
+
+- Not yet run against the client's ODK Central: the field maps are `CONTRACT-ASSUMED`, and
+  `$orderby` on `updatedAt` (Q-32), a stable feed for the backfill's resume (Q-33) and a webhook
+  sender (Q-34) wait for it. The order of work on that day is in the runbook.
+- No reprocess after a field-map fix (`ARCHITECTURE.md` §5.7, §5.9).
+- No administration pages yet (Phase 5): the ODK pull, status, cascade and quarantine APIs are
+  built.
 
 ## [0.4.0] - 2026-10-17
 
@@ -322,7 +359,8 @@ or dashboard pages yet.
 - The session cookie is `Secure` unless `SESSION_SECURE_COOKIE=false`, which is meant for local
   HTTP development only.
 
-[Unreleased]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.1.0...v0.2.0

@@ -80,6 +80,15 @@ return [
         // a second pull waits up to lock_wait_seconds for it, then goes back on the queue.
         'pull' => ['lock_seconds' => 900, 'lock_wait_seconds' => 600],
 
+        // The webhook (§5.4, SECURITY.md §6, D-54): off (404) until ODK_WEBHOOK_SECRET is set. A request
+        // is signed HMAC-SHA256 over "{timestamp}.{raw body}" and its timestamp must be within
+        // tolerance_seconds; it only queues a pull, at most one per debounce_seconds.
+        'webhook' => [
+            'secret' => env('ODK_WEBHOOK_SECRET') ?: null,
+            'tolerance_seconds' => 300,
+            'debounce_seconds' => 60,
+        ],
+
         // The historical backfill (§5.6, D-53): seconds to wait between pages (ODK_BACKFILL_THROTTLE,
         // default 5, so a first pass can run in working hours without loading Central), and how long
         // one BackfillOdkSubmissionsJob runs before it queues the next from its checkpoint.

@@ -410,20 +410,32 @@ The form must satisfy these. If the current form does not, adapting it is a Phas
 
 Choice mapping (configurable per form version): `yes` → pass, `no` → fail, `na` → not applicable.
 
-### 5.2 Components (`app/Domain/Ingestion/Odk/`)
+The cascade's media files (built, D-54): `App\Domain\Facility\Exports\CascadeExporter` writes
+`lgas.csv` (name, label), `wards.csv` (name, label, lga) and `facilities.csv` (name, label, lga,
+ward), active facilities only, as one zip on the private exports disk. `POST
+/api/facility-list/export-cascade` returns a 30-minute signed link. Uploading them to ODK Central is
+a manual step until the portal has credentials to publish drafts: `docs/odk-cascade-media.md`.
+
+### 5.2 Components (`app/Domain/Ingestion/`)
+
+All built in Phase 2B (D-48 to D-54). One path from ODK to the database: the pull and the
+backfill both commit pages through `ProcessSubmissionsPage`.
 
 | Class | Responsibility |
 |---|---|
-| `SubmissionSource` (contract, `Ingestion\Contracts`) | ping, form versions, a submissions page, attachment list and download; `OdkCentralSource` implements it (an Aggregate adapter could too, Q-01) (built, D-49) |
-| `OdkCentralClient` | HTTP wrapper. Auth, OData paging, attachment download, retries/timeouts (built, D-49) |
-| `SessionTokenCache` | `POST /v1/sessions`; caches token, encrypted, until 30 min before expiry (built, D-49) |
-| `PullLock` | `Cache::lock('odk-pull', 900)` — manual press during a scheduled run queues behind it |
-| `PullSubmissionsJob` | Incremental pull. Same job for scheduler, Pull now and webhook |
-| `BackfillOdkSubmissionsJob` | Cursor-from-zero pull, checkpointed per page, throttled; `low`, chunked, carrying one run (built, D-53) |
-| `FetchAttachmentsJob` | `low` queue, 3 tries (60/300/900 s): one submission's pending files through `FetchAttachments` (built, D-52) |
-| `SubmissionParser` | Payload + `FieldMap` → `ParsedSubmission` DTO; never throws on bad data (built, D-48) |
-| `FieldMap` | Resolves logical names → question paths for a form version, additive over the default (built, D-48) |
-| `ProcessSubmissionAction` | Parse → validate → create assessment / quarantine, in one transaction |
+| `SubmissionSource` (contract, `Contracts`) | `ping()`, `formVersions()`, `submissionsPage(since, top, skip, inclusive, by)` (by `submissionDate` or `updatedAt`, `$orderby` on the same field), `attachmentList(rootId)`, `downloadAttachment(rootId, name, sink)`. Read-only; every method throws an `OdkException` subclass, never a transport error. `OdkCentralSource` implements it; an ODK Aggregate adapter could too (Q-01) (D-49, D-51) |
+| `OdkConfig` (`Odk`) | The five settings from `config/edqa.php` only; "not configured" names the missing env keys, never values; https only, http only with `ODK_ALLOW_INSECURE_LOCAL` in local (D-49, D-50) |
+| `OdkCentralClient`, `SessionTokenCache` (`Odk`) | HTTP: encrypted session token refreshed 30 min early and once on a 401, TLS verified, retries on 429/5xx/connection only, logs without secrets (D-49) |
+| `FieldMap`, `SubmissionParser` (`Odk`) | Version → paths, additive over the default; payload → `ParsedSubmission`, never throws, unknown answers `invalid` (D-48) |
+| `PullSubmissions` (`Actions`) + `PullSubmissionsJob` | The incremental pull: two passes (new by `submissionDate`, edits by `updatedAt`), each its own forward-only cursor, under `PullLock`; one run row per attempt; heartbeat on success (D-51) |
+| `ProcessSubmissionsPage` (`Actions`) | One page, one transaction: raw insert `ON CONFLICT DO NOTHING`, parse from the stored payload, supersede, `ProcessParsedBatch` (one `ValidationContext`), attachments recorded, counters, then the sync row (atomic SQL). Shared by pull and backfill (D-53) |
+| `ProcessParsedBatch`, `ProcessParsedSubmission` (`Actions`) | Validate and write: assessment, items and scores, or a quarantine record; an ODK edit updates its assessment in place, audited (Phase 2A) |
+| `DryRunPull` (`Actions`) | `edqa:pull --dry-run` / `edqa:backfill --dry-run`: fetch, parse, validate in memory page by page; writes nothing (D-51, D-53) |
+| `BackfillSubmissions`, `SurveyBackfill` (`Actions`) + `BackfillOdkSubmissionsJob`, `BackfillLock` | The historical backfill by `$skip` from `backfill_skip`, throttled, resumable; the survey per quarter and version; the job chunked on `low` (D-53) |
+| `RecordAttachments`, `FetchAttachments`, `AttachmentRules` + `FetchAttachmentsJob` | Pending rows with their submission; fetch to the private `odk` disk via `.incoming`, size cap, sniffed type on the allow-list, unsafe names refused (D-52) |
+| `StartManualPull` (`Actions`), `OdkStatusQuery`, `AttachmentFileQuery`, `BackfillReportQuery` (`Queries`) | "Pull now" (the run row at request time, or the running one); the status endpoint's ingestion half; the attachment route's exact lookup; the backfill report's counts (D-52 to D-54) |
+| `PullLock`, `BackfillLock` (`Odk`) | `odk-pull` (900 s; a second pull waits up to 600 s, then goes back on the queue); `odk-backfill` (one backfill; its pages commit under `odk-pull`) |
+| `MockSubmissionGenerator` (`App\Support\OdkMock`) + `docker/odk-mock` | The local mock Central and its data, §5.8 (D-50) |
 
 ### 5.3 Pull mechanics
 
@@ -482,6 +494,12 @@ Choice mapping (configurable per form version): `yes` → pass, `no` → fail, `
 `PullSubmissionsJob(PullTrigger::Webhook)`; it never trusts the webhook body as data. The
 scheduled pull always runs regardless.
 
+Built (D-54): off (404) while `ODK_WEBHOOK_SECRET` is unset. The sender sends
+`X-Edqa-Timestamp` (Unix seconds, within 5 minutes) and `X-Edqa-Signature: sha256=<hex>`, the
+HMAC-SHA256 of `"{timestamp}.{raw body}"`; missing, wrong or stale → 401. Accepted → 202 and at
+most one queued pull a minute (`Cache::add` debounce). 60 requests a minute per IP. ODK Central has
+no signed webhooks of its own, so the sender is a relay the client sets up (Q-34).
+
 ### 5.5 Form versions and field maps
 
 Every submission records `form_version` (`__system/formVersion`). The parser resolves names via
@@ -532,6 +550,13 @@ Built (Phase 2B step 1, D-48):
     (Q-16).
 - **Fixtures:** `tests/Fixtures`. Every map path is `CONTRACT-ASSUMED` until the real form is
   audited.
+- **`invalid` answers** (D-48): ITEMS_INCOMPLETE quarantines a submission with any `invalid`
+  answer, even among valid ones, which would otherwise score as a fail. An answer outside the
+  rule version's `choice_map` is never coerced to a choice.
+- **Parsed from the stored payload** (D-51): the pull parses `submissions.payload` as Postgres
+  returns it, not the row in memory. jsonb reorders keys, so items arrive in another order than
+  ODK sent them; reading the stored copy means every later reparse (correction, reprocess) sees
+  exactly what the pull saw.
 
 **Phase 0 task:** list every form version in ODK Central (`GET /v1/projects/{p}/forms/{f}/versions`),
 download each XLSForm, diff question names. That diff *is* the field map.
@@ -573,6 +598,50 @@ Same client, parser, validation and scoring — cursor set to zero.
 
 `ReprocessSubmissionAction` reads `submissions.payload` (never ODK). Used after a quarantine
 correction, a field-map fix, or a scoring rule publish. Idempotent.
+
+Where it stands after Phase 2B:
+
+- **A quarantine correction:** built. `CorrectAndReprocess` parses `submissions.payload` through
+  the parser, lays the corrections over it and runs the full pipeline (D-51). The parsed snapshot
+  on the record is kept for audit only; both give the same result for every broken fixture.
+- **A scoring rule publish:** built, but from stored item responses, not the payload
+  (`RescoreAssessments`, D-32): the answers do not change, only the rules.
+- **A field-map fix:** not built (§5.9). Submissions quarantined under a wrong or missing map
+  (`UNKNOWN_FORM_VERSION`, `ITEMS_INCOMPLETE` from a missed rename) need a reprocess of their
+  stored payloads with the new map. Until it exists, a map is fixed before the production
+  backfill (`docs/runbooks/odk-credentials-day.md`), and staging is truncated and re-run instead.
+
+### 5.8 Mock ODK Central (local only)
+
+`docker/odk-mock` (D-50) serves what `OdkCentralSource` calls, from JSON written by
+`edqa:odk-mock:generate` (`make odk-mock-seed n=…`):
+
+- one row per `__id`, its latest version;
+- `$filter` and `$orderby` on `submissionDate` and `updatedAt`, `$top`, `$skip`, `$count`;
+- edits exactly as Central shows them (same `__id` and `submissionDate`, a new
+  `meta.instanceID` with `deprecatedID`), visible after `--apply-edits`;
+- attachments listed and served.
+
+The data is realistic visits for the seeded facilities: broken ones in turn, about 4% flagged,
+edits, two photos. `--quarters=2024Q1-2025Q2 --older-quarters=N` spreads it over quarters whose
+rounds need not exist yet (the backfill, D-53). Tests drive the real source through the mock's
+handler with `Http::fake`; `make odk-mock-up` runs it at `odk-mock:8080`.
+
+### 5.9 Deferred after Phase 2B
+
+| Item | Waits for |
+|---|---|
+| Real field maps; removing `CONTRACT-ASSUMED` | The form XML of every version (runbook step c; Q-02, Q-05) |
+| Confirm `$orderby`/`$filter` on `__system/updatedAt`, and that edits arrive as the mock serves them | A live Central (Q-32) |
+| Confirm the feed never drops rows, which the backfill's resume relies on | The client's Central and practice (Q-33) |
+| A webhook sender (relay) | A decision on whether to have one (Q-34); the schedule meets the latency target alone |
+| Reprocess after a field-map fix (`ReprocessSubmissionAction`, bulk) | Before the production backfill, if the dry run shows maps still changing (§5.7) |
+| A raw payload containing `\u0000`: Postgres jsonb cannot store it, so its page would fail every pull | Whether real data has one; then quarantine it as its own case |
+| Abort an attachment download over the size cap while it streams (it is checked once downloaded) | Real attachment sizes |
+| Admin pages: ODK pull (progress, history, Pull now), Data issues, Facility list (cascade button) | Phase 5 (build step 11); the APIs are built |
+| Backfill report in Excel | Phase 6 with maatwebsite (build step 12) |
+| `PullFailed` → daily digest and alert; scheduler heartbeat | Build step 13 |
+| An ODK Aggregate adapter for `SubmissionSource` | Only if the client runs Aggregate (Q-01) |
 
 ---
 
@@ -822,14 +891,14 @@ No public API, no API tokens in v1.
 | POST | `/api/rounds/{id}/reopen` | Reopen `{ reason, rescore? }` (reason required); returns the `rescore` run if one started |
 | POST | `/api/rounds/{id}/rescore` | Rescore (reason required, audited); 202 with `{ batch_id, run_id, … }`; 409 for a closed round |
 | GET | `/api/rescores/{batchId}` | Progress: chunks (total, processed, failed), assessments, changed scores and flags, status |
-| POST | `/api/odk/pull` | Manual pull; returns `{ run_id }` |
-| GET | `/api/odk/pull/{runId}` | Progress: fetched, parsed, accepted, quarantined, status |
-| GET | `/api/odk/status` | Connection state, last success, cursor position |
+| POST | `/api/odk/pull` | Manual pull, audited, 6/min; 202 `{ run_id, already_running }` (the running pull's id when one is running) |
+| GET | `/api/odk/pull/{runId}` | Progress: fetched, duplicates, accepted, flagged, quarantined, status (`running`, then the outcome), error |
+| GET | `/api/odk/status` | Configured (and missing env keys), reachable (sign-in, cached 60 s), the status bar's sync state, cursors, the running pull, each open round's accepted, flagged and quarantined |
 | GET | `/api/quarantine` | Quarantined records, grouped or flat |
 | POST | `/api/quarantine/{id}/resolve` | `{ action: correct|reject|override, fields?, reason }` |
 | POST | `/api/quarantine/bulk-resolve` | Same rule, same resolution, many ids |
 | GET | `/api/facility-list` | Master list for admin table |
-| POST | `/api/facility-list/export-cascade` | Regenerate ODK cascading-select media |
+| POST | `/api/facility-list/export-cascade` | Regenerate ODK cascading-select media; 201 with a 30-minute signed download link (D-54) |
 | POST | `/api/scoring-rules/{id}/preview` | Band-change preview before publish |
 | POST | `/api/scoring-rules/{id}/publish` | Publish (reason required), triggers rescore |
 | POST | `/api/exports` | Queue an export; returns `{ export_id }` |
@@ -1069,6 +1138,7 @@ over the 3 s target (Q-31).
 | D-51 | **The pull (Phase 2B step 4).** `PullSubmissions` (the orchestrator) under `PullLock`, run by `PullSubmissionsJob` (queue `default`, 3 tries, backoff 30/120/600 s, timeout 900 s) and by `edqa:pull`. Two passes with their own cursors: `submissionDate ge last_pulled_at` then `updatedAt ge last_edit_at` (new column), each `$orderby` its field (Q-32: replaces the single OR-filter cursor proposed there, which could skip an edit after a crash because the feed cannot be ordered by "the newer of two fields"). Inclusive cursor + instance-ID de-dup within the run; a page of one timestamp steps on with `$skip`. One transaction a page, cursor last; raw insert `ON CONFLICT (instance_id) DO NOTHING RETURNING`; new rows parsed **from the stored payload** (jsonb reorders keys, so every later reparse sees the same order). Run rows gain `flagged` and a CHECKed `outcome` (`succeeded`, `failed`, `skipped_not_configured`); each attempt is its own row; the final failure sets `odk_form_syncs.last_error` and raises `PullFailed`. Heartbeat GET on success only (`edqa.heartbeats.odk_pull` from the existing `HEARTBEAT_ODK_PULL_URL`). `edqa:pull --dry-run` writes nothing. `CorrectAndReprocess` now rebuilds from `submissions.payload` through the parser plus corrections; the parsed snapshot stays for audit only (both agree for every broken fixture, tested). **Server contract:** the queue's `retry_after` must exceed 900 s: `config/queue.php` now defaults it to 960 (was 90) for Redis and database; `REDIS_QUEUE_RETRY_AFTER`, if set on a server, must stay above 900 | Phase 2B step 4 |
 | D-52 | **Attachments (Phase 2B step 5).** Recorded, fetched, served. The OData feed does not name files, so the pull calls `attachmentList(__id)` for each new row expecting some, outside the page transaction (no HTTP while it holds locks), and inserts `pending` rows with the submissions (`RecordAttachments`, `insertOrIgnore` on the new unique key); `FetchAttachmentsJob` (`low`) is dispatched after commit. `FetchAttachments` downloads to `odk/.incoming/{uuid}`, then checks size (`edqa.odk.attachments.max_bytes`, 10 MB, config only: no env key) and type, sniffed with `finfo` against `edqa.odk.attachments.allowed_mimes` (SECURITY.md §7). Text types are told apart by extension among the sniffed text types, and GeoJSON must parse as GeoJSON. Rejected files are deleted, their row `rejected` with the reason (`unsafe_name`, `too_large`, `type_not_allowed`); ODK errors keep the row pending with the error kind and rethrow, so the job retries only what is missing; after the last try, `failed`. **Names are refused, not sanitised:** a name must be a plain file name (`[A-Za-z0-9][A-Za-z0-9._ ()-]{0,199}`, no `..`), so the stored name is ODK's own and the route can match it exactly (NUL and invalid UTF-8 are first made U+FFFD, since Postgres would cut the name at a NUL and make it look safe). Disk `odk` (`storage/app/odk`, `serve: false`). `GET /attachments/{submission}/{filename}` in the auth group (throttle 120/min): `AttachmentFileQuery` finds the fetched row for that submission and exact name; it serves the stored path, never one built from the request; 404 otherwise. `Content-Type` is the sniffed type, `X-Content-Type-Options: nosniff`, `Cache-Control: private, max-age=3600`, inline for images and attachment otherwise; every view is audited (`viewed`, the administrator, the file). Attachment rows are raw input, like submissions: not audited. The drawer's attachment props gain `reason` and `url` (fetched only). Settles Q-18 for attachments | Phase 2B step 5 |
 | D-53 | **Backfill (Phase 2B step 6).** One page path: the pull's page code moved into `ProcessSubmissionsPage` (attachment list before the transaction; insert, parse, supersede, batch, attachments, counters, sync row inside), used by `PullSubmissions` and `BackfillSubmissions`. The sync row is now updated atomically in SQL, since a pull and a backfill may both write it: `submission_count + n`, `last_pulled_at`/`last_edit_at` = `GREATEST(COALESCE(col, v), v)` (forward only, now with microseconds), `backfill_skip` as given. The backfill reads the feed by `$skip` from `backfill_skip` (or `--from-page` × page size), ordered by `submissionDate` with no filter; new submissions append at the end, so positions are stable (a submission deleted in Central would shift them: Central does not delete, Q-33). It refuses to start until a round before the current quarter exists (`BackfillRefused`). Concurrency: `BackfillLock` (`odk-backfill`, non-blocking) for one backfill; each page commits under `PullLock` (waits up to `lock_wait_seconds`). Trigger `backfill` added to `odk_pull_runs`' CHECK; `ShellStatusAggregator` reads only non-backfill runs. Throttle `ODK_BACKFILL_THROTTLE` (already in `.env.example`; empty = 5, `0` = none). `--survey` and `--dry-run` write nothing; the dry run is now page by page (whole history in memory otherwise), so a duplicate split across pages is caught only by the real run. `edqa:backfill-report {--format=md|csv}` writes to the private `exports` disk (`storage/app/exports`): per round (each current submission once: an assessment's round, else its latest quarantine record's; superseded counted apart) with a total row from SQL (`GROUPING SETS`), quarantined by rule × visit year and rule × form version (open records, once per hard rule), and the three most frequent details per rule. `BackfillReportQuery` counts raw submissions and quarantine, so like `QuarantineQuery` it is allowed SQL aggregates outside Reporting (architecture test, by name). An unknown form version is placed by its submission date for the per-round table (its start cannot be read). CSV cells starting `= + - @` are prefixed with `'`. The mock generator gains `--quarters=2024Q1-2025Q2 --older-quarters= --older-version=` (unsaved rounds for quarters without one, so the survey comes first); its "outside every round" defect now lands three years before the window | Phase 2B step 6 |
+| D-54 | **Webhook, Pull now, ODK status, cascade (Phase 2B step 7).** Webhook: off (404) without `ODK_WEBHOOK_SECRET` (already in `.env.example`); `X-Edqa-Timestamp` within 300 s and `X-Edqa-Signature` = `sha256=` + HMAC-SHA256 of `"{timestamp}.{raw body}"` (`hash_equals`). The timestamp is inside the signed string, not only beside it, so a captured request cannot be replayed with a fresh timestamp (SECURITY.md §6 says "over the raw body": this is that, plus the timestamp). Accepted → only `PullSubmissionsJob(Webhook)`, debounced to one a minute; the body is never read. Pull now: `StartManualPull` creates the run row at request time (so `run_id` comes back at once) under a short request lock, or returns the running pull's run (an open, non-backfill run younger than the pull lock); `PullSubmissionsJob` carries a `runId` and closes it in `failed()` if it never ran. Named limiter `odk-pull` (6/min per administrator, its own key: two `throttle:` middlewares on one route share a key and would count each request twice). Status: `ShellStatusAggregator` gains `not_configured` (neutral; the settings are missing), keeps `not_connected` for configured-but-never-pulled, ignores skipped runs, and returns `lastErrorClass`; the bar's failed text gives the time, the error class and the last success. `GET /api/odk/status` composes `OdkStatusQuery` (configured, problems, reachable via a cached `ping`, cursors, running run), the aggregator's sync and open-round counts, and `QuarantineQuery::openCountsByRound`. Cascade: `CascadeExporter` (three CSVs zipped, active facilities via the partial index, codes as names, sorted by label, formula-safe) to `exports/cascade/`; `POST /api/facility-list/export-cascade` → 201 with a `temporarySignedRoute` (30 min); the download route needs the auth group **and** `signed`, accepts only `odk-cascade-*.zip` names. Both audited; `AuditLog::record` takes a null subject for actions on no row | Phase 2B step 7 |
 
 Add new decisions here with the next ID. Any new Composer/npm package needs a line.
 
@@ -1136,6 +1206,7 @@ real month names for single-quarter views, LGA tile grid, Data issues "why it ex
 | Q-31 | **Owner decision.** §10's "first meaningful paint < 3 s on throttled 3G" is not met on Slow 3G (400 Kbps, 400 ms RTT): LCP ≈ 6.5 s, FCP ≈ 4.3 s on Home, Facility view and Visuals with the server answering in 0.3–0.6 s (D-47). The pages render on the client, so nothing paints before ~150 KB (HTML, CSS, the 129 KB first-load JS) arrives, ≈ 3 s of transfer alone; the five web fonts (98 KB) then hold LCP back another ~2 s. §10's own method ("numbers … render before hydration") needs **Inertia server-side rendering**: a Node SSR process beside PHP-FPM in the `app` image and in compose, a new server-contract item for `edqa-infra` (DEPLOY.md §1.3). Smaller levers, together not enough for 3 s: fewer font weights (a design change), `font-display: optional`. **Proposed:** SSR in Phase 7 hardening, with the budget re-measured; until then the measured figures stand as an exception (docs/accessibility-audit-phase4.md) | Performance budget, infra |
 | Q-32 | **Edits and the pull cursor: decided in D-51, to confirm on a live server.** In ODK Central an edit keeps the submission's `__id` and `submissionDate`; only `__system.updatedAt` (and `edits`, `meta.instanceID`, `meta.deprecatedID`) change, so a cursor on `submissionDate` alone never sees an edit. The pull now makes a second pass on `__system/updatedAt ge last_edit_at` with `$orderby=__system/updatedAt asc`. **To confirm with credentials:** that Central accepts `$orderby` and `$filter` on `__system/updatedAt` (documented for OData, unproven on the client's version), and that an edit appears with a new `meta.instanceID` and `deprecatedID`. The mock behaves this way (D-50) | Pull (step 4), edits |
 | Q-33 | **Does ODK Central ever delete or hide submissions from the OData feed?** The backfill pages by position (`$skip`, D-53), which stays stable only if rows are never removed from the middle of the feed. Central has no delete for submissions in the versions we know of, but a project could be archived or a submission's review state filtered. To confirm with the client's Central and admin practice | Backfill (step 6), resume |
+| Q-34 | **What sends the webhook?** ODK Central has no outgoing signed webhooks. A relay (a small service, or a Central plugin the client runs) must sign `"{timestamp}.{body}"` with the shared secret (D-54). Until one exists the 10-minute schedule is the only trigger, which meets the 15-minute latency target on its own. Confirm whether the client wants a relay at all | Webhook (step 7) |
 
 
 ### 11.5 Deferred until credentials

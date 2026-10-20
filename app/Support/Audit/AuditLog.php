@@ -19,9 +19,13 @@ final class AuditLog
      * @param  array<string, mixed>  $new
      * @param  array<string, mixed>  $extra
      */
-    public static function record(Model $subject, ?User $causer, string $event, array $old, array $new, ?string $reason = null, array $extra = []): void
+    public static function record(?Model $subject, ?User $causer, string $event, array $old, array $new, ?string $reason = null, array $extra = []): void
     {
-        $logger = activity()->performedOn($subject)->event($event);
+        // No subject for an action on no one row (a generated export).
+        $logger = activity()->event($event);
+        if ($subject !== null) {
+            $logger->performedOn($subject);
+        }
         if ($causer !== null) {
             $logger->causedBy($causer);
         }

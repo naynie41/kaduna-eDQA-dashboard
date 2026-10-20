@@ -22,10 +22,13 @@ use App\Domain\Scoring\Listeners\RescoreOpenRoundsAfterPublish;
 use App\Domain\Validation\Events\QuarantineResolved;
 use App\Domain\Validation\Listeners\RescoreAfterQuarantineResolved;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -50,6 +53,10 @@ final class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        // "Pull now": 6 a minute per administrator (SECURITY.md §8). Named, with its own key, so it
+        // is not counted together with the API group's 120 a minute.
+        RateLimiter::for('odk-pull', fn (Request $request): Limit => Limit::perMinute(6)->by('odk-pull:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 
         // Domain listeners live outside app/Listeners, so they are registered here.
         Event::listen(QuarantineResolved::class, RescoreAfterQuarantineResolved::class);

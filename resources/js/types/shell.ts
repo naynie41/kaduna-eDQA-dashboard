@@ -4,7 +4,7 @@ import type { ScoreValue } from '@/types/score';
  * Shared props for the shell, mirroring HandleInertiaRequests (`shell`) and ShareDashboardContext
  * (`filters`, `filterOptions`, `summary`, dashboard pages only).
  */
-export type SyncState = 'not_connected' | 'ok' | 'stale' | 'failed';
+export type SyncState = 'not_configured' | 'not_connected' | 'ok' | 'stale' | 'failed';
 
 export type SyncStatus = {
     state: SyncState;
@@ -12,6 +12,8 @@ export type SyncStatus = {
     minutesSinceSuccess: number | null;
     lastFailedAt: string | null;
     lastError: string | null;
+    /** The failed pull's error class, e.g. OdkUnreachable: what the bar names. */
+    lastErrorClass: string | null;
     staleAfterMinutes: number;
 };
 

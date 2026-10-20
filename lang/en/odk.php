@@ -45,6 +45,14 @@ return [
         'failed' => 'Pull failed: :error',
     ],
 
+    // POST /webhooks/odk (SECURITY.md §6): the only words a sender gets back.
+    'webhook' => [
+        'queued' => 'A pull is queued.',
+        'signature_missing' => 'The request is not signed.',
+        'signature_invalid' => 'The signature does not match.',
+        'timestamp_stale' => 'The request is too old, or its clock too far off.',
+    ],
+
     // edqa:attachments:fetch-pending.
     'attachments' => [
         'queued' => 'Queued attachment fetches for :count submission(s) on the low queue.',

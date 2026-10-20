@@ -36,8 +36,11 @@ test.describe('Home', () => {
         await expect(figure.getByRole('img', { name: /Line chart of the overall quality score/ })).toBeVisible();
         await figure.getByRole('button', { name: 'Show as table' }).click();
 
+        // Header + every round there is (four on the demo seed; more once a backfill has run).
+        const rounds = (await (await page.request.get('/api/rounds', { headers: { Accept: 'application/json' } })).json()) as { data: unknown[] };
+        expect(rounds.data.length).toBeGreaterThanOrEqual(4);
         const rows = figure.getByRole('row');
-        await expect(rows).toHaveCount(5); // header + four demo rounds
+        await expect(rows).toHaveCount(rounds.data.length + 1);
         await expect(figure.getByRole('rowheader', { name: /Q2 2026 \(in view\)/ })).toBeVisible();
         await expect(figure.getByRole('rowheader', { name: 'Q3 2025' })).toBeVisible();
     });

@@ -95,11 +95,12 @@ it('shares the shell status with every signed-in page: assessments and ODK sync'
     $this->actingAs($this->admin)->get('/dashboard/home')
         ->assertInertia(fn (Assert $page) => $page
             ->where('shell.assessments', 8) // seven Q2 visits and one Q1
-            ->where('shell.sync.state', 'not_connected')
+            ->where('shell.sync.state', 'not_configured')
             ->where('shell.quarantined', 0));
 });
 
 it('reads the sync state from the latest pull runs', function (array $runs, string $state): void {
+    config(['edqa.odk' => [...config('edqa.odk'), 'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'x', 'project_id' => '7', 'form_id' => 'dqa']]);
     foreach ($runs as [$minutesAgo, $outcome]) {
         DB::table('odk_pull_runs')->insert(['trigger_type' => 'scheduled', 'started_at' => now()->subMinutes($minutesAgo + 1),
             'finished_at' => $outcome === null ? null : now()->subMinutes($minutesAgo), 'outcome' => $outcome, 'error' => $outcome === 'failed' ? 'HTTP 503' : null]);

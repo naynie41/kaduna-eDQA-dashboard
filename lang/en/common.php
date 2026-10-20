@@ -47,11 +47,13 @@ return [
         'title' => ':page · :app',
     ],
     'sync' => [
-        'not_connected' => 'ODK Central not connected yet. The dashboard shows the data already loaded.',
+        'not_configured' => 'ODK Central is not configured, so no submissions are being pulled. The dashboard shows the data already loaded.',
+        'not_connected' => 'ODK Central is configured; no pull has finished yet. The dashboard shows the data already loaded.',
         'ok' => 'Last pull :minutes min ago · :assessments assessments · :quarantined in quarantine',
         'stale' => 'Last successful pull :minutes min ago, more than :limit minutes · :assessments assessments · :quarantined in quarantine',
-        'failed' => 'Last pull failed at :time (:error) · :assessments assessments · :quarantined in quarantine',
-        'failed_no_error' => 'Last pull failed at :time · :assessments assessments · :quarantined in quarantine',
+        'failed' => 'Last pull failed at :time (:error); last success :success · :assessments assessments · :quarantined in quarantine',
+        'failed_no_error' => 'Last pull failed at :time; last success :success · :assessments assessments · :quarantined in quarantine',
+        'never_succeeded' => 'never',
     ],
 
     // Pages outside the dashboard, for the top bar's title.

@@ -7,6 +7,7 @@ export type SyncStatusBarProps = {
 };
 
 const TONE: Record<SyncState, string> = {
+    not_configured: 'border-rule bg-paper text-ink-2',
     not_connected: 'border-rule bg-paper text-ink-2',
     ok: 'border-ok-bg bg-ok-bg text-ok',
     stale: 'border-warn-bg bg-warn-bg text-warn',
@@ -14,11 +15,12 @@ const TONE: Record<SyncState, string> = {
 };
 
 // A shape per state as well as a colour and the words (CLAUDE.md hard rule 11); decorative.
-const MARK: Record<SyncState, string> = { not_connected: '○', ok: '●', stale: '▲', failed: '■' };
+const MARK: Record<SyncState, string> = { not_configured: '○', not_connected: '○', ok: '●', stale: '▲', failed: '■' };
 
 /**
- * The ODK sync line above the top bar (ARCHITECTURE.md §9.1). Until Phase 2B connects ODK Central
- * it says so in the neutral style: nothing has failed.
+ * The ODK sync line above the top bar (ARCHITECTURE.md §9.1, D-54). The words always state the
+ * condition: not configured and waiting for the first pull in the neutral style (nothing has
+ * failed); healthy; stale past the limit; failed with when, the error's class and the last success.
  */
 export default function SyncStatusBar({ status }: SyncStatusBarProps) {
     const t = useTranslate();
@@ -29,6 +31,8 @@ export default function SyncStatusBar({ status }: SyncStatusBarProps) {
 
     const message = (() => {
         switch (sync.state) {
+            case 'not_configured':
+                return t('common.sync.not_configured');
             case 'not_connected':
                 return t('common.sync.not_connected');
             case 'ok':
@@ -36,11 +40,13 @@ export default function SyncStatusBar({ status }: SyncStatusBarProps) {
             case 'stale':
                 return t('common.sync.stale', { minutes, limit: sync.staleAfterMinutes, ...counts });
             case 'failed': {
-                const time = sync.lastFailedAt === null || months.length !== 12 ? '' : formatDateTime(sync.lastFailedAt, months);
+                const at = (value: string | null) => (value === null || months.length !== 12 ? '' : formatDateTime(value, months));
+                const time = at(sync.lastFailedAt);
+                const success = sync.lastSuccessAt === null ? t('common.sync.never_succeeded') : at(sync.lastSuccessAt);
 
-                return sync.lastError === null
-                    ? t('common.sync.failed_no_error', { time, ...counts })
-                    : t('common.sync.failed', { time, error: sync.lastError, ...counts });
+                return sync.lastErrorClass === null
+                    ? t('common.sync.failed_no_error', { time, success, ...counts })
+                    : t('common.sync.failed', { time, error: sync.lastErrorClass, success, ...counts });
             }
         }
     })();

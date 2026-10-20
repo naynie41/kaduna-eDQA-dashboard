@@ -45,6 +45,7 @@ final class PullSubmissionsJob implements ShouldQueue
     public function __construct(
         public readonly PullTrigger $trigger = PullTrigger::Scheduled,
         public readonly ?int $userId = null,
+        public readonly ?int $runId = null,
     ) {
         $this->onQueue('default');
     }
@@ -52,7 +53,7 @@ final class PullSubmissionsJob implements ShouldQueue
     public function handle(PullLock $lock, PullSubmissions $pull): void
     {
         try {
-            $lock->run(fn (): OdkPullRun => $pull->execute($this->trigger, $this->userId), (int) config('edqa.odk.pull.lock_wait_seconds', 600));
+            $lock->run(fn (): OdkPullRun => $pull->execute($this->trigger, $this->userId, $this->runId), (int) config('edqa.odk.pull.lock_wait_seconds', 600));
         } catch (LockTimeoutException) {
             $this->release(60);
         }
@@ -60,6 +61,13 @@ final class PullSubmissionsJob implements ShouldQueue
 
     public function failed(?Throwable $e): void
     {
+        // A run created when the pull was asked for, never reached (the lock stayed busy): close it.
+        if ($this->runId !== null) {
+            OdkPullRun::query()->whereKey($this->runId)->whereNull('finished_at')->update([
+                'outcome' => PullOutcome::Failed, 'finished_at' => now(),
+                'error' => $e === null ? 'Unknown failure' : PullSubmissions::describe($e),
+            ]);
+        }
         self::recordFailure($e);
     }
 

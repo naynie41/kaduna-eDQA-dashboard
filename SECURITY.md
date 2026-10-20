@@ -152,7 +152,7 @@ Plus:
 | Timeouts | Connect 10s, total 60s per page; retries with exponential backoff (3 attempts) |
 | Payload trust | ODK payloads are **untrusted input**. Parsed through the field map, validated, never `eval`'d, never rendered as HTML without escaping |
 | Deep links | Built from config base URL + instance ID; instance ID validated against `^uuid:[0-9a-f-]{36}$` |
-| Webhook | `POST /webhooks/odk` verifies an HMAC-SHA256 signature over the raw body with `ODK_WEBHOOK_SECRET` using `hash_equals`. Rejects on missing/invalid signature or timestamp older than 5 minutes. Rate limited. The webhook only **enqueues a pull** — it never writes the payload directly |
+| Webhook | `POST /webhooks/odk` verifies an HMAC-SHA256 signature over the raw body with `ODK_WEBHOOK_SECRET` using `hash_equals`. Rejects on missing/invalid signature or timestamp older than 5 minutes. Rate limited. The webhook only **enqueues a pull** — it never writes the payload directly. Built (D-54): off (404) without a secret; headers `X-Edqa-Timestamp` and `X-Edqa-Signature: sha256=<hex>` over `"{timestamp}.{raw body}"`; one queued pull a minute at most |
 | Writing back | The portal never writes to ODK Central or DHIS2 |
 
 ---

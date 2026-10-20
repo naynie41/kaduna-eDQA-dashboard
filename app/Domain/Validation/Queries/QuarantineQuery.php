@@ -37,6 +37,27 @@ final class QuarantineQuery
     }
 
     /**
+     * Open records per round, for the given rounds (GET /api/odk/status); a round with none is 0.
+     *
+     * @param  list<int>  $roundIds
+     * @return array<int, int> round ID => open records
+     */
+    public function openCountsByRound(array $roundIds): array
+    {
+        $counts = array_fill_keys($roundIds, 0);
+        if ($roundIds === []) {
+            return $counts;
+        }
+        $rows = QuarantinedRecord::query()->where('status', 'open')->whereIn('round_id', $roundIds)
+            ->groupBy('round_id')->selectRaw('round_id, COUNT(*) AS open')->get();
+        foreach ($rows as $row) {
+            $counts[(int) $row->getAttribute('round_id')] = (int) $row->getAttribute('open');
+        }
+
+        return $counts;
+    }
+
+    /**
      * Records per hard-failure code, most frequent first. A record failing two rules counts in
      * both groups.
      *
