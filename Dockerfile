@@ -135,6 +135,9 @@ FROM base AS dev
 COPY --from=composer-bin /usr/bin/composer /usr/bin/composer
 RUN install-php-extensions xdebug
 COPY docker/php/php.dev.ini /usr/local/etc/php/conf.d/zz-dev.ini
+# vendor/ is a named volume in compose.dev.yml: owned by the app user here, Docker gives a new volume
+# the same owner. /tmp/opcache holds OPcache's file cache (php.dev.ini).
+RUN mkdir -p /var/www/html/vendor /tmp/opcache && chown ${EDQA_UID}:${EDQA_GID} /var/www/html/vendor /tmp/opcache
 COPY docker/entrypoint.sh /usr/local/bin/edqa-entrypoint
 RUN chmod +x /usr/local/bin/edqa-entrypoint
 ENV XDEBUG_MODE=off \

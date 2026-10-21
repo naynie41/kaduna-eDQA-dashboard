@@ -14,7 +14,12 @@ x-php: &php
   env_file: [.env]
   environment:
     XDEBUG_MODE: "${XDEBUG_MODE:-off}"
-  volumes: [".:/var/www/html"]
+  volumes:
+    - .:/var/www/html
+    # Composer's packages in a volume, not through the bind mount: tens of thousands of files that
+    # PHP reads on every boot, slow across Docker Desktop's file sharing (Windows, macOS). `make up`
+    # installs into it; the host's own vendor/ (IDE, native tools) is separate.
+    - vendor:/var/www/html/vendor
   extra_hosts: ["host.docker.internal:host-gateway"]
 
 services:
@@ -119,3 +124,4 @@ services:
 volumes:
   pgdata: {}
   vite-node-modules: {}
+  vendor: {}

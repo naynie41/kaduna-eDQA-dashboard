@@ -1,4 +1,10 @@
-@import 'tailwindcss';
+/*
+ * Classes are found only where they are written: resources/js (components, pages) and
+ * resources/views. Tailwind's default scans the whole project, every file Git does not ignore
+ * (docs, tests, storage, discovery…), which through Docker Desktop's file sharing took ~40 s per
+ * CSS rebuild in dev. No class is built in PHP outside the views.
+ */
+@import 'tailwindcss' source(none);
 
 /* Self-hosted fonts (SECURITY.md §8, CONVENTION.md §6): no external host in the CSP. */
 @import '@fontsource/ibm-plex-sans/400.css';
@@ -8,6 +14,7 @@
 @import '@fontsource/archivo/600.css';
 @import '@fontsource/archivo/700.css';
 
+@source '../js';
 @source '../views';
 
 /*

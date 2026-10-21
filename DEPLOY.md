@@ -1092,6 +1092,18 @@ volumes: { pgdata: {} }
   PDFs).
 - macOS/Windows: bind-mount performance is acceptable with VirtioFS (Docker Desktop) or
   OrbStack; on Windows keep the repo inside WSL2.
+- `vendor/` is a named volume (`vendor`) for every PHP service, like the Vite service's
+  `node_modules`: PHP reads tens of thousands of package files on every boot, and through Docker
+  Desktop's file sharing from a Windows folder that cost ~6 s per `artisan` call and ~8 s per
+  request (0.4 s and 0.25 s with the volume). `make up` runs `composer install` into it; use
+  `make composer c="…"` to change packages. The host's own `vendor/` (IDE, native tools) is
+  separate and not used by the containers. The dev ini also keeps OPcache's file cache in the
+  container (`opcache.file_cache=/tmp/opcache`), so CLI processes (artisan, each parallel Pest
+  worker) share compiled scripts instead of recompiling the framework each time.
+- Tailwind reads only `resources/js` and `resources/views` for class names
+  (`@import 'tailwindcss' source(none)` in `resources/css/app.css`). Its default scans the whole
+  project, which over the bind mount made each first CSS build ~40 s, long enough to time out
+  Playwright's sign-in; now ~8 s cold. The built CSS is byte-for-byte the same.
 - Laravel Sail was considered and rejected: it uses its own image, which would break parity with
   production.
 

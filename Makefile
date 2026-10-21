@@ -16,7 +16,7 @@ help: ## List targets
 up: ## Start the dev stack (first run: .env, vendor, key, migrations)
 	@test -f .env || cp .env.example .env
 	$(COMPOSE) build app
-	@test -f vendor/autoload.php || $(RUNPHP) composer app install --no-interaction
+	$(RUNPHP) composer app install --no-interaction   # into the vendor volume; a no-op when up to date
 	@grep -q '^APP_KEY=base64:' .env || $(RUNPHP) php app artisan key:generate --no-interaction
 	$(COMPOSE) up -d --wait app web worker postgres redis mailpit
 	$(COMPOSE) up -d vite

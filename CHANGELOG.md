@@ -7,6 +7,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Dev stack speed: `vendor/` is now a named volume for the PHP services, and OPcache keeps a file
+  cache inside the container, so PHP no longer reads Composer's packages through Docker
+  Desktop's file sharing. On this Windows machine `artisan` went from ~6.7 s to ~0.4 s, a warm
+  page from ~8 s to ~0.25 s. `make up` installs into the volume; the host's `vendor/` is separate.
+  The test suite runs in ~96 s (was ~510 s), and `make check` fits in Composer's own timeout again.
+- Tailwind scans only `resources/js` and `resources/views` for classes, not the whole project:
+  the first dev CSS build went from ~42 s to ~8 s, and `make e2e` passes on the dev stack without
+  switching PHP to production settings. The built CSS is identical.
+
 ## [0.5.0] - 2026-10-20
 
 Phase 2B (ODK ingestion): step 8 of `CLAUDE.md` §6, built and proven against a local mock ODK
