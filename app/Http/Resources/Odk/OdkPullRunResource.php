@@ -27,6 +27,7 @@ final class OdkPullRunResource extends JsonResource
             'started_at' => $this->started_at->toIso8601String(),
             'finished_at' => $this->finished_at?->toIso8601String(),
             'fetched' => $this->fetched,
+            'parsed' => $this->parsed,
             'duplicates' => $this->duplicates,
             'accepted' => $this->accepted,
             'flagged' => $this->flagged,

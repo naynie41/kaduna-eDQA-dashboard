@@ -15,6 +15,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   open quarantine count ("Data issues, 12 open"), cached and refreshed when a record is
   quarantined or resolved. A banner on every admin page when a round is open and no pull has
   succeeded for 24 hours (SECURITY.md §12).
+- The ODK pull page (Phase 5 step 1, D-56): the connection in words (what is missing when not
+  configured, with the runbook; reachable or not; the last success, how long ago and when; the
+  last pull; each open round; the cursors; the last error, e.g. "ODK Central returned HTTP 503"),
+  Pull now with live progress (fetched, parsed, accepted, flagged, quarantined, already stored),
+  the pull history (filters, 25 a page), the backfill's status with a signed link to the newest
+  report, and the ODK facility file with its signed download.
+- `odk_pull_runs.parsed`: the rows each run stored and parsed.
+- `make e2e-odk`: Pull now end to end against the mock ODK Central, the stack put back after.
 - `ConfirmWithReasonDialog` for every reasoned action, `ProgressPanel` for queued work (polls with
   backoff, announces stage changes only), the `useApiAction` hook (CSRF, field and domain errors in
   words, disabled while sending) and `AdminTable`.

@@ -32,12 +32,12 @@ final class OdkPullRun extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'triggered_by', 'trigger_type', 'started_at', 'finished_at', 'fetched', 'accepted',
+        'triggered_by', 'trigger_type', 'started_at', 'finished_at', 'fetched', 'parsed', 'accepted',
         'flagged', 'quarantined', 'duplicates', 'error', 'outcome',
     ];
 
     /** Mirrors the column defaults, so a new model matches its stored row. */
-    protected $attributes = ['fetched' => 0, 'accepted' => 0, 'flagged' => 0, 'quarantined' => 0, 'duplicates' => 0];
+    protected $attributes = ['fetched' => 0, 'parsed' => 0, 'accepted' => 0, 'flagged' => 0, 'quarantined' => 0, 'duplicates' => 0];
 
     /** @return array<string, string> */
     protected function casts(): array
@@ -47,6 +47,7 @@ final class OdkPullRun extends Model
             'started_at' => 'immutable_datetime',
             'finished_at' => 'immutable_datetime',
             'fetched' => 'integer',
+            'parsed' => 'integer',
             'accepted' => 'integer',
             'flagged' => 'integer',
             'quarantined' => 'integer',

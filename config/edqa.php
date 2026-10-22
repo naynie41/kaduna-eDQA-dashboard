@@ -112,6 +112,12 @@ return [
         ],
     ],
 
+    // Where the project's documents (runbooks) are read, for links from the admin pages; null: no
+    // link, the page names the file instead.
+    'docs' => [
+        'base_url' => 'https://github.com/naynie41/kaduna-eDQA-dashboard/blob/main',
+    ],
+
     'heartbeats' => [
         // Pinged (GET) after each successful pull, for an external dead-man's switch; unset: skipped.
         'odk_pull' => env('HEARTBEAT_ODK_PULL_URL') ?: null,

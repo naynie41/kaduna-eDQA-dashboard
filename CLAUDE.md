@@ -150,6 +150,7 @@ make check                               # pint --test, phpstan, pest
 make test                                # pest --parallel against edqa_test (slow group excluded)
 make test-slow                           # the slow group: rescore of 2,200 assessments < 5 min; server p95 on ~44k
 make e2e                                 # Playwright + axe against the running dev stack (c="shell" to pick specs)
+make e2e-odk                             # Pull now end to end against the mock ODK Central (app and worker put back after)
 make size                                # bundle budget: first-visit gzipped JS < 300 KB
 make lighthouse                          # Lighthouse, Slow 3G, against a production build (stops and restarts vite)
 make npm c="test"                        # Vitest (also c="run typecheck", c="run lint")

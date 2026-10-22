@@ -1,0 +1,15 @@
+# For `make e2e-odk` only: the app and the worker talk to the mock ODK Central (docker/odk-mock),
+# so the ODK pull page's "Pull now" can be driven end to end. Plain http is accepted only with
+# ODK_ALLOW_INSECURE_LOCAL and APP_ENV=local (D-50). The mock's credentials are its own, written by
+# edqa:odk-mock:generate; nothing here is a real secret. The target puts the stack back without it.
+services:
+  app:
+    environment: &odk-mock
+      ODK_CENTRAL_URL: http://odk-mock:8080
+      ODK_CENTRAL_EMAIL: mock@odk.local
+      ODK_CENTRAL_PASSWORD: mock-password
+      ODK_PROJECT_ID: "1"
+      ODK_FORM_ID: dqa
+      ODK_ALLOW_INSECURE_LOCAL: "true"
+  worker:
+    environment: *odk-mock

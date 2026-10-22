@@ -93,6 +93,7 @@ final class ProcessSubmissionsPage
 
             $run->update([
                 'fetched' => $run->fetched + count($rows),
+                'parsed' => $run->parsed + count($batch),
                 'duplicates' => $run->duplicates + count($rows) - count($inserted),
                 'accepted' => $run->accepted + $counts[SubmissionStatus::Accepted->value],
                 'flagged' => $run->flagged + $counts[SubmissionStatus::Flagged->value],

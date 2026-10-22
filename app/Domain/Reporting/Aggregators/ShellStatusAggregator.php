@@ -29,7 +29,7 @@ final class ShellStatusAggregator
     ) {}
 
     /**
-     * @return array{state: string, lastSuccessAt: ?string, minutesSinceSuccess: ?int, lastFailedAt: ?string, lastError: ?string, lastErrorClass: ?string, staleAfterMinutes: int}
+     * @return array{state: string, lastSuccessAt: ?string, minutesSinceSuccess: ?int, sinceSuccess: ?array{value: int, unit: string}, lastFailedAt: ?string, lastError: ?string, lastErrorClass: ?string, lastErrorHttpStatus: ?int, staleAfterMinutes: int}
      */
     public function sync(): array
     {
@@ -55,12 +55,31 @@ final class ShellStatusAggregator
             'state' => $state,
             'lastSuccessAt' => $lastSuccess?->toIso8601String(),
             'minutesSinceSuccess' => $minutes,
+            'sinceSuccess' => self::since($minutes),
             'lastFailedAt' => $failed ? CarbonImmutable::parse((string) $latest->finished_at)->toIso8601String() : null,
             'lastError' => $error,
             // PullSubmissions::describe() writes "Class: message"; the bar names the class.
             'lastErrorClass' => $error === null ? null : (preg_match('/^([A-Za-z]+):/', $error, $m) === 1 ? $m[1] : null),
+            // OdkUnreachable and OdkUnexpectedResponse name the status in their message ("HTTP 503").
+            'lastErrorHttpStatus' => $error !== null && preg_match('/\bHTTP (\d{3})\b/', $error, $h) === 1 ? (int) $h[1] : null,
             'staleAfterMinutes' => $this->staleAfter,
         ];
+    }
+
+    /**
+     * Time since the last success in its largest whole unit ("4 minutes", "3 hours", "2 days"),
+     * for words on the ODK pull page: the rounding happens here, never in the browser.
+     *
+     * @return array{value: int, unit: string}|null
+     */
+    private static function since(?int $minutes): ?array
+    {
+        return match (true) {
+            $minutes === null => null,
+            $minutes < 60 => ['value' => $minutes, 'unit' => 'minutes'],
+            $minutes < 48 * 60 => ['value' => intdiv($minutes, 60), 'unit' => 'hours'],
+            default => ['value' => intdiv($minutes, 24 * 60), 'unit' => 'days'],
+        };
     }
 
     /**

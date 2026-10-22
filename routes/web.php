@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\AdminOdkController;
 use App\Http\Controllers\Attachments\ShowAttachmentController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
 use App\Http\Controllers\Dashboard;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Dashboard\DashboardRedirectController;
 use App\Http\Controllers\DevComponentsController;
 use App\Http\Controllers\Facilities\CascadeExportController;
 use App\Http\Controllers\Facilities\FacilityDetailController;
+use App\Http\Controllers\Odk\BackfillReportDownloadController;
 use App\Http\Controllers\Odk\OdkPullController;
 use App\Http\Controllers\Odk\OdkStatusController;
 use App\Http\Controllers\OdkWebhookController;
@@ -61,7 +63,7 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
     // each a placeholder until its Phase 5 step builds it.
     Route::redirect('admin', '/admin/odk')->name('admin');
     Route::prefix('admin')->name('admin.')->group(function (): void {
-        Route::inertia('odk', 'admin/odk')->name('odk');
+        Route::get('odk', AdminOdkController::class)->name('odk');
         Route::inertia('data-issues', 'admin/data-issues')->name('data-issues');
         Route::inertia('rounds', 'admin/rounds')->name('rounds');
         Route::inertia('facilities', 'admin/facilities')->name('facilities');
@@ -88,6 +90,8 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
         Route::post('odk/pull', [OdkPullController::class, 'store'])->middleware('throttle:odk-pull')->name('odk.pull.store');
         Route::get('odk/pull/{run}', [OdkPullController::class, 'show'])->whereNumber('run')->name('odk.pull.show');
         Route::get('odk/status', OdkStatusController::class)->name('odk.status');
+        Route::get('odk/backfill-report/{file}', BackfillReportDownloadController::class)
+            ->middleware('signed')->where('file', '[A-Za-z0-9.-]+')->name('odk.backfill-report');
 
         // The ODK cascading-select media (§5.1): generated on request, fetched through a signed link.
         Route::post('facility-list/export-cascade', [CascadeExportController::class, 'store'])->name('facility-list.cascade.store');

@@ -239,7 +239,7 @@ it('shows a run\'s progress, and 404 for one that does not exist', function (): 
 
     $this->actingAs($this->admin)->getJson("/api/odk/pull/{$run->id}")->assertOk()->assertExactJson(['data' => [
         'run_id' => $run->id, 'trigger' => 'manual', 'status' => 'running', 'started_at' => $run->started_at->toIso8601String(), 'finished_at' => null,
-        'fetched' => 500, 'duplicates' => 3, 'accepted' => 480, 'flagged' => 7, 'quarantined' => 10, 'error' => null,
+        'fetched' => 500, 'parsed' => 0, 'duplicates' => 3, 'accepted' => 480, 'flagged' => 7, 'quarantined' => 10, 'error' => null,
     ]]);
     $run->update(['outcome' => PullOutcome::Failed, 'finished_at' => now(), 'error' => 'OdkUnreachable: ODK Central could not be reached']);
     $this->actingAs($this->admin)->getJson("/api/odk/pull/{$run->id}")->assertJsonPath('data.status', 'failed')->assertJsonPath('data.error', 'OdkUnreachable: ODK Central could not be reached');

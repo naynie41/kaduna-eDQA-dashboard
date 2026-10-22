@@ -155,3 +155,7 @@ it('records each file of a submission once', function (): void {
 
     expectUniqueViolation(fn () => DB::table('odk_attachments')->insert(['submission_id' => $submission, 'filename' => 'a.png', 'status' => 'pending']), 'odk_attachments_submission_id_filename_unique');
 });
+
+it('rejects a negative parsed count on a pull run', function (): void {
+    expectCheckViolation(fn () => Rows::pullRun(['parsed' => -1]), 'odk_pull_runs_parsed_nonnegative');
+});

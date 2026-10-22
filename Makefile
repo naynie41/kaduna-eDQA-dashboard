@@ -8,7 +8,7 @@ APP_DB_USER     := edqa_app
 APP_DB_PASSWORD := edqa_app_dev
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e size lighthouse odk-mock-up odk-mock-seed
+.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e e2e-odk size lighthouse odk-mock-up odk-mock-seed
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-13s %s\n", $$1, $$2}'
@@ -77,6 +77,15 @@ grants-check: ## Prove the least-privilege grants: tests/Grants act as edqa_app 
 e2e: ## Playwright against the running dev stack (seeds the local e2e admin first)
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
 	$(COMPOSE) --profile e2e run --rm playwright $(c)
+
+e2e-odk: ## Playwright against the mock ODK Central: Pull now end to end (tests/e2e/odk-pull.spec.ts); the stack is put back after
+	$(COMPOSE) --profile odk up -d odk-mock
+	$(EXEC) php artisan edqa:odk-mock:generate --count=20 --broken=2 --seed=$$(date +%s)
+	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
+	$(COMPOSE) -f compose.e2e-odk.yml up -d --wait app worker
+	@# --no-deps: run would otherwise recreate app (a dependency of web) without the override.
+	$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_ODK=1 playwright tests/e2e/odk-pull.spec.ts $(c); status=$$?; \
+		$(COMPOSE) up -d --wait app worker; exit $$status
 
 odk-mock-up: ## Start the mock ODK Central (odk-mock:8080 in the stack, 127.0.0.1:8090 on the host)
 	$(COMPOSE) --profile odk up -d odk-mock
