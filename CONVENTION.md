@@ -239,7 +239,9 @@ Strong/Acceptable → ok, Review → warn, Needs action → bad. Always render t
 `AppShell`, `Rail`, `SyncStatusBar`, `TopBar`, `FilterBar`, `Tabs`, `Panel`, `SegmentedControl`,
 `ScoreTag`, `StatusLabel`, `HeatCell`, `DimensionBar`, `OwnerSplit`, `LgaTile`, `RankedBars`,
 `TrendChart`, `MonthGroupChart`, `DataTable`, `Drawer`, `Toast`, `ConfirmWithReasonDialog`,
-`EmptyState`, `Skeleton`.
+`EmptyState`, `Skeleton`. Administration (D-55): `AdminTabs`, `AdminTable` (DataTable + server
+pagination), `ProgressPanel` (queued work), `StaleIngestionBanner`, and the `useApiAction` hook
+for every write.
 
 `ConfirmWithReasonDialog` is mandatory for: reject quarantine, override flag, correct assessment,
 reopen round, publish rule version, deactivate facility.

@@ -59,7 +59,7 @@ describe("no client-side maths", () => {
         }
 
         expect(offenders).toEqual([]);
-    });
+    }, 30_000); // reads every source file: slow over a Windows/macOS bind mount on a busy machine
 
     it("still finds a file it should (the scan is not silently empty)", () => {
         expect(

@@ -27,6 +27,10 @@ return [
         // ARCHITECTURE.md §9.1: the sync status bar turns amber when the last successful ODK
         // pull is older than this.
         'stale_after_minutes' => 30,
+
+        // SECURITY.md §12: no successful pull for this long while a round is open puts a banner on
+        // every admin page.
+        'banner_after_hours' => 24,
     ],
 
     'rounds' => [

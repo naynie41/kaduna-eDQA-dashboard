@@ -8,6 +8,7 @@ use App\Domain\Facility\Models\Lga;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -30,10 +31,28 @@ final class QuarantineQuery
         return $this->filtered($filters)->orderByDesc('id')->paginate(self::PER_PAGE);
     }
 
-    /** Records still waiting for an administrator: the shell's "N in quarantine". */
+    /** Records still waiting for an administrator, counted now. */
     public function openCount(): int
     {
         return QuarantinedRecord::query()->where('status', 'open')->count();
+    }
+
+    /** The cache key of openCountCached(). */
+    public const OPEN_COUNT_KEY = 'edqa:quarantine:open-count';
+
+    /**
+     * The open count for every page (the shell's "N in quarantine", the Data issues badge), cached:
+     * FlushOpenQuarantineCount forgets it when a record is quarantined or resolved, and it lapses
+     * after 60 s in any case, so a change made another way shows within a minute.
+     */
+    public function openCountCached(): int
+    {
+        return (int) Cache::remember(self::OPEN_COUNT_KEY, 60, fn (): int => $this->openCount());
+    }
+
+    public static function forgetOpenCount(): void
+    {
+        Cache::forget(self::OPEN_COUNT_KEY);
     }
 
     /**

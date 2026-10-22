@@ -52,7 +52,12 @@ final class HandleInertiaRequests extends Middleware
             'shell' => fn (): ?array => $user === null ? null : [
                 'assessments' => app(ShellStatusAggregator::class)->assessments(),
                 'sync' => app(ShellStatusAggregator::class)->sync(),
-                'quarantined' => app(QuarantineQuery::class)->openCount(),
+                'quarantined' => app(QuarantineQuery::class)->openCountCached(),
+            ],
+            // The admin pages' tab badge and stale-ingestion banner (ARCHITECTURE.md §9.3, D-55).
+            'admin' => fn (): ?array => $user === null || ! $request->routeIs('admin.*') ? null : [
+                'openQuarantineCount' => app(QuarantineQuery::class)->openCountCached(),
+                'staleIngestion' => app(ShellStatusAggregator::class)->staleIngestion(),
             ],
             // UI strings, read in React with t() (CONVENTION.md §7, CLAUDE.md hard rule 10).
             'translations' => fn (): array => collect([...self::TRANSLATION_GROUPS, ...$this->pageGroups($request)])
@@ -74,6 +79,7 @@ final class HandleInertiaRequests extends Middleware
         return match (true) {
             $request->routeIs('dev.*') => ['dev', 'enums'],
             $request->routeIs('dashboard.*') => ['enums'],
+            $request->routeIs('admin.*') => ['admin', 'enums'],
             default => [],
         };
     }

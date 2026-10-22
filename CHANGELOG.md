@@ -7,6 +7,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The administration shell (Phase 5 step 0, D-55): `/admin` opens the ODK pull page; tabs for
+  ODK pull, Data issues, Rounds, Facility list and Scoring rules (placeholders until each is
+  built), in place of the dashboard filters; the status bar stays. The Data issues tab shows the
+  open quarantine count ("Data issues, 12 open"), cached and refreshed when a record is
+  quarantined or resolved. A banner on every admin page when a round is open and no pull has
+  succeeded for 24 hours (SECURITY.md §12).
+- `ConfirmWithReasonDialog` for every reasoned action, `ProgressPanel` for queued work (polls with
+  backoff, announces stage changes only), the `useApiAction` hook (CSRF, field and domain errors in
+  words, disabled while sending) and `AdminTable`.
+
 ### Changed
 
 - Dev stack speed: `vendor/` is now a named volume for the PHP services, and OPcache keeps a file

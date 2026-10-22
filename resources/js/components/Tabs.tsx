@@ -7,6 +7,8 @@ export type TabItem = {
     current: boolean;
     /** A count beside the label; `label` is what a screen reader hears for it. */
     badge?: { text: string; label?: string; tone?: 'default' | 'alert' };
+    /** The link's whole accessible name, when label and badge should read as one ("Data issues, 12 open"). */
+    accessibleName?: string;
 };
 
 export type TabsProps = {
@@ -28,6 +30,7 @@ export default function Tabs({ label, items }: TabsProps) {
                         <Link
                             href={item.href}
                             aria-current={item.current ? 'page' : undefined}
+                            aria-label={item.accessibleName}
                             className={`inline-flex items-center rounded-t-[5px] border-b-[2.5px] px-3 pt-2 pb-2.5 text-[13.5px] whitespace-nowrap forced-colors:forced-color-adjust-none forced-colors:bg-[Canvas] forced-colors:text-[LinkText] ${
                                 item.current ? 'border-deep font-semibold text-deep forced-colors:border-[Highlight]' : 'border-transparent text-ink-2 hover:bg-paper hover:text-ink'
                             }`}

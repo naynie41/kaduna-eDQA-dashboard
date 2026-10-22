@@ -20,6 +20,8 @@ use App\Domain\Scoring\Events\RuleVersionPublished;
 use App\Domain\Scoring\Listeners\RescoreAfterAssessmentCorrected;
 use App\Domain\Scoring\Listeners\RescoreOpenRoundsAfterPublish;
 use App\Domain\Validation\Events\QuarantineResolved;
+use App\Domain\Validation\Events\SubmissionQuarantined;
+use App\Domain\Validation\Listeners\FlushOpenQuarantineCount;
 use App\Domain\Validation\Listeners\RescoreAfterQuarantineResolved;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -60,6 +62,7 @@ final class AppServiceProvider extends ServiceProvider
 
         // Domain listeners live outside app/Listeners, so they are registered here.
         Event::listen(QuarantineResolved::class, RescoreAfterQuarantineResolved::class);
+        Event::listen([SubmissionQuarantined::class, QuarantineResolved::class], FlushOpenQuarantineCount::class);
         Event::listen(RuleVersionPublished::class, RescoreOpenRoundsAfterPublish::class);
         Event::listen(AssessmentCorrected::class, RescoreAfterAssessmentCorrected::class);
 

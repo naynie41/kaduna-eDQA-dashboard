@@ -1,14 +1,16 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Head, usePage } from '@inertiajs/react';
+import AdminTabs from '@/components/AdminTabs';
 import DashboardTabs from '@/components/DashboardTabs';
 import FilterBar from '@/components/FilterBar';
 import Rail from '@/components/Rail';
+import StaleIngestionBanner from '@/components/StaleIngestionBanner';
 import SyncStatusBar from '@/components/SyncStatusBar';
 import TopBar from '@/components/TopBar';
 import PageProviders from '@/layouts/PageProviders';
 import { formatCount } from '@/lib/format';
 import { useTranslate } from '@/lib/i18n';
-import { DASHBOARD_PAGES, pageMeta } from '@/lib/pageMeta';
+import { ADMIN_PAGES, DASHBOARD_PAGES, pageMeta } from '@/lib/pageMeta';
 
 export type AppShellProps = {
     children: ReactNode;
@@ -16,7 +18,9 @@ export type AppShellProps = {
 
 /**
  * Every signed-in page (ARCHITECTURE.md §9.1): skip link, rail, ODK status, the sticky top bar
- * (title, subtitle, and on dashboard pages the filters and tabs), then <main id="main">.
+ * (title, subtitle, and on dashboard pages the filters and tabs; on admin pages the admin tabs,
+ * never the dashboard's filters, which admin pages replace with their own), then <main id="main">,
+ * which on admin pages opens with the stale-ingestion banner when it applies (SECURITY.md §12).
  */
 export default function AppShell({ children }: AppShellProps) {
     return (
@@ -35,6 +39,8 @@ function Shell({ children }: AppShellProps) {
     const facilities = props.summary === undefined ? 0 : props.summary.facilities;
     const subtitle = meta?.subtitle === undefined ? null : t(meta.subtitle, { count: formatCount(facilities) });
     const dashboardPage = DASHBOARD_PAGES.find((page) => component === `dashboard/${page}`) ?? null;
+    const adminPage = ADMIN_PAGES.find(({ page }) => component === `admin/${page}`)?.page ?? null;
+    const admin = props.admin ?? null;
 
     // A new page moves focus to its h1 (a screen reader hears where it landed); a filter change
     // reloads the same page and leaves focus on the select.
@@ -89,8 +95,10 @@ function Shell({ children }: AppShellProps) {
                             <DashboardTabs current={dashboardPage} filters={props.filters} lgaCount={props.summary?.lgas ?? 0} />
                         </>
                     )}
+                    {adminPage !== null && admin !== null && <AdminTabs current={adminPage} openQuarantineCount={admin.openQuarantineCount} />}
                 </TopBar>
                 <main id="main" tabIndex={-1} className="w-full max-w-[1280px] px-4 pt-5 pb-14 rail:px-6.5">
+                    {adminPage !== null && admin !== null && <StaleIngestionBanner stale={admin.staleIngestion} />}
                     {children}
                 </main>
             </div>

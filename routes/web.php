@@ -57,8 +57,16 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
         Route::get('plan', Dashboard\PlanController::class)->name('plan');
     });
 
-    // Administration (ARCHITECTURE.md §9.3): a landing page until its five pages arrive (Phase 5).
-    Route::inertia('admin', 'admin/index')->name('admin');
+    // Administration (ARCHITECTURE.md §9.3, D-55): /admin opens the ODK pull page. The five pages,
+    // each a placeholder until its Phase 5 step builds it.
+    Route::redirect('admin', '/admin/odk')->name('admin');
+    Route::prefix('admin')->name('admin.')->group(function (): void {
+        Route::inertia('odk', 'admin/odk')->name('odk');
+        Route::inertia('data-issues', 'admin/data-issues')->name('data-issues');
+        Route::inertia('rounds', 'admin/rounds')->name('rounds');
+        Route::inertia('facilities', 'admin/facilities')->name('facilities');
+        Route::inertia('scoring-rules', 'admin/scoring-rules')->name('scoring-rules');
+    });
 
     // Component gallery for design review; 404 outside the local environment.
     Route::get('dev/components', DevComponentsController::class)->name('dev.components');

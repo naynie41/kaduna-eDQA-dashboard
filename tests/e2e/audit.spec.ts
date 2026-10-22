@@ -21,7 +21,11 @@ const PAGES: { name: string; path: string; heading: string }[] = [
     { name: 'monitor', path: `/dashboard/monitor?${Q}`, heading: 'Monitor' },
     { name: 'visuals', path: `/dashboard/visuals?${Q}`, heading: 'Visuals' },
     { name: 'plan', path: `/dashboard/plan?${Q}`, heading: 'Implementation plan' },
-    { name: 'admin', path: '/admin', heading: 'Administration' },
+    { name: 'admin-odk', path: '/admin', heading: 'ODK pull' }, // /admin opens the ODK pull page
+    { name: 'admin-data-issues', path: '/admin/data-issues', heading: 'Data issues' },
+    { name: 'admin-rounds', path: '/admin/rounds', heading: 'Rounds' },
+    { name: 'admin-facilities', path: '/admin/facilities', heading: 'Facility list' },
+    { name: 'admin-scoring-rules', path: '/admin/scoring-rules', heading: 'Scoring rules' },
     { name: 'security', path: '/settings/security', heading: 'Security' },
 ];
 

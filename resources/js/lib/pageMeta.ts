@@ -15,7 +15,11 @@ const META: Record<string, PageMeta> = {
     'dashboard/monitor': { title: 'dashboard.pages.monitor.title', subtitle: 'dashboard.pages.monitor.subtitle', dashboard: true },
     'dashboard/visuals': { title: 'dashboard.pages.visuals.title', subtitle: 'dashboard.pages.visuals.subtitle', dashboard: true },
     'dashboard/plan': { title: 'dashboard.pages.plan.title', subtitle: 'dashboard.pages.plan.subtitle', dashboard: true },
-    'admin/index': { title: 'common.pages.admin.title', subtitle: 'common.pages.admin.subtitle', dashboard: false },
+    'admin/odk': { title: 'admin.pages.odk.title', subtitle: 'admin.pages.odk.subtitle', dashboard: false },
+    'admin/data-issues': { title: 'admin.pages.data_issues.title', subtitle: 'admin.pages.data_issues.subtitle', dashboard: false },
+    'admin/rounds': { title: 'admin.pages.rounds.title', subtitle: 'admin.pages.rounds.subtitle', dashboard: false },
+    'admin/facilities': { title: 'admin.pages.facilities.title', subtitle: 'admin.pages.facilities.subtitle', dashboard: false },
+    'admin/scoring-rules': { title: 'admin.pages.scoring_rules.title', subtitle: 'admin.pages.scoring_rules.subtitle', dashboard: false },
     'settings/security': { title: 'auth.settings.title', dashboard: false },
     'dev/components': { title: 'common.pages.dev.title', dashboard: false },
 };
@@ -23,6 +27,17 @@ const META: Record<string, PageMeta> = {
 export function pageMeta(component: string): PageMeta | null {
     return META[component] ?? null;
 }
+
+/** The administration pages in tab order (ARCHITECTURE.md §9.3): path segment and lang key. */
+export const ADMIN_PAGES = [
+    { page: 'odk', key: 'odk' },
+    { page: 'data-issues', key: 'data_issues' },
+    { page: 'rounds', key: 'rounds' },
+    { page: 'facilities', key: 'facilities' },
+    { page: 'scoring-rules', key: 'scoring_rules' },
+] as const;
+
+export type AdminPage = (typeof ADMIN_PAGES)[number]['page'];
 
 /** The dashboard pages in tab order. */
 export const DASHBOARD_PAGES = ['home', 'facility', 'lga', 'monitor', 'visuals', 'plan'] as const;

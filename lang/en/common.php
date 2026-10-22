@@ -23,6 +23,28 @@ return [
         'show_table' => 'Show as table',
         'show_chart' => 'Show as chart',
         'scroll_region' => ':label, scrollable',
+        'cancel' => 'Cancel',
+        'close' => 'Close',
+        'working' => 'Working…',
+    ],
+    // ConfirmWithReasonDialog (CONVENTION.md §6): every reasoned action.
+    'reason' => [
+        'label' => 'Reason',
+        'hint' => 'At least :min characters. It is kept in the audit log with your name.',
+        'remaining' => ':count more characters needed.',
+    ],
+    // ProgressPanel: queued work (a pull, a rescore, an export).
+    'progress' => [
+        'stage' => ':label: :stage',
+        'failed' => 'Could not get the progress. It will be tried again.',
+    ],
+    // useApiAction: what an answer that is not 2xx says when the server gives no message.
+    'api' => [
+        'error' => 'Something went wrong. Try again, or reload the page.',
+        'forbidden' => 'Your session has ended or this action is not allowed. Reload the page and sign in again.',
+        'too_many' => 'Too many requests. Wait a minute and try again.',
+        'invalid' => 'Some fields need attention.',
+        'conflict' => 'This could not be done as things stand.',
     ],
     'nav' => [
         'label' => 'Main',
@@ -58,11 +80,6 @@ return [
 
     // Pages outside the dashboard, for the top bar's title.
     'pages' => [
-        'admin' => [
-            'title' => 'Administration',
-            'subtitle' => 'ODK pull, data issues, rounds, the facility list and scoring rules.',
-            'placeholder' => 'The administration pages arrive in Phase 5. Rounds, rescores and scoring rules already work through the API.',
-        ],
         'dev' => [
             'title' => 'Components',
         ],

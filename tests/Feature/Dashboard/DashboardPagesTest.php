@@ -107,7 +107,7 @@ it('reads the sync state from the latest pull runs', function (array $runs, stri
     }
     Rows::quarantined();
 
-    $this->actingAs($this->admin)->get('/admin')
+    $this->actingAs($this->admin)->get('/admin/odk')
         ->assertInertia(fn (Assert $page) => $page
             ->where('shell.sync.state', $state)
             ->where('shell.quarantined', 1));
@@ -118,8 +118,6 @@ it('reads the sync state from the latest pull runs', function (array $runs, stri
     'running after a success' => [[[10, 'succeeded'], [0, null]], 'ok'],
 ]);
 
-it('has an Administration landing page', function (): void {
-    $this->actingAs($this->admin)->get('/admin')
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('admin/index'));
+it('opens Administration on the ODK pull page', function (): void {
+    $this->actingAs($this->admin)->get('/admin')->assertRedirect('/admin/odk');
 });

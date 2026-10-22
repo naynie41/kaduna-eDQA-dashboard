@@ -9,6 +9,17 @@ export type PaginationProps = {
     to: number;
     total: number;
     onPage: (page: number) => void;
+    /** What the rows are, for another table than the Facility view's (AdminTable). */
+    labels?: PaginationLabels;
+};
+
+export type PaginationLabels = {
+    /** "Showing 1–50 of 312 records", from the formatted figures. */
+    showing: (figures: { from: string; to: string; total: string }) => string;
+    /** No rows at all. */
+    none: string;
+    /** Names the page navigation, e.g. "Record pages". */
+    nav: string;
 };
 
 /** The page numbers to offer: first, last, and the current one with its neighbours. */
@@ -39,6 +50,7 @@ export default function Pagination({
     to,
     total,
     onPage,
+    labels,
 }: PaginationProps) {
     const t = useTranslate();
 
@@ -50,15 +62,15 @@ export default function Pagination({
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
             <p className="text-[12.5px] text-ink-2">
                 {from === 0
-                    ? t("dashboard.facility.showing_none")
-                    : t("dashboard.facility.showing", {
+                    ? (labels?.none ?? t("dashboard.facility.showing_none"))
+                    : (labels?.showing ?? ((figures) => t("dashboard.facility.showing", figures)))({
                           from: formatCount(from),
                           to: formatCount(to),
                           total: formatCount(total),
                       })}
             </p>
             {lastPage > 1 && (
-                <nav aria-label={t("dashboard.facility.pages")}>
+                <nav aria-label={labels?.nav ?? t("dashboard.facility.pages")}>
                     <ul className="flex flex-wrap items-center gap-1">
                         <li>
                             <button
