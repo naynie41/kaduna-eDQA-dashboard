@@ -5,8 +5,8 @@ read from it, and what validation must then decide. Each case is three files wit
 
 | File | What it is |
 |---|---|
-| `odk/{valid,broken}/<name>.json` | One entry of an ODK Central OData Submissions response (`GET …/forms/{form}.svc/Submissions`): `__id`, `__system` (submissionDate, updatedAt, submitterId, submitterName, attachmentsPresent, attachmentsExpected, status, reviewState, deviceId, edits, formVersion), `meta.instanceID`, groups as nested objects, scored questions inside their dimension group |
-| `parsed/{valid,broken}/<name>.json` | `ParsedSubmission::toArray()` of that entry, exactly |
+| `sources/odk/{valid,broken}/<name>.json` | One entry of an ODK Central OData Submissions response (`GET …/forms/{form}.svc/Submissions`): `__id`, `__system` (submissionDate, updatedAt, submitterId, submitterName, attachmentsPresent, attachmentsExpected, status, reviewState, deviceId, edits, formVersion), `meta.instanceID`, groups as nested objects, scored questions inside their dimension group |
+| `parsed/{valid,broken}/<name>.json` | `ParsedSubmission::toArray()` of that entry, exactly (with `source` and `external_id`, its `__id`) |
 | `parsed/{valid,broken}/<name>.expected.json` | The outcome: `status` (`accepted`, `flagged` or `quarantined`) and `codes`, in rule order |
 
 **Checked against the ODK Central OData docs (October 2026):**
@@ -21,7 +21,8 @@ read from it, and what validation must then decide. Each case is three files wit
 
 `tests/Feature/Ingestion/OdkFixturesTest.php` checks three things for every case:
 
-1. `SubmissionParser::parse(raw)->toArray()` equals the parsed fixture.
+1. The raw entry through ODK's normaliser and then the parser (`OdkPayloadNormalizer`, then
+   `SubmissionParser::parse(envelope)`, as the pipeline reads it) equals the parsed fixture.
 2. The parsed fixture round-trips through `ParsedSubmission`.
 3. Run through the parser and `ProcessParsedBatch` against `FixtureWorld`, the case ends with
    exactly its expected outcome.

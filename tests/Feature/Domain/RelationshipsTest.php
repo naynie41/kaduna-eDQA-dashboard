@@ -8,9 +8,9 @@ use App\Domain\Assessment\Models\ItemResponse;
 use App\Domain\Facility\Models\Facility;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Facility\Models\Ward;
-use App\Domain\Ingestion\Models\OdkAttachment;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 use App\Domain\Plan\Models\PlanAction;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
@@ -59,7 +59,7 @@ it('links a quarantined record to its submission, round and resolver', function 
 it('links a superseded submission to its replacement, and attachments to a submission', function (): void {
     $replacement = Submission::factory()->create();
     $old = Submission::factory()->create(['superseded_by_id' => $replacement->id]);
-    $attachment = OdkAttachment::factory()->create(['submission_id' => $replacement->id]);
+    $attachment = SubmissionAttachment::factory()->create(['submission_id' => $replacement->id]);
 
     expect($old->supersededBy->is($replacement))->toBeTrue()
         ->and($attachment->submission->is($replacement))->toBeTrue()
@@ -69,7 +69,7 @@ it('links a superseded submission to its replacement, and attachments to a submi
 it('links plan actions, rule versions and pull runs to their owners', function (): void {
     $action = PlanAction::factory()->create();
     $version = ScoringRuleVersion::factory()->create();
-    $run = OdkPullRun::factory()->create(['triggered_by' => User::factory()]);
+    $run = PullRun::factory()->create(['triggered_by' => User::factory()]);
 
     expect($action->round)->toBeInstanceOf(Round::class)
         ->and($action->lga)->toBeInstanceOf(Lga::class)

@@ -1,4 +1,6 @@
 {
+    "source": "odk",
+    "external_id": "uuid:fx-twelve-minute-visit",
     "instance_id": "uuid:fx-twelve-minute-visit",
     "deprecated_id": null,
     "form_version": "2026.1",

@@ -9,6 +9,7 @@ use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Ingestion\DTOs\ProcessOutcome;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Enums\Dimension;
 use Carbon\CarbonImmutable;
@@ -27,6 +28,7 @@ final class SendDemoRowToQuarantine
 
     public function __construct(
         private readonly ProcessParsedBatch $process,
+        private readonly SourceRegistry $sources,
     ) {}
 
     /** The outcome; null when the row is already held. */
@@ -45,9 +47,11 @@ final class SendDemoRowToQuarantine
         $endedAt = $startedAt->addMinutes(45);
 
         $parsed = new ParsedSubmission(
+            source: 'odk',
+            externalId: self::INSTANCE_ID,
             instanceId: self::INSTANCE_ID,
             deprecatedId: null,
-            formVersion: (string) config('edqa_field_maps.default'),
+            formVersion: (string) config('edqa_field_maps.current.odk'),
             formVersionKnown: true,
             submittedAt: $endedAt->addMinutes(5),
             startedAt: $startedAt,
@@ -68,8 +72,10 @@ final class SendDemoRowToQuarantine
 
         // The raw record as ODK would hold it: kept verbatim, never edited (hard rule 8).
         $submission = Submission::query()->create([
+            'source_id' => $this->sources->id('odk'),
+            'external_id' => self::INSTANCE_ID,
             'instance_id' => self::INSTANCE_ID,
-            'form_id' => 'dqa',
+            'form_ref' => 'dqa',
             'form_version' => $parsed->formVersion,
             'payload' => [
                 'facility' => ['lga' => null, 'ward' => 'Quarterly', 'facility_code' => '2019.00'],

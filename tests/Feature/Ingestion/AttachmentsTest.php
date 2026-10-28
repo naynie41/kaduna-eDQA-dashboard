@@ -11,8 +11,8 @@ use App\Domain\Ingestion\Enums\AttachmentStatus;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Exceptions\OdkUnreachable;
 use App\Domain\Ingestion\Jobs\FetchAttachmentsJob;
-use App\Domain\Ingestion\Models\OdkAttachment;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 use App\Domain\Scoring\CurrentRuleVersion;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -38,10 +38,10 @@ beforeEach(function (): void {
     foreach (range(1, 5) as $n) {
         Rows::facility(['code' => sprintf('FX-3%03d', $n), 'name' => "Attachment facility {$n}", 'lga_id' => $chikun, 'ward_id' => $kujama]);
     }
-    config(['edqa.odk' => [...config('edqa.odk'),
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'),
         'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'secret-for-tests', 'project_id' => '7', 'form_id' => 'dqa', 'page_size' => 10,
     ]]);
-    Storage::fake('odk');
+    Storage::fake('attachments');
     $this->source = new FakeSubmissionSource;
     app()->instance(SubmissionSource::class, $this->source);
     $this->admin = User::factory()->withTwoFactor()->create();
@@ -55,7 +55,7 @@ beforeEach(function (): void {
  */
 function attEntry(object $test, int $n, array $files = []): array
 {
-    $entry = json_decode((string) file_get_contents(base_path('tests/Fixtures/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
+    $entry = json_decode((string) file_get_contents(base_path('tests/Fixtures/sources/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
     $entry['__id'] = $entry['meta']['instanceID'] = "uuid:att-{$n}";
     $entry['__system']['submissionDate'] = CarbonImmutable::parse('2026-04-15T10:00:00.000Z')->addMinutes($n)->format('Y-m-d\TH:i:s.v\Z');
     $entry['__system']['deviceId'] = "collect:att{$n}";
@@ -85,18 +85,18 @@ it('records what ODK expects during the pull and fetches it to the private disk'
 
     attPull();
 
-    $attachment = OdkAttachment::query()->sole();
+    $attachment = SubmissionAttachment::query()->sole();
     expect($attachment->submission_id)->toBe(attSubmission(1)->id)
         ->and($attachment->filename)->toBe('register.png')
         ->and($attachment->status)->toBe(AttachmentStatus::Fetched)
         ->and($attachment->mime)->toBe('image/png')
         ->and($attachment->size)->toBe(strlen(base64_decode(ATT_PNG)))
-        ->and($attachment->path)->toBe('uuid_att-1/register.png')
+        ->and($attachment->path)->toBe('odk/uuid_att-1/register.png')
         ->and($attachment->fetched_at)->not->toBeNull()
         ->and($this->source->downloads)->toBe(['uuid:att-1/register.png']);
-    Storage::disk('odk')->assertExists('uuid_att-1/register.png');
-    expect(Storage::disk('odk')->get('uuid_att-1/register.png'))->toBe(base64_decode(ATT_PNG))
-        ->and(Storage::disk('odk')->allFiles('.incoming'))->toBe([]);
+    Storage::disk('attachments')->assertExists('odk/uuid_att-1/register.png');
+    expect(Storage::disk('attachments')->get('odk/uuid_att-1/register.png'))->toBe(base64_decode(ATT_PNG))
+        ->and(Storage::disk('attachments')->allFiles('.incoming'))->toBe([]);
 });
 
 it('queues the fetch on the low queue, once per submission with files, after the page commits', function (): void {
@@ -108,12 +108,12 @@ it('queues the fetch on the low queue, once per submission with files, after the
     Queue::assertPushedOn('low', FetchAttachmentsJob::class);
     Queue::assertPushedTimes(FetchAttachmentsJob::class, 2);
     Queue::assertPushed(FetchAttachmentsJob::class, fn (FetchAttachmentsJob $job): bool => $job->submissionId === attSubmission(1)->id);
-    expect(OdkAttachment::query()->where('status', AttachmentStatus::Pending)->count())->toBe(3);
+    expect(SubmissionAttachment::query()->where('status', AttachmentStatus::Pending)->count())->toBe(3);
 
     // The same pull again records nothing new and queues nothing.
     attPull();
     Queue::assertPushedTimes(FetchAttachmentsJob::class, 2);
-    expect(OdkAttachment::query()->count())->toBe(3);
+    expect(SubmissionAttachment::query()->count())->toBe(3);
 });
 
 it('only records attachments when asked to record without fetching (backfill)', function (): void {
@@ -123,7 +123,7 @@ it('only records attachments when asked to record without fetching (backfill)', 
     $ids = app(RecordAttachments::class)->execute([$submission->id => [new AttachmentRef('trace.geojson', true)]]);
 
     expect($ids)->toBe([$submission->id])
-        ->and(OdkAttachment::query()->sole()->status)->toBe(AttachmentStatus::Pending);
+        ->and(SubmissionAttachment::query()->sole()->status)->toBe(AttachmentStatus::Pending);
     Queue::assertNothingPushed();
 });
 
@@ -132,7 +132,7 @@ it('accepts the allowed types by their bytes', function (string $name, string $b
 
     attPull();
 
-    expect(OdkAttachment::query()->sole()->only(['status', 'mime']))->toBe(['status' => AttachmentStatus::Fetched, 'mime' => $mime]);
+    expect(SubmissionAttachment::query()->sole()->only(['status', 'mime']))->toBe(['status' => AttachmentStatus::Fetched, 'mime' => $mime]);
 })->with([
     'png' => ['photo.png', base64_decode(ATT_PNG), 'image/png'],
     'GeoJSON trace' => ['trace.geojson', '{"type":"FeatureCollection","features":[]}', 'application/geo+json'],
@@ -145,11 +145,11 @@ it('rejects and deletes a file whose bytes are not an allowed type, whatever its
 
     attPull();
 
-    $attachment = OdkAttachment::query()->sole();
+    $attachment = SubmissionAttachment::query()->sole();
     expect($attachment->status)->toBe(AttachmentStatus::Rejected)
         ->and($attachment->reason)->toBe('type_not_allowed')
         ->and($attachment->path)->toBeNull()
-        ->and(Storage::disk('odk')->allFiles())->toBe([]);
+        ->and(Storage::disk('attachments')->allFiles())->toBe([]);
 })->with([
     'php named jpg' => ['register.jpg', '<?php echo "not a photo"; ?>'],
     'html named png' => ['photo.png', '<html><script>alert(1)</script></html>'],
@@ -163,8 +163,8 @@ it('rejects a file larger than the cap, and deletes it', function (): void {
 
     attPull();
 
-    expect(OdkAttachment::query()->sole()->only(['status', 'reason']))->toBe(['status' => AttachmentStatus::Rejected, 'reason' => 'too_large'])
-        ->and(Storage::disk('odk')->allFiles())->toBe([]);
+    expect(SubmissionAttachment::query()->sole()->only(['status', 'reason']))->toBe(['status' => AttachmentStatus::Rejected, 'reason' => 'too_large'])
+        ->and(Storage::disk('attachments')->allFiles())->toBe([]);
 });
 
 it('refuses a file name that could leave its directory, without downloading it', function (string $name): void {
@@ -172,9 +172,9 @@ it('refuses a file name that could leave its directory, without downloading it',
 
     attPull();
 
-    expect(OdkAttachment::query()->sole()->only(['status', 'reason']))->toBe(['status' => AttachmentStatus::Rejected, 'reason' => 'unsafe_name'])
+    expect(SubmissionAttachment::query()->sole()->only(['status', 'reason']))->toBe(['status' => AttachmentStatus::Rejected, 'reason' => 'unsafe_name'])
         ->and($this->source->downloads)->toBe([])
-        ->and(Storage::disk('odk')->allFiles())->toBe([]);
+        ->and(Storage::disk('attachments')->allFiles())->toBe([]);
 })->with(['../../.env', '..\\..\\x.png', '.htaccess', 'a/b.png', "nul\0.png", 'photo..png']);
 
 it('never fetches a fetched file again', function (): void {
@@ -190,12 +190,12 @@ it('never fetches a fetched file again', function (): void {
 
 it('uses a file already on the disk from an interrupted attempt instead of downloading it again', function (): void {
     $submission = Submission::factory()->create(['instance_id' => 'uuid:att-9', 'payload' => ['__id' => 'uuid:att-9']]);
-    OdkAttachment::query()->create(['submission_id' => $submission->id, 'filename' => 'photo.png', 'status' => AttachmentStatus::Pending]);
-    Storage::disk('odk')->put('uuid_att-9/photo.png', base64_decode(ATT_PNG));
+    SubmissionAttachment::query()->create(['submission_id' => $submission->id, 'filename' => 'photo.png', 'status' => AttachmentStatus::Pending]);
+    Storage::disk('attachments')->put('odk/uuid_att-9/photo.png', base64_decode(ATT_PNG));
 
     expect(app(FetchAttachments::class)->execute($submission->id)['fetched'])->toBe(1)
         ->and($this->source->downloads)->toBe([])
-        ->and(OdkAttachment::query()->sole()->status)->toBe(AttachmentStatus::Fetched);
+        ->and(SubmissionAttachment::query()->sole()->status)->toBe(AttachmentStatus::Fetched);
 });
 
 it('keeps a file ODK could not deliver pending for the retry, then failed, and fetch-pending catches it up', function (): void {
@@ -207,25 +207,25 @@ it('keeps a file ODK could not deliver pending for the retry, then failed, and f
     $this->source->failDownload = fn (string $name): Throwable => OdkUnreachable::connection(3);
 
     expect(fn () => (new FetchAttachmentsJob($id))->handle(app(FetchAttachments::class)))->toThrow(OdkUnreachable::class);
-    expect(OdkAttachment::query()->sole()->only(['status', 'reason']))->toBe(['status' => AttachmentStatus::Pending, 'reason' => 'unreachable']);
+    expect(SubmissionAttachment::query()->sole()->only(['status', 'reason']))->toBe(['status' => AttachmentStatus::Pending, 'reason' => 'unreachable']);
 
     (new FetchAttachmentsJob($id))->failed(OdkUnreachable::connection(3));
-    expect(OdkAttachment::query()->sole()->status)->toBe(AttachmentStatus::Failed);
+    expect(SubmissionAttachment::query()->sole()->status)->toBe(AttachmentStatus::Failed);
 
     $this->source->failDownload = null;
     Queue::swap($queue); // the fake also holds back dispatchSync
     $this->artisan('edqa:attachments:fetch-pending', ['--sync' => true])
         ->expectsOutputToContain('Fetched attachments for 1 submission(s)')
         ->assertSuccessful();
-    expect(OdkAttachment::query()->sole()->only(['status', 'reason']))->toBe(['status' => AttachmentStatus::Fetched, 'reason' => null]);
+    expect(SubmissionAttachment::query()->sole()->only(['status', 'reason']))->toBe(['status' => AttachmentStatus::Fetched, 'reason' => null]);
 });
 
 it('queues fetch-pending on the low queue, at most --limit submissions', function (): void {
     Queue::fake([FetchAttachmentsJob::class]);
     foreach (range(1, 3) as $n) {
-        OdkAttachment::factory()->create(['status' => 'pending']);
+        SubmissionAttachment::factory()->create(['status' => 'pending']);
     }
-    OdkAttachment::factory()->create(['status' => 'fetched']);
+    SubmissionAttachment::factory()->create(['status' => 'fetched']);
 
     $this->artisan('edqa:attachments:fetch-pending', ['--limit' => 2])->expectsOutputToContain('Queued attachment fetches for 2 submission(s)')->assertSuccessful();
 
@@ -234,12 +234,12 @@ it('queues fetch-pending on the low queue, at most --limit submissions', functio
 });
 
 /** A fetched PNG for submission 1, stored on the faked disk. */
-function attServed(object $test): OdkAttachment
+function attServed(object $test): SubmissionAttachment
 {
     $test->source->add(attEntry($test, 1, ['register.png' => base64_decode(ATT_PNG), 'trace.geojson' => '{"type":"Point","coordinates":[7.4,10.5]}']));
     attPull();
 
-    return OdkAttachment::query()->where('filename', 'register.png')->sole();
+    return SubmissionAttachment::query()->where('filename', 'register.png')->sole();
 }
 
 it('streams a fetched file to an administrator, with safe headers, and audits the view', function (): void {
@@ -271,8 +271,8 @@ it('downloads a file that is not an image', function (): void {
 it('answers 404 to anything but a fetched file recorded for that submission', function (string $path): void {
     $attachment = attServed($this);
     $other = Submission::factory()->create();
-    OdkAttachment::query()->create(['submission_id' => $attachment->submission_id, 'filename' => 'pending.png', 'status' => AttachmentStatus::Pending]);
-    Storage::disk('odk')->put('secret.txt', 'top secret');
+    SubmissionAttachment::query()->create(['submission_id' => $attachment->submission_id, 'filename' => 'pending.png', 'status' => AttachmentStatus::Pending]);
+    Storage::disk('attachments')->put('secret.txt', 'top secret');
     $id = $attachment->submission_id;
 
     $response = $this->actingAs($this->admin)->get(strtr($path, ['{id}' => (string) $id, '{other}' => (string) $other->id]));
@@ -302,7 +302,7 @@ it('refuses a request that is not signed in', function (): void {
 
 it('answers 404 when the file is recorded but has gone from the disk', function (): void {
     $attachment = attServed($this);
-    Storage::disk('odk')->delete((string) $attachment->path);
+    Storage::disk('attachments')->delete((string) $attachment->path);
 
     $this->actingAs($this->admin)->get("/attachments/{$attachment->submission_id}/register.png")->assertNotFound();
 });

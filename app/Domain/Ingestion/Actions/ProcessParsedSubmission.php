@@ -67,6 +67,7 @@ final class ProcessParsedSubmission
     {
         return DB::transaction(function () use ($submission, $parsed, $context, $result): ProcessOutcome {
             $record = QuarantinedRecord::query()->create([
+                'source_id' => $submission->source_id,
                 'submission_id' => $submission->id,
                 'instance_id' => $parsed->instanceId,
                 'round_id' => $context->roundFor($parsed)?->id,

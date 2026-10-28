@@ -27,7 +27,7 @@ return [
     'UNKNOWN_FORM_VERSION' => [
         'name' => 'Unknown form version',
         'why' => 'Each version of the ODK form names its questions differently. A version the portal has no field map for would be read with the wrong map, and its scores would be silently wrong, so it is held back until a map is added.',
-        'detail' => 'form version :version has no field map',
+        'detail' => ':source form version :version has no field map',
         'blank' => '(blank)',
     ],
 

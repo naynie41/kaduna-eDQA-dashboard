@@ -54,6 +54,12 @@ export default function Drawer({ title, subtitle, closeLabel, onClose, children 
         };
         // Esc closes; Tab and Shift+Tab wrap around inside the dialog.
         const onKeyDown = (event: KeyboardEvent) => {
+            // A modal dialog opened over the drawer (ConfirmWithReasonDialog) keeps its own Esc and Tab.
+            // It handles them first and prevents the default; on Esc it has already closed, and its
+            // contents may already be gone from the page, so the target alone cannot say so.
+            if (event.defaultPrevented || (event.target instanceof Element && event.target.closest('dialog') !== null)) {
+                return;
+            }
             if (event.key === 'Escape') {
                 event.stopPropagation();
                 onCloseRef.current();

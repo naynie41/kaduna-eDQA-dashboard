@@ -8,7 +8,7 @@ APP_DB_USER     := edqa_app
 APP_DB_PASSWORD := edqa_app_dev
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e e2e-odk size lighthouse odk-mock-up odk-mock-seed
+.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e e2e-odk e2e-issues size lighthouse odk-mock-up odk-mock-seed
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-13s %s\n", $$1, $$2}'
@@ -86,6 +86,12 @@ e2e-odk: ## Playwright against the mock ODK Central: Pull now end to end (tests/
 	@# --no-deps: run would otherwise recreate app (a dependency of web) without the override.
 	$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_ODK=1 playwright tests/e2e/odk-pull.spec.ts $(c); status=$$?; \
 		$(COMPOSE) up -d --wait app worker; exit $$status
+
+e2e-issues: ## Playwright on the Data issues page with known broken records held through the real pipeline (tests/e2e/data-issues.spec.ts)
+	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
+	@# A new batch each run: the earlier run's records are resolved, and their facilities assessed.
+	issues=$$($(EXEC) php artisan edqa:demo:data-issues --batch=e2e-$$(date +%s)) && \
+		$(COMPOSE) --profile e2e run --rm -e E2E_ISSUES="$$issues" playwright tests/e2e/data-issues.spec.ts $(c)
 
 odk-mock-up: ## Start the mock ODK Central (odk-mock:8080 in the stack, 127.0.0.1:8090 on the host)
 	$(COMPOSE) --profile odk up -d odk-mock

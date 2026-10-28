@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Ingestion\DTOs\ItemResponseData;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
-use App\Domain\Ingestion\Odk\SubmissionParser;
+use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Scoring\CurrentRuleVersion;
 use Database\Seeders\ScoringRuleVersionSeeder;
 use Illuminate\Support\Facades\DB;
@@ -20,12 +20,12 @@ beforeEach(function (): void {
 /** The valid raw fixture, as a starting point. */
 function rawVisit(): array
 {
-    return json_decode((string) file_get_contents(base_path('tests/Fixtures/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
+    return json_decode((string) file_get_contents(base_path('tests/Fixtures/sources/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
 }
 
 function parse(array $payload): ParsedSubmission
 {
-    return app(SubmissionParser::class)->parse($payload);
+    return odkParse($payload);
 }
 
 it('maps answers through the published rule version\'s choice map', function (): void {

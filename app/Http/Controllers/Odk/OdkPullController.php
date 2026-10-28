@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Odk;
 
 use App\Domain\Ingestion\Actions\StartManualPull;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Odk\OdkPullRunResource;
 use App\Models\User;
@@ -30,6 +30,6 @@ final class OdkPullController extends Controller
 
     public function show(int $run): OdkPullRunResource
     {
-        return new OdkPullRunResource(OdkPullRun::query()->findOrFail($run));
+        return new OdkPullRunResource(PullRun::query()->findOrFail($run));
     }
 }

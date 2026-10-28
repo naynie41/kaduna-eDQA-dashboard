@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Domain\Ingestion\SourceRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -101,12 +102,15 @@ final class DemoAssessmentSeeder extends Seeder
     private function insertSubmissions(array $visits): array
     {
         $rows = [];
+        $source = app(SourceRegistry::class)->id('odk');
         foreach ($visits as [$round, $facility]) {
             $instanceId = $this->instanceId($round, $facility);
             $visit = $this->visitDate($round, $facility);
             $rows[] = [
+                'source_id' => $source,
+                'external_id' => $instanceId,
                 'instance_id' => $instanceId,
-                'form_id' => 'dqa',
+                'form_ref' => 'dqa',
                 'form_version' => '2026.1',
                 'payload' => json_encode([
                     '__id' => $instanceId,

@@ -100,9 +100,9 @@ it('shares the shell status with every signed-in page: assessments and ODK sync'
 });
 
 it('reads the sync state from the latest pull runs', function (array $runs, string $state): void {
-    config(['edqa.odk' => [...config('edqa.odk'), 'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'x', 'project_id' => '7', 'form_id' => 'dqa']]);
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'), 'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'x', 'project_id' => '7', 'form_id' => 'dqa']]);
     foreach ($runs as [$minutesAgo, $outcome]) {
-        DB::table('odk_pull_runs')->insert(['trigger_type' => 'scheduled', 'started_at' => now()->subMinutes($minutesAgo + 1),
+        DB::table('pull_runs')->insert(['source_id' => Rows::sourceId(), 'trigger_type' => 'scheduled', 'started_at' => now()->subMinutes($minutesAgo + 1),
             'finished_at' => $outcome === null ? null : now()->subMinutes($minutesAgo), 'outcome' => $outcome, 'error' => $outcome === 'failed' ? 'HTTP 503' : null]);
     }
     Rows::quarantined();

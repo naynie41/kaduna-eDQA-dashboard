@@ -48,19 +48,45 @@ return [
         'debounce_seconds' => 30,
     ],
 
-    'odk' => [
-        // ODK Central (ARCHITECTURE.md §5, SECURITY.md §6), read only here: the client never reads
-        // env. Any of the five missing (or a URL that is not https) means "not configured": every
-        // caller says so plainly instead of failing. The service account is a Project Viewer.
-        // The facility drawer's link to a submission uses url and project_id too.
-        'url' => env('ODK_CENTRAL_URL') ?: null,
-        'email' => env('ODK_CENTRAL_EMAIL') ?: null,
-        'password' => env('ODK_CENTRAL_PASSWORD') ?: null,
-        'project_id' => env('ODK_PROJECT_ID') ?: null,
-        'form_id' => env('ODK_FORM_ID') ?: null,
+    // The field-collection sources (ARCHITECTURE.md §5.0, SECURITY.md §6): what each one is, where
+    // it is, how to sign in and which form it holds, all from env (never stored, logged or sent to
+    // the browser). A source with any credential missing is "not configured" and never pulls;
+    // enabled=false (ODK_ENABLED / KOBO_ENABLED=false) switches a configured one off.
+    // edqa:sources:sync keeps submission_sources in step with this list (it never deletes rows).
+    'sources' => [
+        'odk' => [
+            'type' => 'odk_central',
+            'name' => 'ODK Central',
+            'enabled' => EnvFlag::enabledUnlessFalse(env('ODK_ENABLED')),
+            // The service account is a Project Viewer. The links to a submission use url and
+            // project_id too.
+            'url' => env('ODK_CENTRAL_URL') ?: null,
+            'email' => env('ODK_CENTRAL_EMAIL') ?: null,
+            'password' => env('ODK_CENTRAL_PASSWORD') ?: null,
+            'project_id' => env('ODK_PROJECT_ID') ?: null,
+            'form_id' => env('ODK_FORM_ID') ?: null,
+            // Submissions per OData page (§5.3).
+            'page_size' => (int) (env('ODK_PULL_PAGE_SIZE') ?: 500),
+            // The backfill's wait between pages (§5.6, D-53): empty or unset means 5; 0 turns it off.
+            'backfill_throttle_seconds' => is_numeric(env('ODK_BACKFILL_THROTTLE')) ? max(0, (int) env('ODK_BACKFILL_THROTTLE')) : 5,
+        ],
+        'kobo' => [
+            'type' => 'kobo',
+            'name' => 'KoboToolbox',
+            'enabled' => EnvFlag::enabledUnlessFalse(env('KOBO_ENABLED')),
+            // The global, EU or a self-hosted server (ARCHITECTURE.md §5.3). The token
+            // belongs to a dedicated read-only account (SECURITY.md §6).
+            'url' => env('KOBO_BASE_URL') ?: null,
+            'token' => env('KOBO_API_TOKEN') ?: null,
+            'asset_uid' => env('KOBO_ASSET_UID') ?: null,
+            'page_size' => (int) (env('KOBO_PULL_PAGE_SIZE') ?: 500),
+            'backfill_throttle_seconds' => is_numeric(env('KOBO_BACKFILL_THROTTLE')) ? max(0, (int) env('KOBO_BACKFILL_THROTTLE')) : 5,
+        ],
+    ],
 
-        // Submissions per OData page (§5.3).
-        'page_size' => (int) (env('ODK_PULL_PAGE_SIZE') ?: 500),
+    'odk' => [
+        // How the ODK Central adapter talks to Central (ARCHITECTURE.md §5, SECURITY.md §6); the
+        // source itself (URL, credentials, form, page size) is under sources.odk.
 
         // Seconds: connect, and the whole request (one page).
         'timeouts' => ['connect' => 10, 'total' => 60],
@@ -93,20 +119,19 @@ return [
             'debounce_seconds' => 60,
         ],
 
-        // The historical backfill (§5.6, D-53): seconds to wait between pages (ODK_BACKFILL_THROTTLE,
-        // default 5, so a first pass can run in working hours without loading Central), and how long
-        // one BackfillOdkSubmissionsJob runs before it queues the next from its checkpoint.
+        // The historical backfill (§5.6, D-53): how long one BackfillOdkSubmissionsJob runs before it
+        // queues the next from its checkpoint (the wait between pages is sources.odk).
         'backfill' => [
-            // Empty or unset means the default; an explicit 0 turns the throttle off.
-            'throttle_seconds' => is_numeric(env('ODK_BACKFILL_THROTTLE')) ? max(0, (int) env('ODK_BACKFILL_THROTTLE')) : 5,
             'job_seconds' => 300,
         ],
 
-        // Attachments (§5.3, SECURITY.md §7): fetched on the low queue to the private odk disk. A
+        // Attachments (§5.3, SECURITY.md §7): fetched on the low queue to the private attachments disk. A
         // file over max_bytes, or whose sniffed type is not in allowed_mimes, is rejected and
         // deleted.
         'attachments' => [
-            'disk' => 'odk',
+            // storage/app/attachments/{source}/{instance}/ (ARCHITECTURE.md §5.3); the old odk disk is
+            // read only by edqa:attachments:relocate.
+            'disk' => 'attachments',
             'max_bytes' => 10 * 1024 * 1024,
             'allowed_mimes' => ['image/jpeg', 'image/png', 'application/geo+json', 'text/csv', 'application/xml'],
         ],

@@ -6,8 +6,9 @@ namespace App\Domain\Ingestion\Actions;
 
 use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\DTOs\BackfillSurvey;
-use App\Domain\Ingestion\Odk\FieldMap;
-use App\Domain\Ingestion\Odk\SubmissionParser;
+use App\Domain\Ingestion\FieldMap;
+use App\Domain\Ingestion\Odk\OdkPayloadNormalizer;
+use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Round\Models\Round;
 use Closure;
 use Illuminate\Support\Sleep;
@@ -25,20 +26,21 @@ final class SurveyBackfill
     public function __construct(
         private readonly SubmissionSource $source,
         private readonly SubmissionParser $parser,
+        private readonly OdkPayloadNormalizer $normaliser,
     ) {}
 
     /** @param  (Closure(int $read, int $total): void)|null  $progress */
     public function execute(?int $throttle = null, ?Closure $progress = null): BackfillSurvey
     {
-        $top = max(1, (int) config('edqa.odk.page_size', 500));
-        $throttle = max(0, $throttle ?? (int) config('edqa.odk.backfill.throttle_seconds', 5));
+        $top = max(1, (int) config('edqa.sources.odk.page_size', 500));
+        $throttle = max(0, $throttle ?? (int) config('edqa.sources.odk.backfill_throttle_seconds', 5));
         $counts = [];
         $skip = 0;
 
         while (true) {
             $page = $this->source->submissionsPage(null, $top, $skip);
             foreach ($page->rows as $row) {
-                $parsed = $this->parser->parse($row);
+                $parsed = $this->parser->parse($this->normaliser->normalise($row));
                 $day = $parsed->visitDate();
                 $key = "{$day->year}|{$day->quarter}|{$parsed->formVersion}";
                 $counts[$key] = ($counts[$key] ?? 0) + 1;
@@ -67,7 +69,7 @@ final class SurveyBackfill
                 'year' => (int) $year,
                 'quarter' => (int) $quarter,
                 'version' => $version,
-                'mapped' => FieldMap::resolve($version) !== null,
+                'mapped' => FieldMap::for(OdkPayloadNormalizer::SOURCE, $version) !== null,
                 'round' => $rounds["{$year}|{$quarter}"] ?? null,
                 'submissions' => $count,
             ];

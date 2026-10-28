@@ -8,6 +8,7 @@ use App\Domain\Facility\Models\Lga;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -100,13 +101,64 @@ final class QuarantineQuery
         return array_values($rows->map(fn (object $row): array => ['code' => (string) $row->code, 'count' => (int) $row->count])->all());
     }
 
+    /** The Data issues page's states (D-57): open, or how a record was resolved. */
+    public const STATES = ['open', 'resolved', 'rejected', 'superseded'];
+
+    public const ADMIN_PER_PAGE = 25;
+
     /**
-     * @param  array{status?: ?string, rule?: ?string, round?: int|string|null, lga?: ?string}  $filters
+     * The Data issues page's records (D-57): newest first, 25 a page, with each record's
+     * submission (received at, form) and round, for the filters below plus `state`.
+     *
+     * @param  array{state?: ?string, rule?: ?string, round?: int|string|null, lga?: ?string}  $filters
+     * @return Paginator<int, QuarantinedRecord>
+     */
+    public function adminPage(array $filters): Paginator
+    {
+        return $this->filtered($filters)
+            ->with(['submission:id,instance_id,form_ref,received_at,status', 'round:id,year,quarter'])
+            ->orderByDesc('id')
+            ->paginate(self::ADMIN_PER_PAGE)
+            ->withQueryString();
+    }
+
+    /**
+     * The master list's name for each facility reference on a page, matched as FACILITY_UNKNOWN
+     * matches them (trimmed, any case). One query.
+     *
+     * @param  list<?string>  $refs
+     * @return array<string, string> lower-cased ref => facility name
+     */
+    public function facilityNames(array $refs): array
+    {
+        $keys = array_values(array_unique(array_filter(array_map(fn (?string $ref): string => mb_strtolower(trim((string) $ref)), $refs), fn (string $key): bool => $key !== '')));
+        if ($keys === []) {
+            return [];
+        }
+
+        $names = [];
+        foreach (DB::table('facilities')->whereIn(DB::raw('lower(code)'), $keys)->get(['code', 'name']) as $row) {
+            $names[mb_strtolower((string) $row->code)] = (string) $row->name;
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param  array{status?: ?string, state?: ?string, rule?: ?string, round?: int|string|null, lga?: ?string}  $filters
      * @return Builder<QuarantinedRecord>
      */
     private function filtered(array $filters): Builder
     {
         $query = QuarantinedRecord::query();
+
+        match ($filters['state'] ?? null) {
+            'open' => $query->where('status', 'open'),
+            'resolved' => $query->where('status', 'resolved')->where('resolution', 'reprocessed'),
+            'rejected' => $query->where('resolution', 'rejected'),
+            'superseded' => $query->where('resolution', 'superseded'),
+            default => null,
+        };
 
         if (($filters['status'] ?? null) !== null) {
             $query->where('status', $filters['status']);

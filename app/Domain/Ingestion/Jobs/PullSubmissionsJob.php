@@ -8,10 +8,11 @@ use App\Domain\Ingestion\Actions\PullSubmissions;
 use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Events\PullFailed;
-use App\Domain\Ingestion\Models\OdkFormSync;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
+use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Odk\OdkConfig;
 use App\Domain\Ingestion\Odk\PullLock;
+use App\Domain\Ingestion\SourceRegistry;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -53,7 +54,7 @@ final class PullSubmissionsJob implements ShouldQueue
     public function handle(PullLock $lock, PullSubmissions $pull): void
     {
         try {
-            $lock->run(fn (): OdkPullRun => $pull->execute($this->trigger, $this->userId, $this->runId), (int) config('edqa.odk.pull.lock_wait_seconds', 600));
+            $lock->run(fn (): PullRun => $pull->execute($this->trigger, $this->userId, $this->runId), (int) config('edqa.odk.pull.lock_wait_seconds', 600));
         } catch (LockTimeoutException) {
             $this->release(60);
         }
@@ -63,7 +64,7 @@ final class PullSubmissionsJob implements ShouldQueue
     {
         // A run created when the pull was asked for, never reached (the lock stayed busy): close it.
         if ($this->runId !== null) {
-            OdkPullRun::query()->whereKey($this->runId)->whereNull('finished_at')->update([
+            PullRun::query()->whereKey($this->runId)->whereNull('finished_at')->update([
                 'outcome' => PullOutcome::Failed, 'finished_at' => now(),
                 'error' => $e === null ? 'Unknown failure' : PullSubmissions::describe($e),
             ]);
@@ -75,13 +76,13 @@ final class PullSubmissionsJob implements ShouldQueue
     public static function recordFailure(?Throwable $e): void
     {
         $message = $e === null ? 'Unknown failure' : PullSubmissions::describe($e);
-        $run = OdkPullRun::query()->where('outcome', PullOutcome::Failed)->latest('id')->first();
+        $run = PullRun::query()->where('outcome', PullOutcome::Failed)->latest('id')->first();
 
         $config = OdkConfig::fromConfig();
         if ($config->isConfigured()) {
-            OdkFormSync::query()
-                ->where('project_id', (int) $config->projectId)
-                ->where('form_id', (string) $config->formId)
+            SourceSync::query()
+                ->where('source_id', app(SourceRegistry::class)->id('odk'))
+                ->where('form_ref', $config->formRef())
                 ->update(['last_error' => $message, 'updated_at' => now()]);
         }
 

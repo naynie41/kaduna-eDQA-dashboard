@@ -6,6 +6,7 @@ namespace App\Domain\Reporting\Aggregators;
 
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Assessment\Models\ItemResponse;
+use App\Domain\Assessment\Support\ItemKey;
 use App\Domain\Facility\Models\Facility;
 use App\Domain\Ingestion\Queries\AssessmentSourceQuery;
 use App\Domain\Reporting\DTOs\FacilityDetail;
@@ -14,6 +15,7 @@ use App\Domain\Reporting\Queries\FacilityRoundOverallsQuery;
 use App\Domain\Reporting\Support\FacilityScoresSql;
 use App\Domain\Reporting\Support\RoundSelection;
 use App\Domain\Reporting\Support\Scores;
+use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Round\Models\Round;
 use App\Domain\Round\MonthSlot;
 use App\Domain\Scoring\DTOs\RuleConfig;
@@ -89,12 +91,16 @@ final class FacilityDetailAggregator
                 'label' => self::roundLabel($round),
                 'year' => $round->year,
                 'quarter' => $round->quarter,
+                // Corrections are allowed while it is open (D-58; a closed round is pinned, D-32).
+                'open' => $round->status === RoundStatus::Open,
             ],
             assessment: $assessment === null ? null : [
                 'id' => $assessment->id,
                 'assessed_on' => $assessment->started_at->setTimezone((string) config('app.timezone'))->toDateString(),
                 'assessor' => (string) $assessment->assessor_name,
                 'status' => (string) $assessment->status,
+                'started_at' => $assessment->started_at->setTimezone((string) config('app.timezone'))->toIso8601String(),
+                'ended_at' => $assessment->ended_at->setTimezone((string) config('app.timezone'))->toIso8601String(),
             ],
             scores: $this->scoreCard($assessment?->id, $versionId, $rules),
             items: $assessment === null ? [] : $this->items($assessment->id, $round, $slots, $rules),
@@ -168,7 +174,7 @@ final class FacilityDetailAggregator
      * mapped pass or fail. Null only when no rule version can be read.
      *
      * @param  array<string, array<int, float|null>>  $slots
-     * @return list<array{dimension: string, dimension_label: string, slot: int, month: string, score: ScoreValue, items: list<array{code: string, label: ?string, result: ?string}>}>
+     * @return list<array{dimension: string, dimension_label: string, slot: int, month: string, score: ScoreValue, items: list<array{code: string, key: string, label: ?string, result: ?string}>}>
      */
     private function items(int $assessmentId, Round $round, array $slots, ?RuleConfig $rules): array
     {
@@ -179,6 +185,7 @@ final class FacilityDetailAggregator
                 $items = $responses->filter(fn (ItemResponse $r): bool => $r->dimension === $dimension && $r->month_slot === $slot)
                     ->map(fn (ItemResponse $r): array => [
                         'code' => (string) $r->item_code,
+                        'key' => ItemKey::make($dimension, $slot, (string) $r->item_code),
                         'label' => self::itemLabel($dimension, (string) $r->item_code),
                         'result' => self::result((string) $r->value, $r->is_applicable, $rules),
                     ])->values()->all();

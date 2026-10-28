@@ -30,7 +30,7 @@ final class ValidationContext
      * @param  array<string, list<string>>  $acceptedInstances  "round:facility" => instance IDs
      * @param  array<int, list<array{sequence: int, overall: float}>>  $priorScores  per facility, latest first
      * @param  array<string, array<int, true>>  $assessorDays  "assessor|Y-m-d" => facility IDs
-     * @param  array<string, true>  $knownFormVersions
+     * @param  array<string, true>  $knownFormVersions  "source|version" => true
      */
     public function __construct(
         private readonly array $lgas,
@@ -175,9 +175,9 @@ final class ValidationContext
         return count($facilities);
     }
 
-    public function isKnownFormVersion(string $version): bool
+    public function isKnownFormVersion(string $source, string $version): bool
     {
-        return isset($this->knownFormVersions[$version]);
+        return isset($this->knownFormVersions["{$source}|{$version}"]);
     }
 
     /** Records a submission the pipeline accepted, for the in-batch checks above. */

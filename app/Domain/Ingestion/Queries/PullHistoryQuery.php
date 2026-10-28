@@ -6,7 +6,7 @@ namespace App\Domain\Ingestion\Queries;
 
 use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 /**
@@ -30,7 +30,7 @@ final class PullHistoryQuery
         $trigger = PullTrigger::tryFrom((string) ($filters['trigger'] ?? ''));
         $outcome = $filters['outcome'] ?? null;
 
-        $query = OdkPullRun::query()->with('triggeredBy:id,name')->orderByDesc('started_at')->orderByDesc('id');
+        $query = PullRun::query()->with('triggeredBy:id,name')->orderByDesc('started_at')->orderByDesc('id');
         if ($trigger !== null) {
             $query->where('trigger_type', $trigger);
         }
@@ -41,7 +41,7 @@ final class PullHistoryQuery
         }
 
         /** @var LengthAwarePaginator<int, array{id: int, started_at: string, trigger: string, triggered_by: ?string, fetched: int, parsed: int, accepted: int, flagged: int, quarantined: int, duplicates: int, duration: ?array{minutes: int, seconds: int}, outcome: string, error: ?string}> */
-        return $query->paginate(self::PER_PAGE)->withQueryString()->through(function (OdkPullRun $run): array {
+        return $query->paginate(self::PER_PAGE)->withQueryString()->through(function (PullRun $run): array {
             $seconds = $run->finished_at === null ? null : max(0, (int) $run->started_at->diffInSeconds($run->finished_at));
 
             return [

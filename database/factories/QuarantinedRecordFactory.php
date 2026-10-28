@@ -27,6 +27,7 @@ final class QuarantinedRecordFactory extends Factory
     {
         return [
             'submission_id' => Submission::factory()->quarantined(),
+            'source_id' => fn (array $a): int => (int) Submission::query()->whereKey($a['submission_id'])->value('source_id'),
             'instance_id' => fn (array $a): string => (string) Submission::query()->whereKey($a['submission_id'])->value('instance_id'),
             'payload' => fn (array $a): array => Submission::query()->findOrFail($a['submission_id'], ['payload'])->payload,
             'failures' => self::failures(['LGA_UNKNOWN']),

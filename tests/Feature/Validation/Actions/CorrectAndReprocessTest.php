@@ -6,7 +6,7 @@ use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Assessment\Models\AssessmentScore;
 use App\Domain\Facility\Models\Facility;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
-use App\Domain\Ingestion\Odk\SubmissionParser;
+use App\Domain\Ingestion\ReadSubmission;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
 use App\Domain\Validation\Actions\CorrectAndReprocess;
 use App\Domain\Validation\DTOs\RuleFailure;
@@ -157,7 +157,7 @@ it('rebuilds from the raw payload exactly as from the parsed snapshot, for every
     [$parsed, $expected] = BrokenSubmissions::build($name);
     $record = quarantineThrough($parsed);
 
-    $fromPayload = app(SubmissionParser::class)->parse($record->submission->payload);
+    $fromPayload = app(ReadSubmission::class)->fromStored($record->submission);
     $context = app(ValidationContextFactory::class)->forBatch([$fromPayload]);
     $codes = array_map(fn (RuleFailure $f): string => $f->code, app(ValidationPipeline::class)->validate($fromPayload, $context)->failures());
 

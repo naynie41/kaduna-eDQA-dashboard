@@ -140,10 +140,10 @@ it('shows the activity log for the facility\'s assessments: who, when, what, why
 it('gives the ODK instance ID, and a deep link only when ODK Central is configured', function (): void {
     $instance = (string) DB::table('submissions')->where('id', $this->assessment->submission_id)->value('instance_id');
 
-    config(['edqa.odk.url' => null]);
+    config(['edqa.sources.odk.url' => null]);
     expect(detail($this)['odk'])->toBe(['instance_id' => $instance, 'url' => null]);
 
-    config(['edqa.odk.url' => 'https://central.example.org/', 'edqa.odk.project_id' => 7]);
+    config(['edqa.sources.odk.url' => 'https://central.example.org/', 'edqa.sources.odk.project_id' => 7]);
     expect(detail($this)['odk']['url'])->toBe('https://central.example.org/#/projects/7/forms/dqa/submissions/'.rawurlencode($instance));
 });
 
@@ -159,7 +159,7 @@ it('lists the attachments, each fetched one with the route that serves it', func
         ['filename' => 'evil.jpg', 'status' => 'rejected', 'mime' => null, 'size' => null, 'path' => null, 'reason' => 'type_not_allowed'],
     ];
     foreach ($rows as $row) {
-        DB::table('odk_attachments')->insert(['submission_id' => $submission, ...$row]);
+        DB::table('submission_attachments')->insert(['submission_id' => $submission, ...$row]);
     }
 
     $attachments = detail($this)['attachments'];

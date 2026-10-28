@@ -9,6 +9,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Source-aware ingestion (Phase 2C step 1): every submission, quarantined record, cursor and pull
+  run now names its field-collection source (`submission_sources`: ODK Central now, KoboToolbox
+  configured but not yet pulled). Existing data belongs to ODK Central and is kept.
+  `edqa:sources:sync` creates the source rows from config and never deletes one.
+  `edqa:attachments:relocate` moves stored attachments to
+  `storage/app/attachments/{source}/{instance}/`.
+- A payload normaliser per source (Phase 2C step 2): the parser now reads one common shape, so
+  KoboToolbox can be added without touching it. Field maps are named and chosen per source and
+  form version. An ODK edit is caught even though Central keeps its submission date: the pull asks
+  for submissions edited since the last edit it saw, and an edit Central sends without
+  `deprecatedID` is recognised by the submission's logical ID.
+- New env keys: `ODK_ENABLED`, `KOBO_BASE_URL`, `KOBO_API_TOKEN`, `KOBO_ASSET_UID`,
+  `KOBO_PULL_PAGE_SIZE`, `KOBO_BACKFILL_THROTTLE`, `KOBO_ENABLED`.
+
 - The administration shell (Phase 5 step 0, D-55): `/admin` opens the ODK pull page; tabs for
   ODK pull, Data issues, Rounds, Facility list and Scoring rules (placeholders until each is
   built), in place of the dashboard filters; the status bar stays. The Data issues tab shows the
@@ -23,6 +37,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   report, and the ODK facility file with its signed download.
 - `odk_pull_runs.parsed`: the rows each run stored and parsed.
 - `make e2e-odk`: Pull now end to end against the mock ODK Central, the stack put back after.
+- The Data issues page (Phase 5 step 2, D-57): every rule with its open count and why it exists
+  (a toggle filters by it); filters in the URL (hard or soft, status, rule, LGA, round); the
+  quarantined records with every failure, the facility's name, a copyable instance ID and an
+  "Open in ODK Central" link when configured; Correct & reprocess with only the correctable
+  fields, each showing what was sent, and a facility search limited to the LGA's active
+  facilities; Reject; Override per soft flag; bulk reject or bulk correct of one field when every
+  selected record fails the same single rule; a detail drawer with the parsed values, the raw
+  submission (collapsed, read-only) and the history. Each outcome is said inline, and the round's
+  queued rescore is linked.
+- `GET /api/quarantine/{record}` (one record in full) and `GET /api/facility-options`.
+- Assessment corrections from the facility drawer (Phase 5 step 3, D-58): while the round is
+  open, item results and visit times can be corrected, with a summary of what changes and a
+  required reason. Scores are worked out again by the scoring engine, never typed; the soft rules
+  run again; the round is rescored; each changed value is in the audit trail with its old and new
+  value. Refused, with a reason in words, for a closed round, a visit moved out of its round, or
+  a correction that would leave nothing to score. `POST /api/assessments/{id}/corrections`.
+- `edqa:demo:data-issues` (local only): known broken submissions through the real pipeline, and
+  `make e2e-issues`, which resolves them in Playwright with the keyboard only.
 - `ConfirmWithReasonDialog` for every reasoned action, `ProgressPanel` for queued work (polls with
   backoff, announces stage changes only), the `useApiAction` hook (CSRF, field and domain errors in
   words, disabled while sending) and `AdminTable`.

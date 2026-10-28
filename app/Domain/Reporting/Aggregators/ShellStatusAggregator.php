@@ -10,7 +10,7 @@ use Illuminate\Container\Attributes\Config;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The shell's status (ARCHITECTURE.md §9.1, D-54): the ODK sync state from odk_pull_runs, and how
+ * The shell's status (ARCHITECTURE.md §9.1, D-54): the ODK sync state from pull_runs, and how
  * many assessments count. Never the quarantine (hard rule 6): that count comes from Validation.
  *
  * States, each said in words by the sync status bar:
@@ -34,7 +34,7 @@ final class ShellStatusAggregator
     public function sync(): array
     {
         // The incremental pull only: a backfill (hours, once) says nothing about how fresh the data is.
-        $pulls = fn () => DB::table('odk_pull_runs')->where('trigger_type', '!=', 'backfill');
+        $pulls = fn () => DB::table('pull_runs')->where('trigger_type', '!=', 'backfill');
         $latest = $pulls()->whereNotNull('finished_at')->whereIn('outcome', ['succeeded', 'failed'])->orderByDesc('finished_at')->orderByDesc('id')->first(['finished_at', 'outcome', 'error']);
         $success = $pulls()->where('outcome', 'succeeded')->max('finished_at');
         $lastSuccess = is_string($success) ? CarbonImmutable::parse($success) : null;
@@ -93,7 +93,7 @@ final class ShellStatusAggregator
     {
         $hours = (int) config('edqa.status.banner_after_hours', 24);
         $round = DB::table('rounds')->where('status', 'open')->orderByDesc('year')->orderByDesc('quarter')->first(['year', 'quarter']);
-        $success = DB::table('odk_pull_runs')->where('trigger_type', '!=', 'backfill')->where('outcome', 'succeeded')->max('finished_at');
+        $success = DB::table('pull_runs')->where('trigger_type', '!=', 'backfill')->where('outcome', 'succeeded')->max('finished_at');
         $lastSuccess = is_string($success) ? CarbonImmutable::parse($success) : null;
         $stale = $round !== null && OdkConfig::fromConfig()->isConfigured()
             && ($lastSuccess === null || $lastSuccess->lessThan(now()->subHours($hours)));

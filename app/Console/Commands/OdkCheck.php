@@ -7,8 +7,9 @@ namespace App\Console\Commands;
 use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\DTOs\FormVersion;
 use App\Domain\Ingestion\Exceptions\OdkException;
-use App\Domain\Ingestion\Odk\FieldMap;
+use App\Domain\Ingestion\FieldMap;
 use App\Domain\Ingestion\Odk\OdkConfig;
+use App\Domain\Ingestion\Odk\OdkPayloadNormalizer;
 use Illuminate\Console\Command;
 
 /**
@@ -46,7 +47,7 @@ final class OdkCheck extends Command
                     'versions' => array_map(fn (FormVersion $v): array => [
                         'version' => $v->version,
                         'published_at' => $v->publishedAt?->toIso8601String(),
-                        'mapped' => FieldMap::resolve($v->version) !== null,
+                        'mapped' => FieldMap::for(OdkPayloadNormalizer::SOURCE, $v->version) !== null,
                     ], $versions),
                 ];
             } catch (OdkException $e) {

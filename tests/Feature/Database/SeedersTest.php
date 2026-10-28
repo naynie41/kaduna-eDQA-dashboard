@@ -96,6 +96,10 @@ it('builds about 2,000 public and exactly 219 private synthetic facilities', fun
 
 it('seeds a demo dataset whose item responses approximate the published means', function (): void {
     runSeedersAs('local', DatabaseSeeder::class);
+    // Thousands of rows inside the test's transaction: give the planner their real size. Without
+    // it, statistics autovacuum took from earlier rolled-back tests can say "empty", and the
+    // aggregate queries below pick a nested-loop plan that does not finish under parallel load.
+    DB::statement('ANALYZE assessments, assessment_scores, facilities, item_responses, rounds');
 
     expect(DB::table('lgas')->count())->toBe(23)
         ->and(DB::table('facilities')->count())->toBe(2176)

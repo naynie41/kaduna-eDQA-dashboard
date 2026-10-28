@@ -3,37 +3,39 @@
 declare(strict_types=1);
 
 /*
- * ODK question paths per form version (ARCHITECTURE.md §5.1, §5.5), read by
- * App\Domain\Ingestion\Odk\FieldMap. A submission is read through the map for its
- * __system.formVersion; a version with no entry here quarantines under UNKNOWN_FORM_VERSION:
- * never fall back to the default map (CLAUDE.md hard rule 12).
+ * Field maps (ARCHITECTURE.md §5.1, §5.5), read by App\Domain\Ingestion\FieldMap.
  *
- * The default version is a full map. Any other version is ADDITIVE: it lists only the paths that
- * differ from the default, plus 'renames' for scored questions it names differently
- * ([name in this version => name in the default]). FieldMap::resolve() merges it over the default.
+ * 'maps' are named. A map is either full or ADDITIVE: with 'extends' it lists only the paths that
+ * differ from the map it extends, plus 'renames' for scored questions it names differently
+ * ([name in this form => name in the base form]).
  *
- * Paths are dot paths into one entry of the ODK Central OData Submissions response: a group is a
- * nested object, so facility.lga reads {"facility": {"lga": …}}. __id, __system and meta are
- * ODK's own and the same in every version, so they are not mapped here.
+ * 'sources' says, for each source, which map each of its form versions uses: ODK Central labels a
+ * version with __system/formVersion, KoboToolbox with its deployment __version__. The same
+ * XLSForm deployed on both platforms points at one map. A (source, version) pair with no entry
+ * quarantines under UNKNOWN_FORM_VERSION: never fall back to another version's map (CLAUDE.md
+ * hard rule 12).
+ *
+ * Paths are dot paths into a submission's answers after its source's normaliser
+ * (SubmissionEnvelope::$data): a group is a nested object, so facility.lga reads
+ * {"facility": {"lga": …}}. The source's own fields (ODK's __id, __system, meta; Kobo's _id,
+ * _submission_time, …) are in the envelope's meta, not mapped here.
  *
  * Scored questions are not listed: every leaf whose name (after renames) matches
  * scored_prefix_pattern is one, wherever its group. Answers are mapped to pass / fail / na with
- * the scoring rule version's choice_map (Q-25), not here.
+ * the scoring rule version's choice_map (Q-25 in the build-era numbering), not here.
  *
- * The real maps come from the form XML of every published version (discovery/form_versions.py
- * and field_diff.py), which waits for ODK credentials (ARCHITECTURE.md §11.5).
+ * The real maps come from the form XML of every deployed version on each source (Phase 0 task,
+ * ARCHITECTURE.md §5.5), which waits for credentials.
  *
- * Version keys contain dots, so read config('edqa_field_maps.versions')[$version]; never
- * config("edqa_field_maps.versions.{$version}"), which splits '2026.1' at the dot.
+ * Version keys contain dots, so read config('edqa_field_maps.sources')[$source][$version]; never
+ * config("edqa_field_maps.sources.{$source}.{$version}"), which splits '2026.1' at the dot.
  */
 
 return [
 
-    'default' => '2026.1',
-
-    'versions' => [
+    'maps' => [
         // The current form, as ARCHITECTURE.md §5.1 specifies it.
-        '2026.1' => [
+        'xls-2026.1' => [
             'facility_code' => 'facility.facility_code', // CONTRACT-ASSUMED: replace when the real form is audited.
             'lga_code' => 'facility.lga', // CONTRACT-ASSUMED: replace when the real form is audited.
             'ward_code' => 'facility.ward', // CONTRACT-ASSUMED: replace when the real form is audited.
@@ -48,10 +50,11 @@ return [
             'renames' => [],
         ],
 
-        // FICTIONAL older version, to exercise the additive map: the facility group was "fac" with
+        // FICTIONAL older form, to exercise the additive map: the facility group was "fac" with
         // its own question names, the assessor question was "assessor", and the NHMIS summary
         // question was called "nhmis_form" in Availability.
-        '2025.2' => [
+        'xls-2025.2' => [
+            'extends' => 'xls-2026.1',
             'facility_code' => 'fac.fac_code', // CONTRACT-ASSUMED: replace when the real form is audited.
             'lga_code' => 'fac.lga_name', // CONTRACT-ASSUMED: replace when the real form is audited.
             'ward_code' => 'fac.ward_name', // CONTRACT-ASSUMED: replace when the real form is audited.
@@ -62,6 +65,23 @@ return [
                 'avail_m3_nhmis_form' => 'avail_m3_nhmis_summary', // CONTRACT-ASSUMED: replace when the real form is audited.
             ],
         ],
+    ],
+
+    'sources' => [
+        // __system/formVersion => map.
+        'odk' => [
+            '2026.1' => 'xls-2026.1', // CONTRACT-ASSUMED: replace when the real form is audited.
+            '2025.2' => 'xls-2025.2', // CONTRACT-ASSUMED: replace when the real form is audited.
+        ],
+        // __version__ (the Kobo deployment) => map. None known yet: every Kobo submission
+        // quarantines under UNKNOWN_FORM_VERSION until the deployed versions are listed (§5.5).
+        'kobo' => [],
+    ],
+
+    // The version each source's current form carries, for code that writes a submission itself
+    // (the mock ODK Central, the local demos). Never used to read one.
+    'current' => [
+        'odk' => '2026.1',
     ],
 
 ];

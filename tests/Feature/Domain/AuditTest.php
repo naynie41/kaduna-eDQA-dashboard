@@ -8,10 +8,10 @@ use App\Domain\Assessment\Models\ItemResponse;
 use App\Domain\Facility\Models\Facility;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Facility\Models\Ward;
-use App\Domain\Ingestion\Models\OdkAttachment;
-use App\Domain\Ingestion\Models\OdkFormSync;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
+use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 use App\Domain\Plan\Models\PlanAction;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
@@ -97,9 +97,9 @@ it('audits exactly the models SECURITY.md §4 lists', function (string $model, b
     'User' => [User::class, true],
     'Lga (seeded only)' => [Lga::class, false],
     'Submission (raw, immutable)' => [Submission::class, false],
-    'OdkFormSync' => [OdkFormSync::class, false],
-    'OdkPullRun' => [OdkPullRun::class, false],
-    'OdkAttachment' => [OdkAttachment::class, false],
+    'SourceSync' => [SourceSync::class, false],
+    'PullRun' => [PullRun::class, false],
+    'SubmissionAttachment' => [SubmissionAttachment::class, false],
 ]);
 
 it('logs item responses only when they are corrected, not when ingested', function (): void {

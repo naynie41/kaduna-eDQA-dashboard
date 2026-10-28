@@ -27,6 +27,10 @@ arch('reporting never reads quarantine or raw submissions')
     ->not->toUse([
         'App\Domain\Validation\Models\QuarantinedRecord',
         'App\Domain\Ingestion\Models\Submission',
+        // Phase 2C: the source rows and adapters are ingestion's; Reporting reads assessments only.
+        'App\Domain\Ingestion\Models\SubmissionSource',
+        'App\Domain\Ingestion\Contracts\SubmissionSource',
+        'App\Domain\Ingestion\SourceRegistry',
     ]);
 
 // The same rule from the other side, so it holds before Reporting has a single class: only
@@ -87,7 +91,20 @@ it('keeps AVG, SUM and COUNT in SQL inside App\Domain\Reporting', function (): v
     expect($offenders)->toBe([]);
 });
 
-// CLAUDE.md hard rule 1: ODK is the only data source.
+// ARCHITECTURE.md §5.2: the parser reads only the SubmissionEnvelope, so it cannot tell the
+// sources apart; no source's classes in it.
+arch('the parser and the field map know no source')
+    ->expect(['App\Domain\Ingestion\SubmissionParser', 'App\Domain\Ingestion\FieldMap'])
+    ->not->toUse(['App\Domain\Ingestion\Odk', 'App\Domain\Ingestion\Kobo', 'Illuminate\Support\Facades\DB', 'Illuminate\Support\Facades\Http']);
+
+// A normaliser is pure: no I/O, so reprocessing a stored payload always reads it the same way.
+arch('payload normalisers are pure')
+    ->expect('App\Domain\Ingestion\Odk\OdkPayloadNormalizer')
+    ->toImplement('App\Domain\Ingestion\Contracts\PayloadNormalizer')
+    ->not->toUse(['Illuminate\Support\Facades', 'Illuminate\Http', 'App\Domain\Ingestion\Odk\OdkCentralClient', 'App\Domain\Ingestion\Models']);
+
+// CLAUDE.md hard rule 1: data enters only from the configured sources (ODK Central, KoboToolbox),
+// through the shared pipeline.
 it('has no CSV import path', function (): void {
     // Arch tests don't boot Laravel, so no app_path() here.
     expect(__DIR__.'/../../app/Domain/Ingestion/Csv')->not->toBeDirectory();

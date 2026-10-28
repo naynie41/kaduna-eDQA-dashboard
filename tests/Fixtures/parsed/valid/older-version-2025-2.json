@@ -1,4 +1,6 @@
 {
+    "source": "odk",
+    "external_id": "uuid:fx-older-version-2025-2",
     "instance_id": "uuid:fx-older-version-2025-2",
     "deprecated_id": null,
     "form_version": "2025.2",

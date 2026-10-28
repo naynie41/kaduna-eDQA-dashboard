@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Ingestion\Enums;
 
-/** How an ODK pull run ended (odk_pull_runs.outcome); null while it runs. */
+/** How an ODK pull run ended (pull_runs.outcome); null while it runs. */
 enum PullOutcome: string
 {
     case Succeeded = 'succeeded';

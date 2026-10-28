@@ -1,4 +1,6 @@
 {
+    "source": "odk",
+    "external_id": "uuid:fx-score-jump",
     "instance_id": "uuid:fx-score-jump",
     "deprecated_id": null,
     "form_version": "2026.1",

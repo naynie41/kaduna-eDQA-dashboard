@@ -6,7 +6,7 @@ namespace App\Domain\Ingestion\Queries;
 
 use App\Domain\Ingestion\Attachments\AttachmentRules;
 use App\Domain\Ingestion\Enums\AttachmentStatus;
-use App\Domain\Ingestion\Models\OdkAttachment;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 
 /**
  * The one fetched attachment a request may read (SECURITY.md §7): the filename must be a safe
@@ -16,13 +16,13 @@ use App\Domain\Ingestion\Models\OdkAttachment;
  */
 final class AttachmentFileQuery
 {
-    public function find(int $submissionId, string $filename): ?OdkAttachment
+    public function find(int $submissionId, string $filename): ?SubmissionAttachment
     {
         if (! AttachmentRules::isSafeName($filename)) {
             return null;
         }
 
-        $attachment = OdkAttachment::query()
+        $attachment = SubmissionAttachment::query()
             ->where('submission_id', $submissionId)
             ->where('filename', $filename)
             ->where('status', AttachmentStatus::Fetched)

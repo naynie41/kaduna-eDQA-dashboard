@@ -62,7 +62,6 @@ final class RescoreAssessments
 
             $run = RescoreRun::query()->findOrFail($runId);
             $round = Round::query()->findOrFail($run->round_id);
-            $rules = RuleConfig::fromVersion(ScoringRuleVersion::query()->findOrFail($run->rule_version_id));
 
             $assessments = Assessment::query()
                 ->whereIn('id', $assessmentIds)
@@ -71,23 +70,7 @@ final class RescoreAssessments
                 ->lockForUpdate()
                 ->get();
 
-            $cards = [];
-            $unscorable = [];
-            foreach ($this->items($assessments->modelKeys(), $rules) as $assessmentId => $items) {
-                try {
-                    $cards[$assessmentId] = $this->calculator->calculate($items, $rules);
-                } catch (IncompleteAssessmentException) {
-                    $unscorable[] = $assessmentId;
-                }
-            }
-            foreach ($assessments as $assessment) {
-                if (! isset($cards[$assessment->id]) && ! in_array($assessment->id, $unscorable, true)) {
-                    $unscorable[] = $assessment->id; // no items at all
-                }
-            }
-
-            $changedScores = $this->writeScores($cards, $run->rule_version_id) + $this->removeScores($unscorable, $run->rule_version_id);
-            $changedFlags = $this->updateFlags($assessments, $cards, $round);
+            $result = $this->score($assessments, $round, $run->rule_version_id);
 
             DB::update(<<<'SQL'
                 UPDATE rescore_runs
@@ -95,8 +78,41 @@ final class RescoreAssessments
                     changed_flags = changed_flags + ?, unscorable = unscorable + ?,
                     completed_chunks = array_append(completed_chunks, ?)
                 WHERE id = ? AND NOT (? = ANY(completed_chunks))
-                SQL, [count($assessmentIds), $changedScores, $changedFlags, count($unscorable), $chunk, $runId, $chunk]);
+                SQL, [count($assessmentIds), $result['scores'], $result['flags'], count($result['unscorable']), $chunk, $runId, $chunk]);
         });
+    }
+
+    /**
+     * Steps 1 to 3 for assessments the caller has locked, in the caller's transaction: scores
+     * from their item responses through ScoreCalculator, written and audited, and the
+     * score-based flags. A run's chunk uses it, and so does CorrectAssessment for the one
+     * assessment it corrected, so a corrected assessment is scored exactly as a rescore would.
+     *
+     * @param  Collection<int, Assessment>  $assessments
+     * @return array{scores: int, flags: int, unscorable: list<int>}
+     */
+    public function score(Collection $assessments, Round $round, int $ruleVersionId): array
+    {
+        $rules = RuleConfig::fromVersion(ScoringRuleVersion::query()->findOrFail($ruleVersionId));
+
+        $cards = [];
+        $unscorable = [];
+        foreach ($this->items($assessments->modelKeys(), $rules) as $assessmentId => $items) {
+            try {
+                $cards[$assessmentId] = $this->calculator->calculate($items, $rules);
+            } catch (IncompleteAssessmentException) {
+                $unscorable[] = $assessmentId;
+            }
+        }
+        foreach ($assessments as $assessment) {
+            if (! isset($cards[$assessment->id]) && ! in_array($assessment->id, $unscorable, true)) {
+                $unscorable[] = $assessment->id; // no items at all
+            }
+        }
+
+        $changedScores = $this->writeScores($cards, $ruleVersionId) + $this->removeScores($unscorable, $ruleVersionId);
+
+        return ['scores' => $changedScores, 'flags' => $this->updateFlags($assessments, $cards, $round), 'unscorable' => $unscorable];
     }
 
     /**

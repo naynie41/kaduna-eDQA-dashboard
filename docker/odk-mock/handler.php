@@ -126,9 +126,11 @@ function odk_mock_submissions(string $dataDir, array $config, array $query): arr
         }
         $rows = array_values(array_filter($rows, $test));
     }
-    // $orderby on __system/submissionDate (the default) or __system/updatedAt, ascending.
-    $order = preg_match('#^__system/(submissionDate|updatedAt)( asc)?$#', (string) ($query['$orderby'] ?? ''), $o) === 1 ? $o[1] : 'submissionDate';
-    usort($rows, fn (array $a, array $b): int => [$a['__system'][$order] ?? '', $a['__id']] <=> [$b['__system'][$order] ?? '', $b['__id']]);
+    // $orderby on __system/submissionDate (the default) or __system/updatedAt, ascending, then
+    // __id (optional ",__id asc"). A row with no updatedAt sorts after the rest, as Postgres puts
+    // NULLs last.
+    $order = preg_match('#^__system/(submissionDate|updatedAt)( asc)?(,\s*__id( asc)?)?$#i', (string) ($query['$orderby'] ?? ''), $o) === 1 ? $o[1] : 'submissionDate';
+    usort($rows, fn (array $a, array $b): int => [! isset($a['__system'][$order]), $a['__system'][$order] ?? '', $a['__id']] <=> [! isset($b['__system'][$order]), $b['__system'][$order] ?? '', $b['__id']]);
 
     $total = count($rows);
     $skip = max(0, (int) ($query['$skip'] ?? 0));

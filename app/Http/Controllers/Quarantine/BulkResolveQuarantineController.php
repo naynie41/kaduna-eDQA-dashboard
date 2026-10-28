@@ -30,7 +30,7 @@ final class BulkResolveQuarantineController extends Controller
 
         return QuarantineResolutionResource::collection(
             QuarantinedRecord::query()->whereKey(array_map(fn (QuarantinedRecord $r): int => $r->id, $records))
-                ->with('submission.assessment')->orderBy('id')->get(),
+                ->with(['submission.assessment', 'round:id,year,quarter'])->orderBy('id')->get(),
         );
     }
 }

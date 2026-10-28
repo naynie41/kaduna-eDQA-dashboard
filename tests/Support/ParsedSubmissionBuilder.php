@@ -7,6 +7,7 @@ namespace Tests\Support;
 use App\Domain\Facility\Models\Facility;
 use App\Domain\Ingestion\DTOs\ItemResponseData;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Ingestion\FieldMap;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Enums\Dimension;
 use Carbon\CarbonImmutable;
@@ -76,6 +77,12 @@ final class ParsedSubmissionBuilder
      * By default formVersionKnown follows the config, as the parser would set it; pass $known
      * to make the parser's answer disagree with the config.
      */
+    /** A submission from another source (its key in edqa.sources). */
+    public function fromSource(string $key): self
+    {
+        return $this->set('source', $key);
+    }
+
     public function withFormVersion(string $version, ?bool $known = null): self
     {
         $this->set('formVersion', $version);
@@ -197,10 +204,13 @@ final class ParsedSubmissionBuilder
         $startedAt = CarbonImmutable::parse($round->window_start->toDateString().' 09:00', (string) config('app.timezone'))->addDays(13);
         $endedAt = $startedAt->addMinutes($this->visitMinutes ?? self::VISIT_MINUTES);
 
+        $instanceId = 'uuid:'.Str::uuid()->toString();
         $fields = [
-            'instanceId' => 'uuid:'.Str::uuid()->toString(),
+            'source' => 'odk',
+            'externalId' => $instanceId,
+            'instanceId' => $instanceId,
             'deprecatedId' => null,
-            'formVersion' => (string) config('edqa_field_maps.default'),
+            'formVersion' => (string) config('edqa_field_maps.current.odk'),
             'formVersionKnown' => true,
             'submittedAt' => $endedAt->addMinutes(5),
             'startedAt' => $startedAt,
@@ -252,8 +262,6 @@ final class ParsedSubmissionBuilder
     /** @return array<string, mixed> */
     private static function knownVersions(): array
     {
-        $versions = config('edqa_field_maps.versions');
-
-        return is_array($versions) ? $versions : [];
+        return array_fill_keys(FieldMap::known()['odk'] ?? [], true);
     }
 }

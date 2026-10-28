@@ -10,7 +10,7 @@ use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Exceptions\OdkException;
 use App\Domain\Ingestion\Jobs\PullSubmissionsJob;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Ingestion\Odk\PullLock;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -64,7 +64,7 @@ final class Pull extends Command
     private function pull(PullLock $lock, PullSubmissions $pullSubmissions): int
     {
         try {
-            $run = $lock->run(fn (): OdkPullRun => $pullSubmissions->execute(PullTrigger::Manual), (int) config('edqa.odk.pull.lock_wait_seconds', 600));
+            $run = $lock->run(fn (): PullRun => $pullSubmissions->execute(PullTrigger::Manual), (int) config('edqa.odk.pull.lock_wait_seconds', 600));
         } catch (LockTimeoutException) {
             $this->error((string) __('odk.pull.busy'));
 

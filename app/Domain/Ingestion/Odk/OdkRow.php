@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Ingestion\Odk;
 
+use App\Domain\Ingestion\FieldMap;
 use Carbon\CarbonImmutable;
 use Throwable;
 

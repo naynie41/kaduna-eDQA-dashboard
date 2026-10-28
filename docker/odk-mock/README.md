@@ -38,7 +38,7 @@ To put real credentials back, restore the five `ODK_*` values and remove
 | `POST /v1/sessions` | a token for `mock@odk.local` / `mock-password`; anything else is 401 |
 | `GET /v1/users/current`, `/v1/projects/1`, `/v1/projects/1/forms/dqa` | the account, project and form (current version) |
 | `GET …/forms/dqa/versions` | the published versions: the generated one and every version with a field map |
-| `GET …/forms/dqa.svc/Submissions` | the OData feed: `$filter` on `__system/submissionDate` or `__system/updatedAt` (`gt ge lt le eq`, joined by `and` / `or`), `$top`, `$skip`, `$count=true`; `$expand` is ignored; oldest submission first |
+| `GET …/forms/dqa.svc/Submissions` | the OData feed: `$filter` on `__system/submissionDate` or `__system/updatedAt` (`gt ge lt le eq`, joined by `and` / `or`), `$orderby` on either (then optionally `__id`; no `updatedAt` sorts last), `$top`, `$skip`, `$count=true`; `$expand` is ignored |
 | `GET …/submissions/{instanceId}/attachments` and `…/attachments/{name}` | the attachment list, and the file with its content type |
 
 Every other request is 404; anything but a GET or the session POST is 405 (the mock, like the

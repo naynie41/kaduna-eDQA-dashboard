@@ -60,7 +60,7 @@ function bulkAssessments(int $round, int $version, string $ownership, int $count
         DB::table('facilities')->insert($facilityRows);
         $facilityIds = DB::table('facilities')->whereIn('code', array_column($facilityRows, 'code'))->pluck('id')->all();
 
-        $submissionRows = array_map(fn (int $id): array => ['instance_id' => "uuid:ref-{$id}", 'form_id' => 'dqa', 'form_version' => '2026.1',
+        $submissionRows = array_map(fn (int $id): array => ['source_id' => Rows::sourceId(), 'external_id' => "uuid:ref-{$id}", 'instance_id' => "uuid:ref-{$id}", 'form_ref' => 'dqa', 'form_version' => '2026.1',
             'payload' => '{}', 'submitted_at' => $now, 'received_at' => $now, 'status' => 'accepted'], $facilityIds);
         DB::table('submissions')->insert($submissionRows);
         $submissions = DB::table('submissions')->whereIn('instance_id', array_column($submissionRows, 'instance_id'))->pluck('id', 'instance_id');

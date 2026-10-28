@@ -6,7 +6,7 @@ namespace Tests\Support;
 
 use App\Domain\Ingestion\DTOs\ItemResponseData;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
-use App\Domain\Ingestion\Odk\FieldMap;
+use App\Domain\Ingestion\FieldMap;
 
 /**
  * The ODK Central OData entry that SubmissionParser reads back into a given ParsedSubmission: the
@@ -38,7 +38,7 @@ final class OdkPayload
             'meta' => array_filter(['instanceID' => $parsed->instanceId, 'deprecatedID' => $parsed->deprecatedId], fn (?string $v): bool => $v !== null),
         ];
 
-        $map = FieldMap::resolve($parsed->formVersion);
+        $map = FieldMap::for($parsed->source, $parsed->formVersion);
         if (! $parsed->formVersionKnown || $map === null) {
             return $entry;
         }

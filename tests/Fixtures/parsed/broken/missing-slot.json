@@ -1,4 +1,6 @@
 {
+    "source": "odk",
+    "external_id": "uuid:fx-missing-slot",
     "instance_id": "uuid:fx-missing-slot",
     "deprecated_id": null,
     "form_version": "2026.1",

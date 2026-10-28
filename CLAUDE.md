@@ -10,8 +10,8 @@ Anything stated here or in the files it points to does not need repeating in pro
 | `CLAUDE.md` | every session (this file) |
 | `ARCHITECTURE.md` | touching domain models, schema, ingestion, validation, scoring, API or page structure |
 | `CONVENTION.md` | writing any code, test, migration, component or commit |
-| `SECURITY.md` | touching auth, routes, audit, file serving, ODK credentials, webhooks |
-| `ACCESSIBILITY.md` | touching any UI. *Not yet in the repo; until supplied, apply WCAG 2.2 AA and CONVENTION.md §6* |
+| `SECURITY.md` | touching auth, routes, audit, file serving, source credentials (ODK/Kobo), webhooks |
+| `ACCESSIBILITY.md` | touching any UI |
 | `DEPLOY.md` | touching the `Dockerfile`, `docker/`, `compose.dev.yml`, or anything the servers depend on (env keys, queues, schedule, volumes, DB roles, health route). Lives in the separate `edqa-infra` DevOps project; a copy is kept here for reference |
 
 Source material: the PRD (*Kaduna eDQA Portal — Product Requirements Document*) and the visual
@@ -25,7 +25,8 @@ wins** (`ARCHITECTURE.md` §11.2).
 A Laravel + PostgreSQL application replacing the Kaduna State eDQA Looker Studio report
 ("Data Quality Assessment e-tool version 3"). It:
 
-1. **Pulls** quarterly Data Quality Assessment submissions from **ODK Central** — the only source.
+1. **Pulls** quarterly Data Quality Assessment submissions from its two field-collection sources,
+   **ODK Central** and **KoboToolbox**, through one shared pipeline — nothing else.
 2. **Validates** every submission before it can influence any number. Failures are quarantined.
 3. **Computes** every score server-side from raw item responses. Scores are never accepted from input.
 4. **Presents** results on six dashboard pages and five administration pages.
@@ -43,24 +44,29 @@ aggregate, chart or export — stop and flag it.
 
 ## 2. Stack
 
-Laravel 13 · PHP 8.3 · PostgreSQL 16 (14 min) · Inertia 3 + React 19 + TypeScript (strict) ·
+Laravel 12 · PHP 8.3 · PostgreSQL 16 (14 min) · Inertia 2 + React 18 + TypeScript (strict) ·
 Tailwind CSS 4 · Recharts + hand-built SVG · TanStack Table (server-driven) · Redis queue/cache
-(database fallback) · Fortify with 2FA (mandatory unless `EDQA_REQUIRE_2FA=false`, D-26) · maatwebsite/excel · spatie/laravel-pdf
-(Browsershot) · spatie/laravel-activitylog · Pest 4 · Larastan level 6 · Pint · Pulse.
+(database fallback) · Fortify with mandatory 2FA · maatwebsite/excel · spatie/laravel-pdf
+(Browsershot) · spatie/laravel-activitylog · Pest 3 · Larastan level 6 · Pint · Pulse.
 
 **Runtime:** Docker. One multi-stage `Dockerfile` (targets `app`, `worker`, `web`, `ci`, `dev`),
 `compose.dev.yml` for local work, Caddy as the web tier, Docker Compose on a single host in
 staging/production. The same images run in dev, CI, staging and production.
 
 **Deliberately absent:** `spatie/laravel-permission`, policies, gates, role columns, any
-import/upload library, any DHIS2 / Kobo / Google Sheets client.
+import/upload library, any DHIS2 / Google Sheets client. (KoboToolbox *is* supported — as a
+`SubmissionSource` adapter, decision D-21.)
 
 ---
 
 ## 3. Hard rules (non-negotiable)
 
-1. **ODK is the only data source.** No import controller, upload route, CSV parser for
-   ingestion, or second ingestion path. Export-only CSV is fine. No `Ingestion/Csv/` directory.
+1. **Data enters only from the configured field-collection sources — ODK Central and
+   KoboToolbox — through the shared pipeline** (adapter → normaliser → parser → validation).
+   No import controller, upload route, CSV parser for ingestion, or source-specific shortcut
+   past the normaliser. Export-only CSV is fine. No `Ingestion/Csv/` directory. A new source
+   means a new adapter + a decision record. (The console-only facility master-list import, D-19,
+   is reference data, not assessment data.)
 2. **Never accept a score from input.** Always derive from item responses.
 3. **One role: Administrator.** No permissions package, policy, gate or role column. One
    middleware group (`auth`, `verified`, `two-factor.confirmed`) is the whole authorisation model.
@@ -71,7 +77,8 @@ import/upload library, any DHIS2 / Kobo / Google Sheets client.
 6. **No aggregate reads a table that can hold an unvalidated row.** Quarantine lives in
    `quarantined_records`; Reporting never touches it or `submissions` (architecture test).
 7. **Every write is audited** — actor, time, old, new, reason where required — and asserted by test.
-8. **Raw ODK payloads are never mutated.** Reprocessing reads `submissions.payload`, never ODK.
+8. **Raw source payloads are never mutated.** Reprocessing reads `submissions.payload` through its
+   own source's normaliser, never re-fetching.
 9. **The LGA list is fixed at 23.** Seeded; no runtime insert path.
 10. **Every user-facing string goes through a language file.**
 11. **Status is never carried by colour alone**, and every chart has a table equivalent.
@@ -80,13 +87,15 @@ import/upload library, any DHIS2 / Kobo / Google Sheets client.
 13. **Containers are stateless.** Persistent files only under `storage/app`; logs to stderr;
     config cached at start, never at build; migrations only in the `migrate` role
     (`CONVENTION.md` §12).
+14. **Never commit, tag or push.** The owner does all git writes; Claude stops with the work
+    uncommitted and suggests the message (§9).
 
 ---
 
 ## 4. Domain vocabulary (use exactly)
 
 **Round** (year + quarter, open → closed) · **Facility** · **Assessment** (one visit, one facility,
-one round) · **Submission** (raw ODK record) · **Dimension** (`availability`, `consistency`,
+one round) · **Submission source** (`odk` or `kobo`) · **Submission** (raw record from a source) · **Dimension** (`availability`, `consistency`,
 `validity`) · **Month slot** (1–3; Q2 slot 1 = April) · **Item response** · **Score** (derived,
 0–100) · **Quarantine** (hard-rule failure) · **Flag** (soft-rule hit) · **Band** (Strong /
 Acceptable / Review / Needs action) · **Rule version**.
@@ -113,24 +122,24 @@ Strictly in sequence. Each step green (Pint, Larastan, Pest) before the next.
 
 | # | Step | Acceptance |
 |---|---|---|
-| 1 | Scaffold: Laravel, Inertia + React + TS, Pint, Larastan, Pest; **Dockerfile (all targets), `docker/`, `compose.dev.yml`, Makefile**; CI running tests in the `ci` image and building `app`/`worker`/`web` | `make up` serves the app; images build. CI and Trivy deferred (ARCHITECTURE.md §11.5) |
+| 1 | Scaffold: Laravel, Inertia + React + TS, Pint, Larastan, Pest; **Dockerfile (all targets), `docker/`, `compose.dev.yml`, Makefile**; CI running tests in the `ci` image and building `app`/`worker`/`web` | `make up` serves the app; CI green; images build and pass Trivy |
 | 2 | Migrations for every table incl. CHECKs, GIN indexes, `refresh_round_aggregates()` — **constraint tests first, watch them fail** | A 347.66 score is rejected by the database |
 | 3 | Models, enums, relationships, factories | |
-| 4 | Seeders: 23 LGAs, wards, synthetic facilities, four demo rounds | |
-| 5 | Fortify + 2FA (mandatory unless `EDQA_REQUIRE_2FA=false`, D-26), `edqa:admin:create`, route-guard test | Only login/2FA/reset, webhook, `/up` unauthenticated |
+| 4 | Seeders: 23 LGAs, wards, synthetic facilities, one round | |
+| 5 | Fortify + mandatory 2FA, `edqa:admin:create`, route-guard test | Only login/2FA/reset, webhook, `/up` unauthenticated |
 | 6 | `ValidationRule` contract, all **14** rules, pipeline, quarantine, broken-submission fixtures | Each fixture quarantines with the right code |
 | 7 | `ScoreCalculator` + rule versions | Reproduces the published figures — **before anything visual** |
-| 8 | ODK client, field maps, pull job, lock, idempotency, edits, backfill, attachments, `odk_pull_runs` | Real submission lands end to end; old form version parses; broken one quarantines |
+| 8 | Source contracts + normalisers; ODK Central and KoboToolbox adapters; field maps per (source, version); pull job per source, lock, idempotency, edits + reconcile, backfill, attachments, `pull_runs` | A submission from each source lands end to end; old form version parses; broken one quarantines |
 | 9 | Aggregators + `round_aggregates` view + cache | Aggregates match a known client round |
 | 10 | Dashboard: Home, Facility, LGA, Monitor, Visuals, Implementation plan, facility drawer | Performance + accessibility budgets met |
-| 11 | Admin: ODK pull, Data issues, Rounds, Facility list, Scoring rules | An admin runs a round without developer help |
+| 11 | Admin: Data sources, Data issues, Rounds, Facility list, Scoring rules | An admin runs a round without developer help |
 | 12 | Exports (CSV, Excel, plan workbook), then PDF round report | |
 | 13 | Daily digest, heartbeats, Pulse | |
 | 14 | Backfill run + backfill report | Every historical round loaded or gaps explained |
 
-Phase view for the client: Discovery 1 wk · Foundation 1.5 · Ingestion 3 · Scoring 1.5 ·
+Phase view for the client: Discovery 1 wk · Foundation 1.5 · Ingestion 3 (+1.5 for KoboToolbox) · Scoring 1.5 ·
 Dashboard 3.5 · Admin 1.5 · Exports & plan 1.5 · Backfill 1.5 · UAT 1.5 · Deploy & training 1
-= 17.5 working weeks (quote 20–22 calendar).
+= 19 working weeks with Kobo (quote 22–24 calendar).
 
 ---
 
@@ -147,33 +156,20 @@ Everything runs inside the containers.
 make up                                  # start the dev stack (app, web :8080, vite, worker, postgres, redis, mailpit)
 make sh                                  # shell in the app container
 make check                               # pint --test, phpstan, pest
-make test                                # pest --parallel against edqa_test (slow group excluded)
-make test-slow                           # the slow group: rescore of 2,200 assessments < 5 min; server p95 on ~44k
-make e2e                                 # Playwright + axe against the running dev stack (c="shell" to pick specs)
-make e2e-odk                             # Pull now end to end against the mock ODK Central (app and worker put back after)
-make size                                # bundle budget: first-visit gzipped JS < 300 KB
-make lighthouse                          # Lighthouse, Slow 3G, against a production build (stops and restarts vite)
-make npm c="test"                        # Vitest (also c="run typecheck", c="run lint")
-make fresh                               # drop, migrate and seed the dev database
-make grants-check                        # prove edqa_app's least-privilege grants
-make prod-build                          # build the app, worker and web images locally
-make routes                              # regenerate Wayfinder route helpers
-make artisan c="edqa:pull"               # one ODK pull, synchronous
-make artisan c="edqa:pull --dry-run"     # fetch, parse, validate up to --limit=200; writes nothing
-make artisan c="edqa:backfill --survey"  # submissions per quarter and form version, and quarters without a round; writes nothing
-make artisan c="edqa:backfill"           # resumable historical backfill (--from-page=, --throttle=, --dry-run)
-make artisan c="edqa:backfill-report"    # per round and per rule, to storage/app/exports (--format=md|csv)
-make artisan c="edqa:attachments:fetch-pending"  # queue pending/failed attachment fetches (--sync, --limit=)
+make test                                # pest --parallel against edqa_test
+make artisan c="edqa:source:check kobo"  # test a source connection
+make artisan c="edqa:pull odk"           # one pull for a source (or --all), synchronous
+make artisan c="edqa:reconcile kobo"     # edit/deletion sweep for the open round
+make artisan c="edqa:backfill kobo"      # resumable historical backfill, one source at a time
 make artisan c="edqa:rescore"
-make artisan c="edqa:seed:perf"          # local only: five years of scored assessments (~44k), for budgets
-make odk-mock-up                         # mock ODK Central (profile odk); see docker/odk-mock/README.md
-make odk-mock-seed n=200                 # raw submissions for the mock, from the seeded facilities
-make artisan c="edqa:odk:check"          # sign in to ODK (real or mock) and list form versions
 make artisan c="edqa:admin:create"
 docker compose -f compose.dev.yml --profile scheduler up -d scheduler   # opt-in scheduler
 ```
 
 ## 9. Working agreement for Claude Code
+
+- **Claude never runs `git commit`, `git tag` or `git push`** (nor anything that does them indirectly: `--amend`, `rebase`, `merge`, `stash` of the owner's work, `gh pr create`, `gh release`). The project owner commits, tags and pushes. When a prompt says "Commit: …" or "tag vX.Y.Z", treat it as **"Suggested commit message: …"** / **"suggest the tag"**: stop with the work uncommitted, run `git status` and `git diff --stat`, and hand over the message.
+  Read-only git commands (`status`, `diff`, `log`, `show`, `blame`) are fine.
 
 - One build step per session where possible. Start by reading the relevant section of
   `ARCHITECTURE.md`.
@@ -183,6 +179,7 @@ docker compose -f compose.dev.yml --profile scheduler up -d scheduler   # opt-in
   add it to `ARCHITECTURE.md` §11.4 (open questions) and ask.
 - If a change affects the server contract (env keys, queues, schedule, DB roles, health route,
   migration connection), note it in the PR so `edqa-infra` can be updated (`DEPLOY.md` §1.3).
-- End every step with `make check` green and a Conventional Commit.
+- End every step with `make check` green, then **stop**: show `git status`, `git diff --stat`
+  and a suggested Conventional Commit message. Don't commit (see the git rule below).
 - Never add `ports:` for Postgres/Redis outside `compose.dev.yml`, never mount the Docker socket,
   and never bake secrets into an image.

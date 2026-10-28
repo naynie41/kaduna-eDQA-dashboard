@@ -1,4 +1,6 @@
 {
+    "source": "odk",
+    "external_id": "uuid:fx-typed-scores-only",
     "instance_id": "uuid:fx-typed-scores-only",
     "deprecated_id": null,
     "form_version": "2026.1",

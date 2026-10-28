@@ -69,8 +69,9 @@ final class PerformanceSeeder extends Seeder
             SQL, ['{'.implode(',', $this->rounds).'}']);
 
         DB::statement(<<<'SQL'
-            INSERT INTO submissions (instance_id, form_id, form_version, payload, submitted_at, received_at, processed_at, status)
-            SELECT 'uuid:perf-' || round_id || '-' || facility_id, 'dqa', '2026.1', '{"perf": true}'::jsonb, now(), now(), now(), 'accepted'
+            INSERT INTO submissions (source_id, external_id, instance_id, form_ref, form_version, payload, submitted_at, received_at, processed_at, status)
+            SELECT (SELECT id FROM submission_sources WHERE key = 'odk'), 'uuid:perf-' || round_id || '-' || facility_id,
+                'uuid:perf-' || round_id || '-' || facility_id, 'dqa', '2026.1', '{"perf": true}'::jsonb, now(), now(), now(), 'accepted'
             FROM perf_pairs
             SQL);
 

@@ -9,9 +9,10 @@ use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Exceptions\OdkException;
-use App\Domain\Ingestion\Models\OdkFormSync;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
+use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Odk\OdkConfig;
+use App\Domain\Ingestion\SourceRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -31,6 +32,7 @@ final class OdkStatusQuery
 
     public function __construct(
         private readonly SubmissionSource $source,
+        private readonly SourceRegistry $sources,
     ) {}
 
     /**
@@ -41,18 +43,19 @@ final class OdkStatusQuery
         $config = OdkConfig::fromConfig();
         $configured = $config->isConfigured();
         $sync = $configured
-            ? OdkFormSync::query()->where('project_id', (int) $config->projectId)->where('form_id', (string) $config->formId)->first()
+            ? SourceSync::current($this->sources->id('odk'), $config->formRef())
             : null;
 
+        // The keys are the API's (GET /api/odk/status), unchanged until /api/sources (Phase 2C step 7).
         return [
             'configured' => $configured,
             'problems' => $config->problems(),
             'reachable' => $configured ? $this->reachable() : null,
             'cursor' => $sync === null ? null : [
-                'last_pulled_at' => $sync->last_pulled_at?->toIso8601String(),
-                'last_edit_at' => $sync->last_edit_at?->toIso8601String(),
-                'last_instance_id' => is_string($sync->last_instance_id) ? $sync->last_instance_id : null,
-                'backfill_skip' => (int) $sync->backfill_skip,
+                'last_pulled_at' => $sync->cursor_at?->toIso8601String(),
+                'last_edit_at' => $sync->edit_cursor_at?->toIso8601String(),
+                'last_instance_id' => is_string($sync->cursor_instance_id) ? $sync->cursor_instance_id : null,
+                'backfill_skip' => (int) $sync->backfill_checkpoint,
                 'submission_count' => (int) $sync->submission_count,
             ],
             'running_run_id' => StartManualPull::running()?->id,
@@ -67,7 +70,7 @@ final class OdkStatusQuery
      */
     private static function lastRun(): ?array
     {
-        $run = OdkPullRun::query()->whereNotNull('finished_at')->where('trigger_type', '!=', PullTrigger::Backfill)
+        $run = PullRun::query()->whereNotNull('finished_at')->where('trigger_type', '!=', PullTrigger::Backfill)
             ->whereIn('outcome', [PullOutcome::Succeeded, PullOutcome::Failed])->latest('finished_at')->latest('id')->first();
 
         return $run === null ? null : [
@@ -88,11 +91,11 @@ final class OdkStatusQuery
     {
         $config = OdkConfig::fromConfig();
         $sync = $config->isConfigured()
-            ? OdkFormSync::query()->where('project_id', (int) $config->projectId)->where('form_id', (string) $config->formId)->first()
+            ? SourceSync::current($this->sources->id('odk'), $config->formRef())
             : null;
-        $run = OdkPullRun::query()->where('trigger_type', PullTrigger::Backfill)->latest('started_at')->latest('id')->first();
-        $position = $sync === null ? 0 : (int) $sync->backfill_skip;
-        $pageSize = max(1, (int) config('edqa.odk.page_size', 500));
+        $run = PullRun::query()->where('trigger_type', PullTrigger::Backfill)->latest('started_at')->latest('id')->first();
+        $position = $sync === null ? 0 : (int) $sync->backfill_checkpoint;
+        $pageSize = max(1, (int) config('edqa.sources.odk.page_size', 500));
 
         $reports = array_values(array_filter(Storage::disk('exports')->files(), fn (string $file): bool => preg_match(self::REPORT_PATTERN, $file) === 1));
         rsort($reports); // the name carries the time: newest first

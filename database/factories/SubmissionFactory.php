@@ -9,7 +9,7 @@ use App\Domain\Ingestion\Models\Submission;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * A raw ODK record in its received state. Realistic broken payloads for validation live in
+ * A raw record from the odk source in its received state (fromSource('kobo') for another). Realistic broken payloads for validation live in
  * tests/Fixtures/odk (CONVENTION.md §8), not here.
  *
  * @extends Factory<Submission>
@@ -23,8 +23,10 @@ final class SubmissionFactory extends Factory
         $instanceId = 'uuid:'.fake()->uuid();
 
         return [
+            'source_id' => fn (): int => SubmissionSourceFactory::idFor('odk'),
+            'external_id' => $instanceId,
             'instance_id' => $instanceId,
-            'form_id' => 'dqa',
+            'form_ref' => 'dqa',
             'form_version' => '2026.1',
             'payload' => [
                 '__id' => $instanceId,
@@ -35,6 +37,12 @@ final class SubmissionFactory extends Factory
             'received_at' => now(),
             'status' => SubmissionStatus::Received,
         ];
+    }
+
+    /** A submission from another configured source (its row is created once). */
+    public function fromSource(string $key): self
+    {
+        return $this->state(['source_id' => fn (): int => SubmissionSourceFactory::idFor($key)]);
     }
 
     public function accepted(): self

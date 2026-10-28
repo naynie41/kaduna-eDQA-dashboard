@@ -70,8 +70,8 @@ const translations = {
 
 const detail: FacilityDetail = {
     facility: { id: 5, code: 'KD-F1', name: 'Facility F1', lga: 'Alpha', ward: 'Ward F1', level: 'primary', level_label: 'Primary', ownership: 'public', ownership_label: 'Public', active: true },
-    round: { id: 2, label: 'Q2 2026', year: 2026, quarter: 2 },
-    assessment: { id: 9, assessed_on: '2026-04-10', assessor: 'Assessor', status: 'flagged' },
+    round: { id: 2, label: 'Q2 2026', year: 2026, quarter: 2, open: true },
+    assessment: { id: 9, assessed_on: '2026-04-10', assessor: 'Assessor', status: 'flagged', started_at: '2026-04-10T09:00:00+01:00', ended_at: '2026-04-10T09:45:00+01:00' },
     scores: { availability: score('90.0', 'strong', 'Strong'), consistency: score('80.0'), validity: score('70.0', 'review', 'Review'), overall: score('80.0') },
     items: [
         {
@@ -81,9 +81,9 @@ const detail: FacilityDetail = {
             month: 'April 2026',
             score: score('50.0', 'needs_action', 'Needs action'),
             items: [
-                { code: 'item_1', label: null, result: 'pass' },
-                { code: 'item_2', label: 'Register in place', result: 'fail' },
-                { code: 'item_3', label: null, result: 'na' },
+                { code: 'item_1', key: 'avail_m1_item_1', label: null, result: 'pass' },
+                { code: 'item_2', key: 'avail_m1_item_2', label: 'Register in place', result: 'fail' },
+                { code: 'item_3', key: 'avail_m1_item_3', label: null, result: 'na' },
             ],
         },
     ],

@@ -25,7 +25,7 @@ const ODK_TOKEN_A = 'tok-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const ODK_TOKEN_B = 'tok-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
 
 beforeEach(function (): void {
-    config(['edqa.odk' => [
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'),
         'url' => ODK_URL.'/', 'email' => 'svc-edqa@kaduna.example', 'password' => ODK_TEST_PASSWORD, 'project_id' => '7', 'form_id' => 'dqa',
         'page_size' => 500, 'timeouts' => ['connect' => 10, 'total' => 60],
         'retry' => ['attempts' => 3, 'base_ms' => 1000, 'max_ms' => 30000], 'token_refresh_minutes' => 30,
@@ -129,7 +129,7 @@ it('pages through submissions: three pages, the last one partial', function (): 
 });
 
 it('filters on __system/submissionDate in UTC and encodes every part of the query', function (): void {
-    config(['edqa.odk.form_id' => 'dqa form']);
+    config(['edqa.sources.odk.form_id' => 'dqa form']);
     Http::fake([
         ODK_URL.'/v1/sessions' => Http::response(odkSession(ODK_TOKEN_A)),
         ODK_URL.'/*' => Http::response(['@odata.count' => 0, 'value' => []]),
@@ -141,6 +141,20 @@ it('filters on __system/submissionDate in UTC and encodes every part of the quer
     $sent = odkSent('.svc/Submissions');
     expect($sent[0]->url())->toBe(ODK_URL.'/v1/projects/7/forms/dqa%20form.svc/Submissions?%24filter=__system%2FsubmissionDate%20gt%202026-04-14T08%3A50%3A00.250Z&%24orderby=__system%2FsubmissionDate%20asc&%24top=500&%24skip=0&%24count=true&%24expand=%2A')
         ->and($sent[1]->url())->toBe(ODK_URL.'/v1/projects/7/forms/dqa%20form.svc/Submissions?%24orderby=__system%2FsubmissionDate%20asc&%24top=500&%24skip=1000&%24count=true&%24expand=%2A');
+});
+
+it('asks for submissions received or edited since the cursor, ordered by edit time then __id; with no cursor, the edited ones', function (): void {
+    Http::fake([
+        ODK_URL.'/v1/sessions' => Http::response(odkSession(ODK_TOKEN_A)),
+        ODK_URL.'/*' => Http::response(['@odata.count' => 0, 'value' => []]),
+    ]);
+
+    odkSource()->changedSince(CarbonImmutable::parse('2026-04-20 09:00:00.500', 'Africa/Lagos'), 500, 0);
+    odkSource()->changedSince(null, 500, 500);
+
+    $sent = odkSent('.svc/Submissions');
+    expect(urldecode($sent[0]->url()))->toBe(ODK_URL.'/v1/projects/7/forms/dqa.svc/Submissions?$filter=__system/submissionDate ge 2026-04-20T08:00:00.500Z or __system/updatedAt ge 2026-04-20T08:00:00.500Z&$orderby=__system/updatedAt asc,__id asc&$top=500&$skip=0&$count=true&$expand=*')
+        ->and(urldecode($sent[1]->url()))->toBe(ODK_URL.'/v1/projects/7/forms/dqa.svc/Submissions?$filter=__system/updatedAt ge 1970-01-01T00:00:00.000Z&$orderby=__system/updatedAt asc,__id asc&$top=500&$skip=500&$count=true&$expand=*');
 });
 
 it('retries 5xx and 429 with exponential backoff, honouring Retry-After', function (): void {
@@ -224,7 +238,7 @@ it('reports a body it cannot read as OdkUnexpectedResponse, with the status and 
 ]);
 
 it('sends nothing when not configured, and says what to set', function (array $odk, array $problems): void {
-    config(['edqa.odk' => [...config('edqa.odk'), ...$odk]]);
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'), ...$odk]]);
     Http::fake();
 
     foreach ([fn () => odkSource()->ping(), fn () => odkSource()->formVersions(), fn () => odkSource()->submissionsPage(null, 10, 0), fn () => odkSource()->attachmentList('uuid:1'), fn () => odkSource()->downloadAttachment('uuid:1', 'a.jpg', '/tmp/x')] as $call) {

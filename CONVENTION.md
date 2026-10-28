@@ -1,6 +1,7 @@
 # CONVENTION.md — Kaduna eDQA Portal
 
-How code in this repository is written, named, tested and committed. If a convention here
+How code in this repository is written, named, tested and committed (by the owner — Claude
+never commits, §9). If a convention here
 conflicts with a habit or a framework default, this file wins. Architecture lives in
 `ARCHITECTURE.md`; security rules in `SECURITY.md`; accessibility in `ACCESSIBILITY.md`.
 
@@ -107,7 +108,8 @@ Backed string enums in `App\Domain\*\Enums`: `Dimension`, `Severity`, `RoundStat
 
 ### 2.9 Errors and logging
 - Log channel `edqa` for ingestion; structured context arrays, never interpolated strings.
-- Never log ODK credentials, session tokens, full payloads, or passwords.
+- Never log source credentials (ODK password, ODK session token, Kobo API token), full payloads,
+  or passwords.
 - User-facing error messages come from the language file.
 
 ---
@@ -162,7 +164,9 @@ Backed string enums in `App\Domain\*\Enums`: `Dimension`, `Severity`, `RoundStat
 | Tables | plural snake_case | `quarantined_records` |
 | Columns | snake_case; booleans `is_`/`has_`; timestamps `_at` | `is_active`, `closed_at` |
 | Dimensions in DB/code | `availability`, `consistency`, `validity` | |
-| ODK question names | `(avail|consist|valid)_m[1-3]_<item>` | `consist_m2_opd_register` |
+| Form question names (both sources) | `(avail|consist|valid)_m[1-3]_<item>` | `consist_m2_opd_register` |
+| Source keys | lower-case, short: `odk`, `kobo` | `PullSubmissionsJob('kobo', …)` |
+| Source adapters | `<Platform>Source`, `<Platform>Client`, `<Platform>PayloadNormalizer` in `Ingestion\<Platform>` | `Kobo\KoboPayloadNormalizer` |
 | Routes | kebab-case URLs, dot names | `/admin/data-issues` → `admin.data-issues` |
 | Artisan commands | `edqa:<noun>[:<verb>]` | `edqa:admin:create` |
 | Config keys | snake_case under `edqa.` | `edqa.soft_rules.visit_min_minutes` |
@@ -239,9 +243,7 @@ Strong/Acceptable → ok, Review → warn, Needs action → bad. Always render t
 `AppShell`, `Rail`, `SyncStatusBar`, `TopBar`, `FilterBar`, `Tabs`, `Panel`, `SegmentedControl`,
 `ScoreTag`, `StatusLabel`, `HeatCell`, `DimensionBar`, `OwnerSplit`, `LgaTile`, `RankedBars`,
 `TrendChart`, `MonthGroupChart`, `DataTable`, `Drawer`, `Toast`, `ConfirmWithReasonDialog`,
-`EmptyState`, `Skeleton`. Administration (D-55): `AdminTabs`, `AdminTable` (DataTable + server
-pagination), `ProgressPanel` (queued work), `StaleIngestionBanner`, and the `useApiAction` hook
-for every write.
+`EmptyState`, `Skeleton`.
 
 `ConfirmWithReasonDialog` is mandatory for: reject quarantine, override flag, correct assessment,
 reopen round, publish rule version, deactivate facility.
@@ -264,10 +266,10 @@ reopen round, publish rule version, deactivate facility.
 
 ## 8. Testing
 
-Pest 4 against PostgreSQL (never SQLite).
+Pest 3 against PostgreSQL (never SQLite).
 
 
-Pest 4. Postgres for tests too (never SQLite — CHECK constraints, jsonb and materialised views
+Pest 3. Postgres for tests too (never SQLite — CHECK constraints, jsonb and materialised views
 must behave exactly as in production). Use `RefreshDatabase` against a dedicated `edqa_test` DB,
 `--parallel` with per-process databases.
 
@@ -279,18 +281,21 @@ tests/
   Unit/          ScoreCalculator, Bands, MonthSlot, FieldMap, each ValidationRule
   Feature/
     Database/    constraint tests (write these FIRST — Phase 1 acceptance)
-    Ingestion/   OdkClient (Http::fake), pull job, backfill resume, idempotency, edits
+    Ingestion/   each adapter (Http::fake), normalisers (golden tests), pull job per source,
+                 backfill resume, idempotency, cross-source duplicates, edits + reconcile
     Validation/  pipeline + quarantine workflow
     Scoring/     reference figures, rescore, rule-version publish
     Reporting/   every Aggregator
     Http/        pages render, route guard, filters in URL
     Audit/       every write Action produces the right activity entry
-  Fixtures/odk/  JSON submissions (see below)
+  Fixtures/parsed/        ParsedSubmission JSON — the reference answers (see below)
+  Fixtures/sources/odk/   raw ODK Central OData rows for each parsed fixture
+  Fixtures/sources/kobo/  raw KoboToolbox API rows for each parsed fixture
 ```
 
 ### The broken-submission fixture set (build early)
 
-`tests/Fixtures/odk/broken/` — reproduces the exact defects in the live Looker report. This is
+`tests/Fixtures/parsed/broken/` (with raw counterparts under `sources/odk/` **and** `sources/kobo/`) — reproduces the exact defects in the live Looker report. This is
 the regression suite for the system's central promise **and** the client demo.
 
 | Fixture | Expected |
@@ -309,7 +314,7 @@ the regression suite for the system's central promise **and** the client demo.
 | `ten_minute_visit.json` | Accepted, flagged `VISIT_TOO_SHORT` |
 | `multiple_failures.json` | Quarantined with **all** failing codes listed |
 
-Plus `tests/Fixtures/odk/valid/` — current form version, an older version with renames, an edit
+Plus `tests/Fixtures/parsed/valid/` — current form version, an older version with renames, an edit
 pair (`deprecatedID`), one with all-N/A slot.
 
 ### Must-have tests
@@ -319,12 +324,15 @@ pair (`deprecatedID`), one with all-N/A slot.
   (ARCHITECTURE.md §7, Reference figures).
 - **Determinism (G3):** score the same fixture twice → identical `ScoreCard`s.
 - **Idempotency:** pulling the same page twice creates no duplicate rows.
+- **Source parity:** every parsed fixture's ODK and Kobo raw counterparts normalise and parse to
+  exactly the same `ParsedSubmission` (apart from `source` and IDs), and produce the same outcome.
+- **Cross-source duplicates:** the same instance ID from the other source is counted, not inserted.
 - **Resume:** backfill killed after page N restarts at page N (simulate with exception on N+1).
 - **Cursor:** `last_pulled_at` does not advance when a page fails mid-way.
 - **Lock:** manual pull during a running pull does not double-process.
 - **LGA count (G4):** after ingesting all fixtures, every aggregate reports ≤ 23 LGAs.
 - **Route guard:** every route except login/2FA/reset/webhook redirects unauthenticated users.
-- **2FA:** a user without confirmed 2FA cannot reach any dashboard route, unless `EDQA_REQUIRE_2FA=false` (D-26); both settings are tested.
+- **2FA:** a user without confirmed 2FA cannot reach any dashboard route.
 - **Audit (G7):** each write Action → activity entry with causer, old, new, reason.
 - **Webhook:** bad/missing signature → 401; valid → pull job dispatched, no data written.
 - **Performance smoke:** seeded 5-year dataset, each dashboard page < 1.5 s (tagged `@slow`).
@@ -360,6 +368,10 @@ reference for per-LGA counts and noise.
 
 ## 9. Git, branches and reviews
 
+- **Only the project owner writes to git.** Claude Code never runs `git commit`, `git tag`,
+  `git push`, `--amend`, `rebase`, `merge`, `gh pr create` or `gh release`. It finishes each step
+  with the work uncommitted, shows `git status` / `git diff --stat`, and proposes a Conventional
+  Commit message (and a tag when a phase closes) for the owner to use.
 - Trunk-based: short-lived branches off `main`: `feat/<area>-<short>`, `fix/...`, `chore/...`.
 - **Conventional Commits**: `feat(scoring): add N/A exclusion`, `fix(ingestion): hold cursor on
   page failure`, `test(validation): add COLUMN_DRIFT fixture`. Scopes: `ingestion`, `validation`,
@@ -436,8 +448,8 @@ Code must behave well in them.
 - **Stateless processes.** Nothing written to the local filesystem survives a restart except
   `storage/app` (a shared volume). Never store anything the app needs later in
   `storage/framework`, `storage/logs`, `/tmp` or `bootstrap/cache` — those are tmpfs.
-- **Persistent files** (ODK attachments, exports) go through a named disk rooted at
-  `storage/app` (`odk`, `exports`), never the `public` disk.
+- **Persistent files** (source attachments, exports) go through a named disk rooted at
+  `storage/app` (`attachments`, `exports`), never the `public` disk.
 - **Logs to stderr** (`LOG_CHANNEL=stderr`, JSON formatter in staging/production). No log files.
 - **Config is cached at container start, not at build.** Never call `env()` outside
   `config/*.php`; never run `config:cache` in the Dockerfile.
@@ -448,7 +460,7 @@ Code must behave well in them.
   report progress so a restart resumes rather than repeats.
 - **Hosts are service names**: `DB_HOST=postgres`, `REDIS_HOST=redis`. Never `localhost` or
   `127.0.0.1` in `.env.example`.
-- **The scheduler runs once.** Keep `withoutOverlapping()` on the ODK pull; don't rely on
+- **The scheduler runs once.** Keep `withoutOverlapping()` on each source's pull; don't rely on
   `onOneServer()`.
 - **Browsershot** renders only the app's own Blade views, never external URLs, always with
   `noSandbox()` and the Chromium path from env.
@@ -468,7 +480,7 @@ Code must behave well in them.
 ### 12.3 Compose conventions (`compose.dev.yml`)
 - Service names match production: `app`, `web`, `worker`, `scheduler`, `postgres`, `redis`.
 - Only dev publishes Postgres/Mailpit/Vite ports; production publishes only `web`.
-- The scheduler is opt-in locally (`--profile scheduler`) so dev machines don't hit ODK every
+- The scheduler is opt-in locally (`--profile scheduler`) so dev machines don't hit the source mocks every
   10 minutes.
 
 ### 12.4 Everyday commands

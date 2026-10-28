@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
+import CorrectionPanel, { ItemResultSelect, useCorrection } from '@/components/AssessmentCorrection';
 import HistorySparkline from '@/components/HistorySparkline';
 import ScoreTag from '@/components/ScoreTag';
 import { formatDate, formatDateTime } from '@/lib/format';
@@ -7,18 +8,22 @@ import type { Dimension, FacilityDetail, ItemResult } from '@/types/dashboard';
 
 export type FacilityDetailViewProps = {
     detail: FacilityDetail;
+    /** Given where corrections are offered (the drawer): called after one is saved, to reload (D-58). */
+    onCorrected?: (() => void) | undefined;
 };
 
 const DIMENSIONS: Dimension[] = ['availability', 'consistency', 'validity'];
-const EVENTS = ['created', 'updated', 'deleted', 'flag_overridden'];
+const EVENTS = ['created', 'updated', 'deleted', 'flag_overridden', 'corrected'];
 
 /** The facility drawer's body (ARCHITECTURE.md §9.2.7). Renders the server's values as they are. */
-export default function FacilityDetailView({ detail }: FacilityDetailViewProps) {
+export default function FacilityDetailView({ detail, onCorrected }: FacilityDetailViewProps) {
     const t = useTranslate();
     const monthsShort = useTranslationList('common.months_short');
     const date = (value: string) => (monthsShort.length === 12 ? formatDate(value, monthsShort) : value);
     const dateTime = (value: string) => (monthsShort.length === 12 ? formatDateTime(value, monthsShort) : value);
     const { facility, round, assessment, scores } = detail;
+    const correction = useCorrection(detail);
+    const idBase = useId();
 
     return (
         <div className="flex flex-col gap-6">
@@ -40,6 +45,7 @@ export default function FacilityDetailView({ detail }: FacilityDetailViewProps) 
                         </div>
                     ))}
                 </dl>
+                {onCorrected !== undefined && <CorrectionPanel detail={detail} correction={correction} onSaved={onCorrected} />}
             </Section>
 
             <Section title={t('dashboard.drawer.items_title')}>
@@ -54,7 +60,7 @@ export default function FacilityDetailView({ detail }: FacilityDetailViewProps) 
                             }
 
                             return (
-                                <details key={dimension} className="rounded-md border border-rule bg-panel" open={dimension === 'availability'}>
+                                <details key={dimension} className="rounded-md border border-rule bg-panel" open={correction.editing || dimension === 'availability'}>
                                     <summary className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 text-[14px] font-medium">
                                         <span className="flex-1">{t(`enums.dimension.${dimension}`)}</span>
                                         <ScoreTag score={scores[dimension]} />
@@ -70,7 +76,16 @@ export default function FacilityDetailView({ detail }: FacilityDetailViewProps) 
                                                     {group.items.map((item) => (
                                                         <li key={item.code} className="flex items-center justify-between gap-2 border-b border-paper py-1 text-[12.5px] last:border-b-0">
                                                             <span className="min-w-0 break-words">{item.label ?? item.code}</span>
-                                                            <Result result={item.result} t={t} />
+                                                            {correction.editing && item.result !== null ? (
+                                                                <ItemResultSelect
+                                                                    id={`${idBase}-${item.key}`}
+                                                                    label={t('dashboard.drawer.correct.item_label', { item: item.label ?? item.code, month: group.month })}
+                                                                    value={correction.results[item.key] ?? item.result}
+                                                                    onChange={(result) => correction.setResult(item.key, result)}
+                                                                />
+                                                            ) : (
+                                                                <Result result={item.result} t={t} />
+                                                            )}
                                                         </li>
                                                     ))}
                                                 </ul>

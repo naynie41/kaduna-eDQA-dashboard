@@ -3,7 +3,7 @@
 ## 0. Scope of this file
 
 This file covers **application** security: authentication, authorisation, audit, data
-integrity, ODK integration, file handling and HTTP behaviour — everything enforced in code.
+integrity, field-collection source integrations (ODK Central and KoboToolbox), file handling and HTTP behaviour — everything enforced in code.
 **Infrastructure** security (OS hardening, firewall, TLS termination, Postgres roles and grants,
 secrets on the server, backups, monitoring) is owned by the DevOps project and specified in
 `DEPLOY.md`. Where a control spans both, this file states the requirement and `DEPLOY.md`
@@ -30,7 +30,7 @@ Authorisation therefore does **no** work in this system. The controls that matte
 The system holds no patient-level or personal health data — it scores facility record-keeping.
 
 Assets worth protecting, in order: published round figures (credibility of the state report),
-the facility master list (the validation authority), ODK Central credentials, the audit log,
+the facility master list (the validation authority), ODK Central and KoboToolbox credentials, the audit log,
 administrator accounts.
 
 ---
@@ -40,21 +40,20 @@ administrator accounts.
 | Control | Setting |
 |---|---|
 | Method | Email + password via Laravel Fortify |
-| Two-factor | **Mandatory** for every account (TOTP) unless `EDQA_REQUIRE_2FA=false` (D-26). When required, an account without confirmed 2FA can reach only the 2FA setup screen. When switched off, 2FA is optional (set up from Security settings) and an account that has it is still challenged at sign-in. Unset means required |
+| Two-factor | **Mandatory** for every account (TOTP). An account without confirmed 2FA can reach only the 2FA setup screen |
 | Recovery codes | Generated at 2FA setup, shown once, stored hashed |
-| Password policy | `Password::min(12)->mixedCase()->numbers()->uncompromised()` (`uncompromised()` skipped in the test environment only; needs outbound HTTPS, Q-22) |
+| Password policy | `Password::min(12)->mixedCase()->numbers()->uncompromised()` |
 | Hashing | bcrypt (Laravel default) or argon2id |
 | Login throttle | 5 attempts / minute per email + IP (`RateLimiter::for('login')`) |
 | 2FA throttle | 5 attempts / minute per session |
 | Session idle timeout | 8 hours (`SESSION_LIFETIME=480`) |
-| Session cookie | `Secure` (unless `SESSION_SECURE_COOKIE=false`, local HTTP only), `HttpOnly`, `SameSite=Lax`; `SESSION_ENCRYPT=true` |
+| Session cookie | `Secure`, `HttpOnly`, `SameSite=Lax`; `SESSION_ENCRYPT=true` |
 | Session fixation | Regenerate session ID on login and on 2FA confirmation |
 | Password reset | Emailed signed link, 60-minute expiry, throttled |
 | Registration | **Disabled.** Accounts are created by an artisan command only: `php artisan edqa:admin:create` |
 
-There is no self-service sign-up and no in-app user management page. Creating and disabling
-administrators is a console action and is audited. Accounts are disabled, never deleted, so audit
-entries keep a named actor (Q-23).
+There is no self-service sign-up and no in-app user management page. Creating, disabling and
+deleting administrators is a console action and is audited.
 
 **Account count:** keep it at three or fewer for v1. Above three or four, revisit roles before
 launch (PRD open question 8).
@@ -69,15 +68,11 @@ A single middleware group guards everything:
 Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function () { ... });
 ```
 
-Only three routes are reachable without signing in:
+Only three routes sit outside it:
 
 1. The login / 2FA challenge / password reset screens (Fortify)
-2. `POST /webhooks/odk` — protected by HMAC signature verification instead (§6)
+2. `POST /webhooks/{source}` — verified per source instead (§6): HMAC for ODK, a shared header token for Kobo
 3. `GET /up` — Laravel's health route, used by uptime monitoring; returns status only, no data
-
-A fourth set needs a signed-in session but sits outside the 2FA check, because a user without 2FA
-must reach it: logout, password confirmation, Fortify's 2FA management routes, email verification
-and `GET /two-factor/setup`.
 
 Rules:
 - Do not add policies, gates, `can()` checks or role columns. Their presence implies granularity
@@ -95,7 +90,7 @@ Implemented with `spatie/laravel-activitylog`.
 **What is logged:** every create, update and delete on
 `assessments`, `item_responses` (corrections), `assessment_scores`, `quarantined_records`
 (resolution), `facilities`, `wards`, `rounds`, `scoring_rule_versions`, `plan_actions`, `users`,
-plus: manual ODK pulls, backfill starts, rescore triggers, exports, cascade-file regeneration,
+plus: manual pulls and reconciles (with the source), backfill starts, deletion-at-source reviews, rescore triggers, exports, cascade-file regeneration,
 login, logout, failed login, 2FA enable/disable.
 
 **Each entry carries:** actor (`causer`), timestamp, subject, event, `properties.old`,
@@ -141,42 +136,48 @@ Plus:
 
 ---
 
-## 6. ODK integration security
+## 6. Field-collection source security (ODK Central and KoboToolbox)
+
+Both sources are treated the same way: read-only service credentials, untrusted payloads,
+HTTPS only, and webhooks that can only *trigger* a pull.
+
+| Concern | ODK Central | KoboToolbox |
+|---|---|---|
+| Credentials (env only — never committed, logged or sent to the frontend) | `ODK_CENTRAL_URL`, `ODK_CENTRAL_EMAIL`, `ODK_CENTRAL_PASSWORD`, `ODK_PROJECT_ID`, `ODK_FORM_ID` | `KOBO_BASE_URL`, `KOBO_API_TOKEN`, `KOBO_ASSET_UID` |
+| Service account | Dedicated web user with **Project Viewer** (read-only) on the one project — never a site admin | Kobo API tokens are **account-wide**, so use a **dedicated Kobo account** that has only *view form* and *view submissions* on the one asset — never the form owner's token (Q-18) |
+| Session / token handling | Session token cached in the encrypted cache until 30 min before expiry; refreshed once on 401 | Static token sent as `Authorization: Token …`; on 401/403 the source is marked "auth failed" and pulls stop until fixed — no retry loop |
+| Base URL | From config; HTTPS only | From config (global, EU or self-hosted server); HTTPS only |
+
+**Common controls**
 
 | Concern | Control |
 |---|---|
-| Credentials | `ODK_CENTRAL_URL`, `ODK_CENTRAL_EMAIL`, `ODK_CENTRAL_PASSWORD`, `ODK_PROJECT_ID`, `ODK_FORM_ID` in `.env` only. Never committed, never logged, never sent to the frontend |
-| Service account | A dedicated ODK Central web user with **Project Viewer** (read-only) role on the one project — never a site admin |
-| Session token | Cached (encrypted cache) until 30 minutes before expiry, then refreshed. Never written to logs |
-| Transport | HTTPS only. `Http::withOptions(['verify' => true])`. Fail closed on TLS errors |
-| Timeouts | Connect 10s, total 60s per page; retries with exponential backoff (3 attempts) |
-| Payload trust | ODK payloads are **untrusted input**. Parsed through the field map, validated, never `eval`'d, never rendered as HTML without escaping |
-| Deep links | Built from config base URL + instance ID; instance ID validated against `^uuid:[0-9a-f-]{36}$` |
-| Webhook | `POST /webhooks/odk` verifies an HMAC-SHA256 signature over the raw body with `ODK_WEBHOOK_SECRET` using `hash_equals`. Rejects on missing/invalid signature or timestamp older than 5 minutes. Rate limited. The webhook only **enqueues a pull** — it never writes the payload directly. Built (D-54): off (404) without a secret; headers `X-Edqa-Timestamp` and `X-Edqa-Signature: sha256=<hex>` over `"{timestamp}.{raw body}"`; one queued pull a minute at most |
-| Writing back | The portal never writes to ODK Central or DHIS2 |
+| Transport | HTTPS only, TLS verification on, fail closed on TLS errors. Plain HTTP is accepted only for the local mock when `APP_ENV=local` and an explicit flag is set |
+| Timeouts / retries | Connect 10 s, total 60 s per page; 3 attempts with backoff; honour `Retry-After` |
+| Payload trust | Payloads from either source are **untrusted input**: normalised, parsed through the field map, validated, never `eval`'d, never rendered as HTML without escaping |
+| Attachment URLs (SSRF) | Kobo returns download URLs inside the payload. The portal fetches an attachment **only if the URL's scheme is https and its host equals the configured source host**; redirects to other hosts are refused. ODK attachment paths are built by the client from IDs, never taken from the payload |
+| Deep links | Built from the configured base URL + validated IDs (instance ID `^uuid:[0-9a-f-]{36}$`, Kobo `_id` numeric, asset UID alphanumeric); never from payload strings |
+| Webhooks | `POST /webhooks/odk`: HMAC-SHA256 over the raw body with `ODK_WEBHOOK_SECRET`, timestamp within 5 min. `POST /webhooks/kobo`: Kobo REST Services can't sign, so a ≥ 32-byte random `KOBO_WEBHOOK_TOKEN` in the `X-EDQA-Webhook-Token` header, compared with `hash_equals`. Both: rate limited, disabled (404) when no secret is set, and they **only enqueue a pull for that source** — the body is never stored or trusted |
+| Deletions at source | Reported for administrator review, never applied automatically (audited when acted on) |
+| Writing back | The portal never writes to ODK Central, KoboToolbox or DHIS2. Uploading the facility media file to each form is a manual step |
 
 ---
 
 ## 7. File and attachment handling
 
-- ODK attachments (register photos, GPS traces) are stored in `storage/app/odk/{instance_id}/`
+- Attachments from either source (register photos, GPS traces) are stored in
+  `storage/app/attachments/{source}/{instance_id}/`
   on the `app-files` volume — **outside the web root** (the `web` container only has
   `public/`). Never on the `public` disk.
 - Served only through an authenticated route that streams the file:
   `GET /attachments/{submission}/{filename}` — validates the filename against the submission's
   known attachment list (no path traversal), sets `Content-Disposition` and
   `X-Content-Type-Options: nosniff`.
-- MIME type sniffed on download from ODK and checked against an allow-list
+- MIME type sniffed on download (whatever the source claims) and checked against an allow-list
   (`image/jpeg`, `image/png`, `application/geo+json`, `text/csv`, `application/xml`).
-- Built (D-52): the disk is `odk` (`serve: false`). A file is downloaded to `odk/.incoming`
-  and moves into place only after its checks: at most 10 MB (`edqa.odk.attachments.max_bytes`),
-  a sniffed type on the allow-list; otherwise it is deleted and its row `rejected`. A file name
-  that is not a plain safe name is refused before any download, never renamed. The route serves
-  the path stored on the row (never one built from the request) with the sniffed type, `nosniff`
-  and `Cache-Control: private`, and audits every view.
 - Exports are written to a private disk and downloaded via signed, time-limited URLs (30 min).
-- The facility cascade CSV served to ODK is generated to a private path and uploaded to ODK as
-  form media; it is not publicly reachable on the portal.
+- The facility cascade CSV is generated to a private path and uploaded by an administrator as
+  form media on ODK Central and KoboToolbox; it is not publicly reachable on the portal.
 
 ---
 
@@ -194,7 +195,7 @@ Plus:
 - `APP_DEBUG=false` in staging and production. Custom error pages; no stack traces to the browser.
 - Mass assignment: explicit `$fillable` on every model; never `$guarded = []`.
 - Output escaping: React escapes by default; `dangerouslySetInnerHTML` is banned (lint rule).
-- Rate limiting: `api` group 120/min per user; `POST /api/odk/pull` 6/min; exports 10/min.
+- Rate limiting: `api` group 120/min per user; `POST /api/sources/{key}/pull` and `/reconcile` 6/min per source; exports 10/min.
 
 ---
 
@@ -217,8 +218,7 @@ Plus:
 
 ## 10. Secrets management
 
-- `.env` is never committed. `.env.example` lists every key. Secrets are empty, except the
-  dev-only Postgres passwords and local switches the `compose.dev.yml` stack needs.
+- `.env` is never committed. `.env.example` lists every key with an empty value.
 - `APP_KEY` generated per environment; rotating it invalidates sessions and encrypted cache.
 - CI secrets live in the CI provider's secret store.
 - Grep check in CI fails the build if anything matching common secret patterns is committed.
@@ -239,11 +239,11 @@ Plus:
 - Laravel Pulse for queue health, slow queries, exceptions.
 - Daily digest email to administrators: last successful pull, time since last success,
   quarantine count, failed jobs, any login failures above threshold.
-- The ODK pull page shows **time since last success** in plain language. If no successful pull in
+- The Data sources page shows **time since last success, per source**, in plain language. If no successful pull **from any enabled source** in
   24 hours during an open round, a banner appears on every admin page.
 - Suspected compromise of an admin account: disable the account via
   `php artisan edqa:admin:disable {email}`, rotate `APP_KEY` with the old key in `APP_PREVIOUS_KEYS` so 2FA secrets still decrypt (logs everyone out), rotate the ODK
-  service-account password, review `activity_log` for the account's actions since last known-good
+  service-account password and the Kobo API token, review `activity_log` for the account's actions since last known-good
   time, restore affected records from audit old-values or from backup.
 
 ---
@@ -251,11 +251,12 @@ Plus:
 ## 13. Data protection statement (for the client)
 
 The portal stores facility-level record-keeping assessments, assessor names and device IDs from
-ODK metadata, optional GPS coordinates of the visit and optional register photos. It stores **no
+submission metadata (ODK Central or KoboToolbox), optional GPS coordinates of the visit and optional register photos. It stores **no
 patient-level or personal health information**. Register photos must be taken so that patient
-names are not legible; this is an assessor-training requirement and should be stated in the ODK
-form hint. If a photo containing patient data is found, an administrator deletes the attachment
-file (audited) and ODK Central is asked to do the same.
+names are not legible; this is an assessor-training requirement and should be stated in the form hint on both platforms. If a photo containing patient data is found, an administrator deletes the attachment
+file (audited) and the source (ODK Central or KoboToolbox) is asked to do the same. If the
+client uses a hosted KoboToolbox server, submissions are stored outside Nigeria by that service;
+confirm this is acceptable (Q-17).
 
 ---
 
@@ -268,11 +269,13 @@ Expect acknowledgement within 3 working days.
 
 ## 15. Security checklist before go-live
 
-- [ ] `EDQA_REQUIRE_2FA` unset or true on the server; every admin has 2FA confirmed; ≤ 3 accounts
+- [ ] Every admin has 2FA confirmed; ≤ 3 accounts
 - [ ] `APP_DEBUG=false`, `APP_ENV=production`
 - [ ] HTTPS + HSTS live; security headers verified (securityheaders.com or curl)
 - [ ] Route-guard test passing; only login/2FA/reset, webhook and `/up` are unauthenticated
 - [ ] ODK service account is Project Viewer only
+- [ ] Kobo token belongs to a dedicated account with view-only access to the one asset
+- [ ] Attachment fetches refuse hosts other than the configured source hosts (test passing)
 - [ ] Webhook signature verified end to end (or webhook disabled)
 - [ ] `edqa_app` DB role cannot `DROP`, `TRUNCATE`, or modify `activity_log`
 - [ ] Attachments not reachable by direct URL

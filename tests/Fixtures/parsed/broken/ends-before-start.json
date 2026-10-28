@@ -1,4 +1,6 @@
 {
+    "source": "odk",
+    "external_id": "uuid:fx-ends-before-start",
     "instance_id": "uuid:fx-ends-before-start",
     "deprecated_id": null,
     "form_version": "2026.1",

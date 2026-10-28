@@ -95,14 +95,25 @@ final class Rows
         ]);
     }
 
+    /** The submission_sources row for this key (the migration creates odk; others on first use). */
+    public static function sourceId(string $key = 'odk'): int
+    {
+        return (int) (DB::table('submission_sources')->where('key', $key)->value('id') ?? DB::table('submission_sources')->insertGetId([
+            'key' => $key, 'type' => $key === 'kobo' ? 'kobo' : 'odk_central', 'name' => $key, 'is_enabled' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]));
+    }
+
     /** @param array<string, mixed> $overrides */
     public static function submission(array $overrides = []): int
     {
         $n = self::next();
 
         return DB::table('submissions')->insertGetId([
+            'source_id' => self::sourceId(),
+            'external_id' => "uuid:test-{$n}",
             'instance_id' => "uuid:test-{$n}",
-            'form_id' => 'dqa',
+            'form_ref' => 'dqa',
             'form_version' => '2026.1',
             'payload' => json_encode(['facility' => ['facility_code' => "FAC{$n}"]]),
             'submitted_at' => now(),
@@ -178,6 +189,7 @@ final class Rows
         $submissionId = $overrides['submission_id'] ?? self::submission();
 
         return DB::table('quarantined_records')->insertGetId([
+            'source_id' => DB::table('submissions')->where('id', $submissionId)->value('source_id') ?? self::sourceId(),
             'submission_id' => $submissionId,
             'instance_id' => "uuid:quarantined-{$submissionId}",
             'payload' => json_encode(['lga' => null]),
@@ -209,7 +221,8 @@ final class Rows
     /** @param array<string, mixed> $overrides */
     public static function pullRun(array $overrides = []): int
     {
-        return DB::table('odk_pull_runs')->insertGetId([
+        return DB::table('pull_runs')->insertGetId([
+            'source_id' => self::sourceId(),
             'trigger_type' => 'scheduled',
             'started_at' => now(),
             ...$overrides,

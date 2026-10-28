@@ -2,26 +2,28 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Ingestion\Odk;
+namespace App\Domain\Ingestion;
 
 use App\Domain\Ingestion\DTOs\ItemResponseData;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Ingestion\DTOs\SubmissionEnvelope;
+use App\Domain\Ingestion\Support\IsoTime;
 use App\Domain\Scoring\CurrentRuleVersion;
 use Carbon\CarbonImmutable;
-use Throwable;
 
 /**
- * Reads one entry of an ODK Central OData Submissions response into a ParsedSubmission through
- * its form version's FieldMap (ARCHITECTURE.md §5.5).
+ * Reads a SubmissionEnvelope into a ParsedSubmission through the field map for its (source, form
+ * version) (ARCHITECTURE.md §5.5). It reads only the envelope, so it cannot tell the sources
+ * apart: each source's PayloadNormalizer has absorbed its API's shape already.
  *
  * It never throws on bad data: anything it cannot read is passed through raw (rawStart and rawEnd
  * keep the original text, references stay text) so validation can quarantine it, and nothing is
  * guessed (CLAUDE.md hard rule 12):
  *
- * - an unknown __system.formVersion gives formVersionKnown = false and the minimal fields only
- *   (identity, version, submission time, device), never a read through the default map;
+ * - a (source, version) with no map gives formVersionKnown = false and the minimal fields only
+ *   (identity, version, submission time, device), never a read through another version's map;
  * - a time is read only when it is strict ISO 8601 ("FEBRUARY" is not a date);
- * - scored questions are every leaf whose name, after the version's renames, matches the map's
+ * - scored questions are every leaf whose name, after the form's renames, matches the map's
  *   pattern; each answer is mapped with the published scoring rule version's choice_map (Q-25);
  *   an answer the map does not know is 'invalid' (ITEMS_INCOMPLETE quarantines it); an unanswered
  *   question (null) is skipped;
@@ -30,85 +32,79 @@ use Throwable;
  */
 final class SubmissionParser
 {
-    private const ISO_8601 = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:?\d{2})$/';
-
-    /** ODK's own parts of an entry: never form questions. */
-    private const SYSTEM_KEYS = ['__id', '__system', 'meta'];
-
     public function __construct(
         private readonly CurrentRuleVersion $rules,
     ) {}
 
-    /** @param  array<array-key, mixed>  $payload */
-    public function parse(array $payload): ParsedSubmission
+    public function parse(SubmissionEnvelope $envelope): ParsedSubmission
     {
-        $version = self::text(FieldMap::get($payload, '__system.formVersion')) ?? '';
-        $map = FieldMap::resolve($version);
-        $instanceId = self::text(FieldMap::get($payload, 'meta.instanceID')) ?? self::text($payload['__id'] ?? null) ?? '';
-        $deprecatedId = self::text(FieldMap::get($payload, 'meta.deprecatedID'));
-        $submittedAt = self::time(FieldMap::get($payload, '__system.submissionDate'))
-            ?? self::time(FieldMap::get($payload, '__system.updatedAt'))
+        $meta = $envelope->meta;
+        $data = $envelope->data;
+        $map = FieldMap::for($meta->source, $meta->formVersion);
+        $submittedAt = $meta->submittedAt ?? $meta->updatedAt
             ?? CarbonImmutable::createFromTimestampUTC(0); // unreadable: ROUND_WINDOW will hold it
-        $deviceId = self::text(FieldMap::get($payload, '__system.deviceId'));
 
         if ($map === null) {
             return new ParsedSubmission(
-                instanceId: $instanceId, deprecatedId: $deprecatedId, formVersion: $version, formVersionKnown: false,
+                source: $meta->source, externalId: $meta->externalId,
+                instanceId: $meta->instanceId, deprecatedId: $meta->deprecatedId, formVersion: $meta->formVersion, formVersionKnown: false,
                 submittedAt: $submittedAt, startedAt: null, endedAt: null, rawStart: '', rawEnd: '',
                 lgaRef: null, wardRef: null, facilityRef: null, roundYear: null, roundQuarter: null,
-                assessorName: '', deviceId: $deviceId, gps: null, items: [], rawNumericScores: null,
+                assessorName: '', deviceId: $meta->deviceId, gps: null, items: [], rawNumericScores: null,
             );
         }
 
-        $start = $map->value($payload, 'started_at');
-        $end = $map->value($payload, 'ended_at');
-        [$items, $numeric] = $this->scored($payload, $map);
+        $start = $map->value($data, 'started_at');
+        $end = $map->value($data, 'ended_at');
+        [$items, $numeric] = $this->scored($data, $map);
 
         return new ParsedSubmission(
-            instanceId: $instanceId,
-            deprecatedId: $deprecatedId,
-            formVersion: $version,
+            source: $meta->source,
+            externalId: $meta->externalId,
+            instanceId: $meta->instanceId,
+            deprecatedId: $meta->deprecatedId,
+            formVersion: $meta->formVersion,
             formVersionKnown: true,
             submittedAt: $submittedAt,
-            startedAt: self::time($start),
-            endedAt: self::time($end),
+            startedAt: IsoTime::parse($start),
+            endedAt: IsoTime::parse($end),
             rawStart: self::text($start) ?? '',
             rawEnd: self::text($end) ?? '',
-            lgaRef: self::text($map->value($payload, 'lga_code')),
-            wardRef: self::text($map->value($payload, 'ward_code')),
-            facilityRef: self::text($map->value($payload, 'facility_code')),
-            roundYear: self::whole($map->value($payload, 'round_year')),
-            roundQuarter: self::whole($map->value($payload, 'round_quarter')),
-            assessorName: self::text($map->value($payload, 'assessor')) ?? '',
-            deviceId: $deviceId,
-            gps: self::gps($map->value($payload, 'gps')),
+            lgaRef: self::text($map->value($data, 'lga_code')),
+            wardRef: self::text($map->value($data, 'ward_code')),
+            facilityRef: self::text($map->value($data, 'facility_code')),
+            roundYear: self::whole($map->value($data, 'round_year')),
+            roundQuarter: self::whole($map->value($data, 'round_quarter')),
+            assessorName: self::text($map->value($data, 'assessor')) ?? '',
+            deviceId: $meta->deviceId,
+            gps: self::gps($map->value($data, 'gps')),
             items: $items,
             rawNumericScores: $numeric === [] ? null : $numeric,
         );
     }
 
     /**
-     * Every scored question in the entry, in the order it arrives.
+     * Every scored question in the answers, in the order it arrives.
      *
-     * @param  array<array-key, mixed>  $payload
+     * @param  array<array-key, mixed>  $data
      * @return array{0: list<ItemResponseData>, 1: array<string, float>}
      */
-    private function scored(array $payload, FieldMap $map): array
+    private function scored(array $data, FieldMap $map): array
     {
         $choices = $this->rules->config()->choiceMap ?? []; // no published version: every answer is invalid
         $items = [];
         $numeric = [];
 
-        $walk = function (array $group, bool $top) use (&$walk, $map, $choices, &$items, &$numeric): void {
+        $walk = function (array $group) use (&$walk, $map, $choices, &$items, &$numeric): void {
             foreach ($group as $name => $value) {
-                if (! is_string($name) || ($top && in_array($name, self::SYSTEM_KEYS, true))) {
+                if (! is_string($name)) {
                     continue;
                 }
                 $scored = $map->scored($name);
                 if ($scored === null) {
-                    // A group: look inside it (a list is a repeat, which ODK serves separately).
+                    // A group: look inside it (a list is a repeat, which the sources serve separately).
                     if (is_array($value) && ! array_is_list($value)) {
-                        $walk($value, false);
+                        $walk($value);
                     }
 
                     continue;
@@ -130,7 +126,7 @@ final class SubmissionParser
                 $items[] = new ItemResponseData($dimension, $slot, $code, $outcome, $outcome === 'pass' || $outcome === 'fail');
             }
         };
-        $walk($payload, true);
+        $walk($data);
 
         return [$items, $numeric];
     }
@@ -159,26 +155,10 @@ final class SubmissionParser
         return null;
     }
 
-    /** A strict ISO 8601 date and time with its offset; null for anything else. */
-    private static function time(mixed $value): ?CarbonImmutable
-    {
-        if (! is_string($value) || preg_match(self::ISO_8601, $value) !== 1) {
-            return null;
-        }
-        try {
-            $time = CarbonImmutable::parse($value);
-        } catch (Throwable) {
-            return null;
-        }
-
-        // Out-of-range parts ("2026-13-45T99:00") roll over in PHP: refuse them.
-        return $time->format('Y-m-d') === substr($value, 0, 10) && $time->format('H:i') === substr($value, 11, 5) ? $time : null;
-    }
-
     /**
-     * ODK's geopoint as GeoJSON ({"type": "Point", "coordinates": [lng, lat, alt]}) to lat and lng;
-     * null when it is not one. Central's OData leaves the accuracy out today; one given in
-     * properties.accuracy is kept.
+     * A geopoint as GeoJSON ({"type": "Point", "coordinates": [lng, lat, alt]}) to lat and lng;
+     * null when it is not one. An accuracy given in properties.accuracy is kept (ODK Central's
+     * OData leaves it out today).
      *
      * @return array<string, float>|null
      */

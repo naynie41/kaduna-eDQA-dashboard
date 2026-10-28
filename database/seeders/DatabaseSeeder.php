@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * Chooses seeders by environment.
- *   production        the 23 LGAs and scoring rule version 1 only; real facilities come from
+ *   production        the 23 LGAs, scoring rule version 1 and the configured sources only; real facilities come from
  *                     the signed-off master list, rounds and accounts from administrators
  *   local, staging    + synthetic wards and facilities, four rounds, demo assessments, scored
  *                     by the real rescore (closed rounds pinned to version 1)
@@ -19,7 +19,7 @@ final class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call([LgaSeeder::class, ScoringRuleVersionSeeder::class]);
+        $this->call([LgaSeeder::class, ScoringRuleVersionSeeder::class, SubmissionSourceSeeder::class]);
 
         if (app()->environment('production')) {
             return;

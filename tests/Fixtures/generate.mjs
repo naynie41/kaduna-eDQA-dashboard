@@ -1,6 +1,6 @@
 // The ODK fixture generator (tests/Fixtures/README.md): `node tests/Fixtures/generate.mjs`.
 // Writes, from one spec per case:
-//   odk/{valid,broken}/<name>.json             one ODK Central OData Submissions entry
+//   sources/odk/{valid,broken}/<name>.json     one ODK Central OData Submissions entry
 //   parsed/{valid,broken}/<name>.json          ParsedSubmission::toArray() a correct parser gives
 //   parsed/{valid,broken}/<name>.expected.json the outcome 2A expects
 // The parsed side is written from the spec, never by the parser, so the golden tests stay a
@@ -127,6 +127,7 @@ function parsed(c) {
     const submitted = `${c.date}T${c.submitted}:00+00:00`;
     if (!known) {
         return {
+            source: 'odk', external_id: c.instance,
             instance_id: c.instance, deprecated_id: null, form_version: c.version, form_version_known: false,
             submitted_at: submitted, started_at: null, ended_at: null, raw_start: '', raw_end: '',
             lga_ref: null, ward_ref: null, facility_ref: null, round_year: null, round_quarter: null,
@@ -140,6 +141,8 @@ function parsed(c) {
     const typed = { ...(c.typed ?? {}), ...(c.onlyTyped ?? {}) };
 
     return {
+        source: 'odk',
+        external_id: c.instance, // __id: an unedited submission's own instance ID
         instance_id: c.instance,
         deprecated_id: null,
         form_version: c.version,
@@ -169,7 +172,7 @@ const write = (file, data) => {
 
 for (const [kind, name, changes, status, codes] of CASES) {
     const c = { ...base(name), ...changes };
-    write(path.join(ROOT, 'tests/Fixtures/odk', kind, `${name}.json`), raw(c));
+    write(path.join(ROOT, 'tests/Fixtures/sources/odk', kind, `${name}.json`), raw(c));
     write(path.join(ROOT, 'tests/Fixtures/parsed', kind, `${name}.json`), parsed(c));
     write(path.join(ROOT, 'tests/Fixtures/parsed', kind, `${name}.expected.json`), { status, codes });
 }

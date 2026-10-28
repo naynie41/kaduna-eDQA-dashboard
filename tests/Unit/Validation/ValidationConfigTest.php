@@ -37,17 +37,22 @@ it('reserves the words that leak into the ward column', function (): void {
     expect($words)->toEqualCanonicalizing(['quarterly', 'monthly', 'annual', 'null', 'n/a', 'none', ...$months]);
 });
 
-it('has a default form version with a full field map', function (): void {
-    $default = config('edqa_field_maps.default');
+it('maps the current ODK form version to a full field map', function (): void {
+    $current = config('edqa_field_maps.current.odk');
+    // Versions contain dots, so never config("edqa_field_maps.sources.odk.{$v}"): index the array.
+    $name = config('edqa_field_maps.sources')['odk'][$current] ?? null;
 
-    // Versions contain dots, so never config("edqa_field_maps.versions.{$v}"): index the array.
-    expect($default)->toBe('2026.1')
-        ->and(config('edqa_field_maps.versions')[$default] ?? null)->toHaveKeys([
+    expect($current)->toBe('2026.1')
+        ->and($name)->toBe('xls-2026.1')
+        ->and(config('edqa_field_maps.maps')[$name] ?? null)->toHaveKeys([
             'facility_code', 'lga_code', 'ward_code', 'round_year', 'round_quarter', 'started_at',
             'ended_at', 'assessor', 'gps', 'scored_prefix_pattern', 'renames',
         ])
         // Answers map through the rule version's choice_map (Q-25), never the field map.
-        ->and(config('edqa_field_maps.versions')[$default])->not->toHaveKey('choices');
+        ->and(config('edqa_field_maps.maps')[$name])->not->toHaveKey('choices')
+        ->and(config('edqa_field_maps.maps')[$name])->not->toHaveKey('extends')
+        // No Kobo version is known yet: every Kobo form version quarantines until it is mapped.
+        ->and(config('edqa_field_maps.sources')['kobo'])->toBe([]);
 });
 
 it('names, explains and words a detail for every rule', function (string $code): void {

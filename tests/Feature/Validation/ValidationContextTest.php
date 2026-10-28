@@ -63,7 +63,7 @@ it('answers every lookup from memory, without further queries', function (): voi
         $context->duplicateOf($submission, $round->id, $facility->id);
         $context->priorOverallScore($facility->id, $round);
         $context->assessorVisitCount($submission->assessorName, $submission->deviceId, $submission->visitDate());
-        $context->isKnownFormVersion($submission->formVersion);
+        $context->isKnownFormVersion($submission->source, $submission->formVersion);
         $context->registerAccepted($submission);
     });
 
@@ -339,7 +339,8 @@ it('counts the facility being checked once, on top of the day so far', function 
 it('knows the form versions that have a field map, and no others', function (): void {
     $context = contextFor([]);
 
-    expect($context->isKnownFormVersion('2026.1'))->toBeTrue()
-        ->and($context->isKnownFormVersion('2019.1'))->toBeFalse()
-        ->and($context->isKnownFormVersion(''))->toBeFalse();
+    expect($context->isKnownFormVersion('odk', '2026.1'))->toBeTrue()
+        ->and($context->isKnownFormVersion('odk', '2019.1'))->toBeFalse()
+        ->and($context->isKnownFormVersion('odk', ''))->toBeFalse()
+        ->and($context->isKnownFormVersion('kobo', '2026.1'))->toBeFalse();
 });

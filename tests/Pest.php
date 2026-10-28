@@ -6,6 +6,8 @@ use App\Domain\Ingestion\Actions\ProcessParsedBatch;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Ingestion\Odk\OdkPayloadNormalizer;
+use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Reporting\Jobs\RefreshRoundAggregatesJob;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\DTOs\RuleFailure;
@@ -85,14 +87,23 @@ function checkRule(string $rule, ParsedSubmission $submission): array
  */
 function submissionRow(ParsedSubmission $parsed): Submission
 {
+    $payload = OdkPayload::fromParsed($parsed);
+
     return Submission::factory()->create([
+        'external_id' => $payload['__id'],
         'instance_id' => $parsed->instanceId,
         'deprecated_id' => $parsed->deprecatedId,
         'form_version' => $parsed->formVersion,
-        'payload' => OdkPayload::fromParsed($parsed),
+        'payload' => $payload,
         'submitted_at' => $parsed->submittedAt,
         'status' => SubmissionStatus::Parsed,
     ]);
+}
+
+/** A raw ODK Central entry read as the pipeline reads it: its normaliser, then the parser. */
+function odkParse(array $raw): ParsedSubmission
+{
+    return app(SubmissionParser::class)->parse(app(OdkPayloadNormalizer::class)->normalise($raw));
 }
 
 /**

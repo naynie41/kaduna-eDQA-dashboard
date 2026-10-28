@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Domain\Ingestion\Enums\AttachmentStatus;
 use App\Domain\Ingestion\Jobs\FetchAttachmentsJob;
-use App\Domain\Ingestion\Models\OdkAttachment;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 use Illuminate\Console\Command;
 
 /**
@@ -25,7 +25,7 @@ final class FetchPendingAttachments extends Command
 
     public function handle(): int
     {
-        $submissions = OdkAttachment::query()
+        $submissions = SubmissionAttachment::query()
             ->whereIn('status', [AttachmentStatus::Pending, AttachmentStatus::Failed])
             ->orderBy('submission_id')
             ->distinct()

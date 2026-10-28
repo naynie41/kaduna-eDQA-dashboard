@@ -61,7 +61,34 @@ final class FakeSubmissionSource implements SubmissionSource
         return [];
     }
 
-    public function submissionsPage(?CarbonImmutable $since, int $top, int $skip, bool $inclusive = false, string $by = 'submissionDate'): SubmissionPage
+    public function submissionsPage(?CarbonImmutable $since, int $top, int $skip, bool $inclusive = false): SubmissionPage
+    {
+        return $this->serve($since, $top, $skip, $inclusive, 'submissionDate');
+    }
+
+    /** As Central: received or edited at or after the cursor, by edit time then __id; no cursor: the edited ones. */
+    public function changedSince(?CarbonImmutable $cursor, int $top, int $skip): SubmissionPage
+    {
+        $this->calls[] = ['since' => $cursor?->utc()->format('Y-m-d\TH:i:s.v\Z'), 'top' => $top, 'skip' => $skip, 'inclusive' => true, 'by' => 'changedSince'];
+        $error = $this->failOn === null ? null : ($this->failOn)(count($this->calls));
+        if ($error !== null) {
+            throw $error;
+        }
+
+        $at = fn (array $row, string $field): ?float => is_string($row['__system'][$field] ?? null) ? (float) CarbonImmutable::parse($row['__system'][$field])->format('U.u') : null;
+        $c = $cursor === null ? null : (float) $cursor->format('U.u');
+        $rows = array_values(array_filter($this->rows, fn (array $row): bool => $c === null
+            ? $at($row, 'updatedAt') !== null
+            : ($at($row, 'submissionDate') ?? -INF) >= $c || ($at($row, 'updatedAt') ?? -INF) >= $c));
+        // Edited first, by edit time; unedited after (nulls last, as Postgres sorts them); then __id.
+        usort($rows, fn (array $a, array $b): int => [$at($a, 'updatedAt') === null, $at($a, 'updatedAt'), $a['__id']] <=> [$at($b, 'updatedAt') === null, $at($b, 'updatedAt'), $b['__id']]);
+
+        $page = array_slice($rows, $skip, max(1, $top));
+
+        return new SubmissionPage($page, count($rows), $skip + count($page) < count($rows));
+    }
+
+    private function serve(?CarbonImmutable $since, int $top, int $skip, bool $inclusive, string $by): SubmissionPage
     {
         $this->calls[] = ['since' => $since?->utc()->format('Y-m-d\TH:i:s.v\Z'), 'top' => $top, 'skip' => $skip, 'inclusive' => $inclusive, 'by' => $by];
         $error = $this->failOn === null ? null : ($this->failOn)(count($this->calls));

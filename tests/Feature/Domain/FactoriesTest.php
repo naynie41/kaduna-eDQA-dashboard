@@ -9,10 +9,10 @@ use App\Domain\Facility\Enums\Ownership;
 use App\Domain\Facility\Models\Facility;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Facility\Models\Ward;
-use App\Domain\Ingestion\Models\OdkAttachment;
-use App\Domain\Ingestion\Models\OdkFormSync;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
+use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 use App\Domain\Plan\Models\PlanAction;
 use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Round\Models\Round;
@@ -26,7 +26,7 @@ it('builds a valid row for every model', function (string $model): void {
 })->with([
     Lga::class, Ward::class, Facility::class, Round::class, Submission::class, Assessment::class,
     ItemResponse::class, AssessmentScore::class, QuarantinedRecord::class, ScoringRuleVersion::class,
-    PlanAction::class, OdkFormSync::class, OdkPullRun::class, OdkAttachment::class,
+    PlanAction::class, SourceSync::class, PullRun::class, SubmissionAttachment::class,
 ]);
 
 it('keeps a facility in the same LGA as its ward', function (): void {

@@ -25,6 +25,6 @@ final class ResolveQuarantineController extends Controller
             ? $correct->execute($record, $request->corrections(), $actor, $reason)
             : $reject->execute($record, $actor, $reason);
 
-        return new QuarantineResolutionResource($record->refresh()->load('submission.assessment'));
+        return new QuarantineResolutionResource($record->refresh()->load(['submission.assessment', 'round:id,year,quarter']));
     }
 }

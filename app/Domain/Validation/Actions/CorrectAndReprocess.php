@@ -8,7 +8,7 @@ use App\Domain\Ingestion\Actions\ProcessParsedSubmission;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Ingestion\DTOs\ProcessOutcome;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
-use App\Domain\Ingestion\Odk\SubmissionParser;
+use App\Domain\Ingestion\ReadSubmission;
 use App\Domain\Validation\Enums\QuarantineResolution;
 use App\Domain\Validation\Enums\QuarantineStatus;
 use App\Domain\Validation\Events\QuarantineResolved;
@@ -50,7 +50,7 @@ final class CorrectAndReprocess
     public function __construct(
         private readonly ValidationContextFactory $contexts,
         private readonly ProcessParsedSubmission $process,
-        private readonly SubmissionParser $parser,
+        private readonly ReadSubmission $read,
     ) {}
 
     /** @param  array<string, mixed>  $corrections */
@@ -66,7 +66,7 @@ final class CorrectAndReprocess
             }
             $before = $record->corrections;
             $after = array_replace($before, $corrections);
-            $parsed = self::rebuild($this->parser->parse($record->submission->payload)->toArray(), $after);
+            $parsed = self::rebuild($this->read->fromStored($record->submission)->toArray(), $after);
 
             $context = $this->contexts->forBatch([$parsed]);
             $outcome = $this->process->execute($record->submission, $parsed, $context, reprocessing: $record);

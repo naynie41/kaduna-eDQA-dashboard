@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * One rescore of a round: who or what asked, under which rule version, and its progress. An
- * operational record like odk_pull_runs; the request is audited on the round
+ * operational record like pull_runs; the request is audited on the round
  * (rescore_requested) and every score it changes on the score.
  *
  * @property int $id

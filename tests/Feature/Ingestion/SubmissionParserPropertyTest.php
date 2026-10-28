@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
-use App\Domain\Ingestion\Odk\SubmissionParser;
+use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Scoring\CurrentRuleVersion;
 use Database\Seeders\ScoringRuleVersionSeeder;
 
@@ -76,7 +76,7 @@ function mangle(array $payload): array
 
 it('never throws on 500 randomly mangled payloads', function (): void {
     mt_srand(20261017);
-    $clean = json_decode((string) file_get_contents(base_path('tests/Fixtures/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
+    $clean = json_decode((string) file_get_contents(base_path('tests/Fixtures/sources/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
     $parser = app(SubmissionParser::class);
 
     for ($i = 0; $i < 500; $i++) {
@@ -94,7 +94,7 @@ it('never throws on 500 randomly mangled payloads', function (): void {
             $payload = mangle($payload);
         }
 
-        $parsed = $parser->parse($payload);
+        $parsed = odkParse($payload);
 
         expect($parsed)->toBeInstanceOf(ParsedSubmission::class)
             ->and(ParsedSubmission::fromArray($parsed->toArray())->toArray())->toBe($parsed->toArray());

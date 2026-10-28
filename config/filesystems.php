@@ -42,9 +42,20 @@ return [
             'report' => false,
         ],
 
-        // ODK attachments (SECURITY.md §7): storage/app/odk on the app-files volume, outside the
-        // web root, never served by Laravel itself: only the authenticated attachment route
-        // streams them.
+        // Attachments from every source (SECURITY.md §7, ARCHITECTURE.md §5.3):
+        // storage/app/attachments/{source}/{instance}/ on the app-files volume, outside the web root,
+        // never served by Laravel itself: only the authenticated attachment route streams them.
+        'attachments' => [
+            'driver' => 'local',
+            'root' => storage_path('app/attachments'),
+            'serve' => false,
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
+        // Before Phase 2C: ODK attachments in storage/app/odk/{instance}/. Read only by
+        // edqa:attachments:relocate, which moves them to the attachments disk.
         'odk' => [
             'driver' => 'local',
             'root' => storage_path('app/odk'),

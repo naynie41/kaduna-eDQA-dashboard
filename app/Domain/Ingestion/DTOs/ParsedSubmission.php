@@ -25,6 +25,8 @@ final readonly class ParsedSubmission
      * @param  array<string, float>|null  $rawNumericScores
      */
     public function __construct(
+        public string $source,
+        public ?string $externalId,
         public string $instanceId,
         public ?string $deprecatedId,
         public string $formVersion,
@@ -46,6 +48,12 @@ final readonly class ParsedSubmission
         public ?array $rawNumericScores,
     ) {}
 
+    /** The same submission as the version that replaces $deprecatedId (an edit found by external ID, D-23 in the new numbering). */
+    public function asEditOf(string $deprecatedId): self
+    {
+        return new self(...[...get_object_vars($this), 'deprecatedId' => $deprecatedId]);
+    }
+
     /**
      * The local calendar day of the visit: when it started, or when it was submitted if the
      * start did not parse (COLUMN_DRIFT reports that separately).
@@ -61,6 +69,8 @@ final readonly class ParsedSubmission
         $read = new ArrayReader($data, 'parsed submission');
 
         return new self(
+            source: $read->string('source'),
+            externalId: $read->nullableString('external_id'),
             instanceId: $read->string('instance_id'),
             deprecatedId: $read->nullableString('deprecated_id'),
             formVersion: $read->string('form_version'),
@@ -91,6 +101,8 @@ final readonly class ParsedSubmission
     public function toArray(): array
     {
         return [
+            'source' => $this->source,
+            'external_id' => $this->externalId,
             'instance_id' => $this->instanceId,
             'deprecated_id' => $this->deprecatedId,
             'form_version' => $this->formVersion,

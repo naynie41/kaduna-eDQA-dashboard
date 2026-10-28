@@ -37,12 +37,13 @@ final class AttachmentRules
         return preg_match(self::SAFE_NAME, $name) === 1 && ! str_contains($name, '..') && basename($name) === $name;
     }
 
-    /** The directory on the odk disk for one submission's files. */
-    public static function directory(string $instanceId): string
+    /** The directory on the attachments disk for one submission's files: {source}/{instance}. */
+    public static function directory(string $instanceId, string $source = 'odk'): string
     {
         $dir = preg_replace('/[^A-Za-z0-9._-]/', '_', $instanceId) ?? '';
+        $key = preg_match('/^[a-z][a-z0-9_]{0,31}$/', $source) === 1 ? $source : '_';
 
-        return trim($dir, '.') === '' ? '_' : $dir;
+        return $key.'/'.(trim($dir, '.') === '' ? '_' : $dir);
     }
 
     /**

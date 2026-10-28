@@ -74,3 +74,87 @@ export type CascadeExport = {
     url: string;
     expires_at: string;
 };
+
+/** The Data issues page (D-57). */
+export type IssueTab = 'hard' | 'soft';
+export type IssueState = 'open' | 'resolved' | 'rejected' | 'superseded';
+
+export type DataIssuesFilters = {
+    tab: IssueTab;
+    state: IssueState;
+    rule: string | null;
+    lga: string | null;
+    round: number | null;
+};
+
+export type RuleSummary = {
+    code: string;
+    severity: 'hard' | 'soft';
+    name: string;
+    why: string;
+    open: number;
+};
+
+export type Failure = { code: string; severity: string; name: string; detail: string; field: string | null };
+
+export type RoundRef = { id: number; year: number; quarter: number };
+
+export type CorrectableField = 'lga_ref' | 'ward_ref' | 'facility_ref' | 'raw_start' | 'raw_end' | 'round_year' | 'round_quarter';
+
+/** DataIssueRowResource. */
+export type DataIssueRow = {
+    id: number;
+    instance_id: string;
+    submission_id: number;
+    failures: Failure[];
+    facility_ref: string | null;
+    facility_name: string | null;
+    lga_ref: string | null;
+    round: RoundRef | null;
+    received_at: string | null;
+    status: 'open' | 'resolved';
+    resolution: 'reprocessed' | 'rejected' | 'superseded' | null;
+    resolution_note: string | null;
+    resolved_at: string | null;
+    corrections: Partial<Record<CorrectableField, string | number | null>>;
+    current: Record<CorrectableField, string | number | null>;
+    odk_url: string | null;
+};
+
+/** DataIssueDetailResource: the row plus what the drawer shows. */
+export type DataIssueDetail = DataIssueRow & {
+    parsed: Record<string, unknown>;
+    payload: Record<string, unknown>;
+    history: {
+        id: number;
+        event: string;
+        at: string | null;
+        by: string | null;
+        reason: string | null;
+        old: Record<string, unknown>;
+        new: Record<string, unknown>;
+    }[];
+};
+
+/** FlaggedAssessmentResource. */
+export type FlaggedRow = {
+    id: number;
+    facility: { id: number; code: string; name: string };
+    lga: { code: string; name: string } | null;
+    round: RoundRef;
+    assessor: string;
+    started_at: string;
+    flags: { code: string; name: string }[];
+};
+
+/** QuarantineResolutionResource: what a resolve or bulk resolve answers per record. */
+export type Resolution = {
+    quarantined_record_id: number;
+    instance_id: string;
+    failures: Failure[];
+    record_status: 'open' | 'resolved';
+    /** The submission's status after: accepted, flagged, quarantined, rejected. */
+    status: string;
+    assessment_id: number | null;
+    rescore_round: RoundRef | null;
+};

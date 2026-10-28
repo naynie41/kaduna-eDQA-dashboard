@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\OdkMock;
 
-use App\Domain\Ingestion\Odk\FieldMap;
+use App\Domain\Ingestion\FieldMap;
 use App\Domain\Round\Models\Round;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -88,7 +88,7 @@ final class MockSubmissionGenerator
         $index = 0;
         $broken = min($broken, $count);
         foreach ($periods as $p => [$round, $version]) {
-            $map = FieldMap::resolve($version) ?? FieldMap::resolve((string) config('edqa_field_maps.default'));
+            $map = FieldMap::for('odk', $version) ?? FieldMap::for('odk', (string) config('edqa_field_maps.current.odk'));
             if ($map === null) {
                 throw new RuntimeException('No field map to write with.');
             }
@@ -374,7 +374,7 @@ final class MockSubmissionGenerator
 
     private function writeConfig(string $version): void
     {
-        $versions = array_values(array_unique([$version, ...array_keys((array) config('edqa_field_maps.versions'))]));
+        $versions = array_values(array_unique([$version, ...FieldMap::known()['odk'] ?? []]));
         file_put_contents("{$this->dataDir}/config.json", json_encode([
             'email' => 'mock@odk.local',
             'password' => 'mock-password',

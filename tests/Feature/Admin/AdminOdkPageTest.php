@@ -6,7 +6,7 @@ use App\Domain\Ingestion\Actions\PullSubmissions;
 use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Exceptions\OdkUnreachable;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Scoring\CurrentRuleVersion;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +30,7 @@ beforeEach(function (): void {
 
 function odkPageConfigure(): void
 {
-    config(['edqa.odk' => [...config('edqa.odk'), 'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'secret-for-tests', 'project_id' => '7', 'form_id' => 'dqa']]);
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'), 'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'secret-for-tests', 'project_id' => '7', 'form_id' => 'dqa']]);
 }
 
 it('is behind the sign-in', function (): void {
@@ -38,8 +38,8 @@ it('is behind the sign-in', function (): void {
 });
 
 it('says what is missing when ODK is not configured, never the values, and links the runbook', function (): void {
-    config(['edqa.odk.url' => null, 'edqa.odk.password' => null]);
-    config(['edqa.odk.email' => 'secret-mail@example.org']);
+    config(['edqa.sources.odk.url' => null, 'edqa.sources.odk.password' => null]);
+    config(['edqa.sources.odk.email' => 'secret-mail@example.org']);
 
     $response = $this->actingAs($this->admin)->get('/admin/odk');
 
@@ -97,7 +97,7 @@ it('says when ODK Central is configured but not reachable', function (): void {
 
 it('follows a pull already running', function (): void {
     odkPageConfigure();
-    $run = OdkPullRun::query()->create(['trigger_type' => PullTrigger::Scheduled, 'started_at' => now()]);
+    $run = PullRun::query()->create(['source_id' => Rows::sourceId(), 'trigger_type' => PullTrigger::Scheduled, 'started_at' => now()]);
 
     $this->actingAs($this->admin)->get('/admin/odk')->assertInertia(fn (Assert $page) => $page->where('status.running_run_id', $run->id));
 });
@@ -145,8 +145,8 @@ it('refuses a filter it does not know', function (string $query): void {
 
 it('shows the last backfill, its checkpoint page, and a signed link to the newest report', function (): void {
     odkPageConfigure();
-    config(['edqa.odk.page_size' => 500]);
-    DB::table('odk_form_syncs')->insert(['project_id' => 7, 'form_id' => 'dqa', 'backfill_skip' => 1500, 'created_at' => now(), 'updated_at' => now()]);
+    config(['edqa.sources.odk.page_size' => 500]);
+    DB::table('source_syncs')->insert(['source_id' => Rows::sourceId(), 'form_ref' => '7/dqa', 'backfill_checkpoint' => 1500, 'created_at' => now(), 'updated_at' => now()]);
     Rows::pullRun(['trigger_type' => 'backfill', 'outcome' => 'succeeded', 'started_at' => now()->subDay(), 'finished_at' => now()->subDay()->addHour(), 'fetched' => 1500, 'accepted' => 1400]);
     Storage::disk('exports')->put('backfill-report-20261019-090000.md', '# old');
     Storage::disk('exports')->put('backfill-report-20261020-090000.md', '# Backfill report');
@@ -184,7 +184,7 @@ it('counts the rows a pull parsed, for the progress panel', function (): void {
     FixtureWorld::build();
     CurrentRuleVersion::forget();
     odkPageConfigure();
-    $entry = json_decode((string) file_get_contents(base_path('tests/Fixtures/odk/valid/clean-visit.json')), true);
+    $entry = json_decode((string) file_get_contents(base_path('tests/Fixtures/sources/odk/valid/clean-visit.json')), true);
     $this->source->add($entry);
 
     $run = app(PullSubmissions::class)->execute(PullTrigger::Scheduled)->refresh();

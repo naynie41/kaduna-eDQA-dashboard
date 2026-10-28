@@ -11,7 +11,7 @@ use Illuminate\Support\Sleep;
 const CHECK_URL = 'https://central.example.org';
 
 beforeEach(function (): void {
-    config(['edqa.odk' => [
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'),
         'url' => CHECK_URL, 'email' => 'svc-edqa@kaduna.example', 'password' => 'S3cret-for-check', 'project_id' => '7', 'form_id' => 'dqa',
         'page_size' => 500, 'timeouts' => ['connect' => 10, 'total' => 60],
         'retry' => ['attempts' => 3, 'base_ms' => 1000, 'max_ms' => 30000], 'token_refresh_minutes' => 30,
@@ -66,7 +66,7 @@ it('gives the same as JSON', function (): void {
 });
 
 it('says plainly what is missing when not configured, sends nothing and fails', function (): void {
-    config(['edqa.odk.password' => null, 'edqa.odk.form_id' => null]);
+    config(['edqa.sources.odk.password' => null, 'edqa.sources.odk.form_id' => null]);
     Http::fake();
 
     $this->artisan('edqa:odk:check')

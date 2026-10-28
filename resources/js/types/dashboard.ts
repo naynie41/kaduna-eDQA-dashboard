@@ -179,12 +179,15 @@ export type FacilityDetail = {
         ownership_label: string;
         active: boolean;
     };
-    round: { id: number; label: string; year: number; quarter: number } | null;
+    /** open: corrections are allowed (D-58); a closed round is pinned (D-32). */
+    round: { id: number; label: string; year: number; quarter: number; open: boolean } | null;
     assessment: {
         id: number;
         assessed_on: string;
         assessor: string;
         status: string;
+        started_at: string;
+        ended_at: string;
     } | null;
     scores: {
         availability: ScoreValue;
@@ -201,6 +204,8 @@ export type FacilityDetail = {
         /** result is null only when no rule version can be read. */
         items: {
             code: string;
+            /** The form's name, e.g. avail_m2_reporting_rate: what a correction sends. */
+            key: string;
             label: string | null;
             result: ItemResult | null;
         }[];

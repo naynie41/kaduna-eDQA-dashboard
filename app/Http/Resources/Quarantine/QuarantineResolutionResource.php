@@ -26,6 +26,10 @@ final class QuarantineResolutionResource extends JsonResource
             'record_status' => $this->status->value,
             'status' => $this->submission->status->value,
             'assessment_id' => $this->submission->assessment?->id,
+            // A resolution in a round queues that round's rescore (RescoreAfterQuarantineResolved, debounced).
+            'rescore_round' => $this->status->value === 'resolved' && $this->round !== null
+                ? ['id' => $this->round->id, 'year' => $this->round->year, 'quarter' => $this->round->quarter]
+                : null,
         ];
     }
 }

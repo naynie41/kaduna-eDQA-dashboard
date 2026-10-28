@@ -30,7 +30,7 @@ const ADMIN_PAGES = [
 
 function configureOdk(): void
 {
-    config(['edqa.odk' => [...config('edqa.odk'), 'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'x', 'project_id' => '7', 'form_id' => 'dqa']]);
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'), 'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'x', 'project_id' => '7', 'form_id' => 'dqa']]);
 }
 
 it('redirects /admin to the ODK pull page', function (): void {
@@ -127,7 +127,7 @@ it('says which round is open and when the last success was', function (): void {
 });
 
 it('leaves the banner to the status bar while ODK is not configured', function (): void {
-    config(['edqa.odk.url' => null]);
+    config(['edqa.sources.odk.url' => null]);
     Rows::round(['year' => 2026, 'quarter' => 4, 'window_start' => '2026-10-01', 'window_end' => '2026-12-31']);
 
     $this->actingAs($this->admin)->get('/admin/odk')->assertInertia(fn (Assert $page) => $page

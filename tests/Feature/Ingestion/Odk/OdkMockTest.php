@@ -12,9 +12,9 @@ use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Exceptions\OdkAuthFailed;
 use App\Domain\Ingestion\Exceptions\OdkUnexpectedResponse;
-use App\Domain\Ingestion\Models\OdkAttachment;
 use App\Domain\Ingestion\Models\Submission;
-use App\Domain\Ingestion\Odk\SubmissionParser;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
+use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Scoring\CurrentRuleVersion;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use App\Support\OdkMock\MockSubmissionGenerator;
@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
+use Tests\Support\Rows;
 
 // The local mock ODK Central (docker/odk-mock) and its generator. Http::fake routes every request
 // to the mock's own handler, so the real OdkCentralSource, parser and pipeline run against it.
@@ -40,11 +41,12 @@ beforeEach(function (): void {
     $this->seed([LgaSeeder::class, ScoringRuleVersionSeeder::class, WardSeeder::class, FacilitySeeder::class, RoundSeeder::class]);
     CurrentRuleVersion::forget();
     $this->mock = sys_get_temp_dir().'/odk-mock-'.bin2hex(random_bytes(4));
-    config(['edqa.odk' => [...config('edqa.odk'),
-        'url' => 'https://odk-mock.test', 'email' => 'mock@odk.local', 'password' => 'mock-password', 'project_id' => '1', 'form_id' => 'dqa', 'mock_path' => $this->mock,
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'),
+        'url' => 'https://odk-mock.test', 'email' => 'mock@odk.local', 'password' => 'mock-password', 'project_id' => '1', 'form_id' => 'dqa',
     ]]);
+    config(['edqa.odk.mock_path' => $this->mock]);
     Sleep::fake();
-    Storage::fake('odk');
+    Storage::fake('attachments');
     $mock = $this->mock;
     Http::fake(function (Request $request) use ($mock) {
         $headers = [];
@@ -84,8 +86,8 @@ it('serves them through the real source, and the pipeline holds exactly the brok
     do {
         $page = $source->submissionsPage(null, 25, $skip);
         foreach ($page->rows as $raw) {
-            $parsed = $parser->parse($raw);
-            $submission = Submission::query()->create(['instance_id' => $parsed->instanceId, 'deprecated_id' => $parsed->deprecatedId, 'form_id' => 'dqa', 'form_version' => $parsed->formVersion,
+            $parsed = odkParse($raw);
+            $submission = Submission::query()->create(['source_id' => Rows::sourceId(), 'external_id' => $parsed->instanceId, 'instance_id' => $parsed->instanceId, 'deprecated_id' => $parsed->deprecatedId, 'form_ref' => 'dqa', 'form_version' => $parsed->formVersion,
                 'payload' => $raw, 'submitted_at' => $parsed->submittedAt, 'received_at' => now(), 'status' => SubmissionStatus::Received]);
             $outcome = app(ProcessParsedBatch::class)->execute([[$submission, $parsed]])[0];
             $statuses[] = $outcome->status->value;
@@ -134,9 +136,9 @@ it('filters on submissionDate, pages, and refuses a wrong password or form', fun
         ->and($after->totalCount)->toBe(count(array_filter($dates, fn (string $d): bool => CarbonImmutable::parse($d)->gt($middle))))
         ->and($source->submissionsPage(null, 10, 30)->hasMore)->toBeFalse();
 
-    config(['edqa.odk.form_id' => 'other']);
+    config(['edqa.sources.odk.form_id' => 'other']);
     expect(fn () => app(SubmissionSource::class)->formVersions())->toThrow(OdkUnexpectedResponse::class);
-    config(['edqa.odk.form_id' => 'dqa', 'edqa.odk.password' => 'wrong']);
+    config(['edqa.sources.odk.form_id' => 'dqa', 'edqa.sources.odk.password' => 'wrong']);
     Cache::flush();
     expect(fn () => app(SubmissionSource::class)->formVersions())->toThrow(OdkAuthFailed::class);
 });
@@ -176,7 +178,7 @@ it('writes an older version through its own field map, and the parser reads it b
 
     expect($raw)->toHaveKey('fac')->not->toHaveKey('facility')
         ->and($raw['availability'])->toHaveKey('avail_m1_nhmis_form')
-        ->and(app(SubmissionParser::class)->parse($raw)->facilityRef)->toBe($raw['fac']['fac_code']);
+        ->and(odkParse($raw)->facilityRef)->toBe($raw['fac']['fac_code']);
 });
 
 it('refuses outside local and testing, and a round it cannot read', function (): void {
@@ -188,7 +190,7 @@ it('refuses outside local and testing, and a round it cannot read', function ():
 });
 
 it('is pulled end to end: three pages, the broken ones quarantined, an edit applied in place, nothing twice', function (): void {
-    config(['edqa.odk.page_size' => 25]);
+    config(['edqa.sources.odk.page_size' => 25]);
     $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 10])->assertSuccessful();
     $pull = fn () => app(PullSubmissions::class)->execute(PullTrigger::Scheduled)->refresh();
 
@@ -198,11 +200,11 @@ it('is pulled end to end: three pages, the broken ones quarantined, an edit appl
         ->and(Submission::query()->count())->toBe(59)
         ->and(QuarantinedRecord::query()->count())->toBe(10);
     // Its two photos: recorded by the pull, fetched (the sync test queue) as JPEGs.
-    $photos = OdkAttachment::query()->get();
+    $photos = SubmissionAttachment::query()->get();
     expect($photos)->toHaveCount(2)
-        ->and($photos->every(fn (OdkAttachment $a): bool => $a->status === AttachmentStatus::Fetched && $a->mime === 'image/jpeg'))->toBeTrue();
+        ->and($photos->every(fn (SubmissionAttachment $a): bool => $a->status === AttachmentStatus::Fetched && $a->mime === 'image/jpeg'))->toBeTrue();
     foreach ($photos as $photo) {
-        Storage::disk('odk')->assertExists((string) $photo->path);
+        Storage::disk('attachments')->assertExists((string) $photo->path);
     }
     $assessments = Assessment::query()->count();
 
@@ -224,7 +226,7 @@ it('spreads the data over a span of quarters, the oldest in an older version, be
     $byQuarter = [];
     $parser = app(SubmissionParser::class);
     foreach (glob($this->mock.'/submissions/*.json') ?: [] as $file) {
-        $parsed = $parser->parse(json_decode((string) file_get_contents($file), true));
+        $parsed = odkParse(json_decode((string) file_get_contents($file), true));
         $day = $parsed->visitDate();
         $byQuarter["{$day->year}Q{$day->quarter}"][$parsed->formVersion] = ($byQuarter["{$day->year}Q{$day->quarter}"][$parsed->formVersion] ?? 0) + 1;
     }

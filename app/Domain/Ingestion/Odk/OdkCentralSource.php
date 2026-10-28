@@ -54,20 +54,47 @@ final class OdkCentralSource implements SubmissionSource
         return $versions;
     }
 
-    public function submissionsPage(?CarbonImmutable $since, int $top, int $skip, bool $inclusive = false, string $by = 'submissionDate'): SubmissionPage
+    public function submissionsPage(?CarbonImmutable $since, int $top, int $skip, bool $inclusive = false): SubmissionPage
     {
-        $field = $by === 'updatedAt' ? 'updatedAt' : 'submissionDate';
-        $path = $this->form().'.svc/Submissions';
         $query = [];
         if ($since !== null) {
-            // OData DateTimeOffset literal, UTC with milliseconds, as Central stores its times.
-            $query['$filter'] = "__system/{$field} ".($inclusive ? 'ge' : 'gt').' '.$since->utc()->format('Y-m-d\TH:i:s.v\Z');
-        } elseif ($field === 'updatedAt') {
-            // Only edited submissions have an updatedAt.
-            $query['$filter'] = '__system/updatedAt ge 1970-01-01T00:00:00.000Z';
+            $query['$filter'] = '__system/submissionDate '.($inclusive ? 'ge' : 'gt').' '.self::literal($since);
         }
         // A cursor on a field is only safe if the feed is ordered by that field.
-        $query += ['$orderby' => "__system/{$field} asc", '$top' => max(1, $top), '$skip' => max(0, $skip), '$count' => 'true', '$expand' => '*'];
+        $query += ['$orderby' => '__system/submissionDate asc'];
+
+        return $this->page($query, $top, $skip);
+    }
+
+    /**
+     * Received or edited at or after the cursor (Central's OData $filter takes or, and $orderby
+     * the same __system fields, from v2024.1: docs.getodk.org/central-api-odata-endpoints,
+     * checked October 2026). The feed is ordered by updatedAt, which moves the edits cursor, then
+     * __id, so pages stay stable however Central sorts the unedited (null updatedAt) rows; the
+     * pull's first pass reads those by submissionDate anyway. With no cursor yet, only edited
+     * submissions (every submission would be read twice otherwise).
+     */
+    public function changedSince(?CarbonImmutable $cursor, int $top, int $skip): SubmissionPage
+    {
+        $query = ['$filter' => $cursor === null
+            ? '__system/updatedAt ge 1970-01-01T00:00:00.000Z'
+            : '__system/submissionDate ge '.self::literal($cursor).' or __system/updatedAt ge '.self::literal($cursor)];
+        $query += ['$orderby' => '__system/updatedAt asc,__id asc'];
+
+        return $this->page($query, $top, $skip);
+    }
+
+    /** OData DateTimeOffset literal, UTC with milliseconds, as Central stores its times. */
+    private static function literal(CarbonImmutable $time): string
+    {
+        return $time->utc()->format('Y-m-d\TH:i:s.v\Z');
+    }
+
+    /** @param  array<string, string>  $query */
+    private function page(array $query, int $top, int $skip): SubmissionPage
+    {
+        $path = $this->form().'.svc/Submissions';
+        $query += ['$top' => max(1, $top), '$skip' => max(0, $skip), '$count' => 'true', '$expand' => '*'];
 
         $body = OdkCentralClient::json($this->client->get($path, $query), $path);
         $rows = $body['value'] ?? null;

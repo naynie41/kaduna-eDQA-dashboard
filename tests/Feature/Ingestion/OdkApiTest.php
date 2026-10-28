@@ -7,7 +7,7 @@ use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Exceptions\OdkUnreachable;
 use App\Domain\Ingestion\Jobs\PullSubmissionsJob;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Ingestion\Queries\OdkStatusQuery;
 use App\Domain\Reporting\Aggregators\ShellStatusAggregator;
 use App\Http\Controllers\OdkWebhookController;
@@ -27,7 +27,7 @@ use Tests\Support\Rows;
 const WEBHOOK_SECRET = 'whsec-test-0123456789abcdef';
 
 beforeEach(function (): void {
-    config(['edqa.odk' => [...config('edqa.odk'),
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'),
         'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'secret-for-tests', 'project_id' => '7', 'form_id' => 'dqa',
     ]]);
     config(['edqa.odk.webhook.secret' => WEBHOOK_SECRET]);
@@ -170,7 +170,7 @@ it('starts a manual pull, audited, and answers 202 with its run id', function ()
 
     $response = $this->actingAs($this->admin)->postJson('/api/odk/pull')->assertStatus(202)->assertJson(['already_running' => false]);
 
-    $run = OdkPullRun::query()->sole();
+    $run = PullRun::query()->sole();
     expect($response->json('run_id'))->toBe($run->id)
         ->and($run->trigger_type)->toBe(PullTrigger::Manual)
         ->and($run->triggered_by)->toBe($this->admin->id)
@@ -183,19 +183,19 @@ it('starts a manual pull, audited, and answers 202 with its run id', function ()
 
 it('returns the running pull instead of queueing a second, and audits that too', function (): void {
     Queue::fake();
-    $running = OdkPullRun::query()->create(['trigger_type' => PullTrigger::Scheduled, 'started_at' => now()->subMinute()]);
+    $running = PullRun::query()->create(['source_id' => Rows::sourceId(), 'trigger_type' => PullTrigger::Scheduled, 'started_at' => now()->subMinute()]);
 
     $this->actingAs($this->admin)->postJson('/api/odk/pull')->assertStatus(202)->assertJson(['run_id' => $running->id, 'already_running' => true]);
 
-    expect(OdkPullRun::query()->count())->toBe(1);
+    expect(PullRun::query()->count())->toBe(1);
     Queue::assertNothingPushed();
     expect(Activity::query()->forSubject($running)->where('event', 'pull_requested')->sole()->properties['joined_running'])->toBeTrue();
 });
 
 it('does not count a backfill, or a run left open long ago, as a running pull', function (): void {
     Queue::fake();
-    OdkPullRun::query()->create(['trigger_type' => PullTrigger::Backfill, 'started_at' => now()->subMinute()]);
-    OdkPullRun::query()->create(['trigger_type' => PullTrigger::Scheduled, 'started_at' => now()->subHours(3)]);
+    PullRun::query()->create(['source_id' => Rows::sourceId(), 'trigger_type' => PullTrigger::Backfill, 'started_at' => now()->subMinute()]);
+    PullRun::query()->create(['source_id' => Rows::sourceId(), 'trigger_type' => PullTrigger::Scheduled, 'started_at' => now()->subHours(3)]);
 
     $this->actingAs($this->admin)->postJson('/api/odk/pull')->assertStatus(202)->assertJson(['already_running' => false]);
 
@@ -203,12 +203,12 @@ it('does not count a backfill, or a run left open long ago, as a running pull', 
 });
 
 it('carries the run it was given through the pull, without a second audit entry', function (): void {
-    $this->source->add(json_decode((string) file_get_contents(base_path('tests/Fixtures/odk/valid/clean-visit.json')), true));
+    $this->source->add(json_decode((string) file_get_contents(base_path('tests/Fixtures/sources/odk/valid/clean-visit.json')), true));
 
     // The sync test queue runs the pull at once.
     $runId = $this->actingAs($this->admin)->postJson('/api/odk/pull')->assertStatus(202)->json('run_id');
 
-    $run = OdkPullRun::query()->sole();
+    $run = PullRun::query()->sole();
     expect($run->id)->toBe($runId)
         ->and($run->outcome)->toBe(PullOutcome::Succeeded)
         ->and($run->fetched)->toBe(1)
@@ -216,7 +216,7 @@ it('carries the run it was given through the pull, without a second audit entry'
 });
 
 it('closes the run it was given when the pull never got the lock', function (): void {
-    $run = OdkPullRun::query()->create(['trigger_type' => PullTrigger::Manual, 'triggered_by' => $this->admin->id, 'started_at' => now()]);
+    $run = PullRun::query()->create(['source_id' => Rows::sourceId(), 'trigger_type' => PullTrigger::Manual, 'triggered_by' => $this->admin->id, 'started_at' => now()]);
 
     (new PullSubmissionsJob(PullTrigger::Manual, $this->admin->id, $run->id))->failed(new RuntimeException('lock busy'));
 
@@ -235,7 +235,7 @@ it('limits "Pull now" to six a minute', function (): void {
 });
 
 it('shows a run\'s progress, and 404 for one that does not exist', function (): void {
-    $run = OdkPullRun::query()->create(['trigger_type' => PullTrigger::Manual, 'started_at' => now(), 'fetched' => 500, 'duplicates' => 3, 'accepted' => 480, 'flagged' => 7, 'quarantined' => 10]);
+    $run = PullRun::query()->create(['source_id' => Rows::sourceId(), 'trigger_type' => PullTrigger::Manual, 'started_at' => now(), 'fetched' => 500, 'duplicates' => 3, 'accepted' => 480, 'flagged' => 7, 'quarantined' => 10]);
 
     $this->actingAs($this->admin)->getJson("/api/odk/pull/{$run->id}")->assertOk()->assertExactJson(['data' => [
         'run_id' => $run->id, 'trigger' => 'manual', 'status' => 'running', 'started_at' => $run->started_at->toIso8601String(), 'finished_at' => null,
@@ -249,7 +249,7 @@ it('shows a run\'s progress, and 404 for one that does not exist', function (): 
 
 it('keeps every ODK endpoint behind the sign-in', function (string $method, string $uri): void {
     $this->json($method, $uri)->assertUnauthorized();
-    expect(OdkPullRun::query()->count())->toBe(0);
+    expect(PullRun::query()->count())->toBe(0);
 })->with([['POST', '/api/odk/pull'], ['GET', '/api/odk/pull/1'], ['GET', '/api/odk/status']]);
 
 // ---- GET /api/odk/status and the status bar's states
@@ -260,9 +260,9 @@ it('reports configured, reachable, the cursor, the running pull and the open rou
     Rows::assessment(['round_id' => $q2, 'status' => 'accepted']);
     Rows::assessment(['round_id' => $q2, 'status' => 'flagged']);
     Rows::quarantined(['round_id' => $q2]);
-    DB::table('odk_form_syncs')->insert(['project_id' => 7, 'form_id' => 'dqa', 'last_pulled_at' => '2026-10-20 09:00:00+01', 'backfill_skip' => 1500, 'submission_count' => 1502, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('source_syncs')->insert(['source_id' => Rows::sourceId(), 'form_ref' => '7/dqa', 'cursor_at' => '2026-10-20 09:00:00+01', 'backfill_checkpoint' => 1500, 'submission_count' => 1502, 'created_at' => now(), 'updated_at' => now()]);
     Rows::pullRun(['trigger_type' => 'scheduled', 'outcome' => 'succeeded', 'started_at' => now()->subMinutes(5), 'finished_at' => now()->subMinutes(4)]);
-    $running = OdkPullRun::query()->create(['trigger_type' => PullTrigger::Scheduled, 'started_at' => now()]);
+    $running = PullRun::query()->create(['source_id' => Rows::sourceId(), 'trigger_type' => PullTrigger::Scheduled, 'started_at' => now()]);
 
     $data = $this->actingAs($this->admin)->getJson('/api/odk/status')->assertOk()->json('data');
 
@@ -290,7 +290,7 @@ it('says when ODK Central does not answer, and asks it at most once a minute', f
 });
 
 it('names the missing settings, never their values, when not configured, and asks ODK nothing', function (): void {
-    config(['edqa.odk.url' => null, 'edqa.odk.password' => null]);
+    config(['edqa.sources.odk.url' => null, 'edqa.sources.odk.password' => null]);
     $source = Mockery::mock(SubmissionSource::class);
     $source->shouldNotReceive('ping');
     app()->instance(SubmissionSource::class, $source);
@@ -312,9 +312,9 @@ it('gives the status bar each state', function (Closure $setup, string $state, ?
     expect($sync['state'])->toBe($state)
         ->and($sync['lastErrorClass'])->toBe($errorClass);
 })->with([
-    'not configured' => [fn () => config(['edqa.odk.url' => null]), 'not_configured', null],
+    'not configured' => [fn () => config(['edqa.sources.odk.url' => null]), 'not_configured', null],
     'not configured, whatever ran before' => [function (): void {
-        config(['edqa.odk.url' => null]);
+        config(['edqa.sources.odk.url' => null]);
         Rows::pullRun(['outcome' => 'succeeded', 'started_at' => now()->subMinutes(3), 'finished_at' => now()->subMinutes(2)]);
     }, 'not_configured', null],
     'configured, no pull yet' => [fn () => null, 'not_connected', null],

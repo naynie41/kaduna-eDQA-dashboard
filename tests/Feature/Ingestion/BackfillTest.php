@@ -13,10 +13,10 @@ use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Exceptions\BackfillRefused;
 use App\Domain\Ingestion\Jobs\BackfillOdkSubmissionsJob;
 use App\Domain\Ingestion\Jobs\FetchAttachmentsJob;
-use App\Domain\Ingestion\Models\OdkAttachment;
-use App\Domain\Ingestion\Models\OdkFormSync;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
+use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 use App\Domain\Ingestion\Odk\BackfillLock;
 use App\Domain\Ingestion\Queries\BackfillReportQuery;
 use App\Domain\Reporting\Aggregators\ShellStatusAggregator;
@@ -45,12 +45,12 @@ beforeEach(function (): void {
     foreach (range(1, 12) as $n) {
         Rows::facility(['code' => sprintf('FX-4%03d', $n), 'name' => "Backfill facility {$n}", 'lga_id' => $chikun, 'ward_id' => $kujama]);
     }
-    config(['edqa.odk' => [...config('edqa.odk'),
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'),
         'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'secret-for-tests', 'project_id' => '7', 'form_id' => 'dqa', 'page_size' => 3,
     ]]);
-    config(['edqa.odk.backfill.throttle_seconds' => 0]);
+    config(['edqa.sources.odk.backfill_throttle_seconds' => 0]);
     Sleep::fake();
-    Storage::fake('odk');
+    Storage::fake('attachments');
     Storage::fake('exports');
     $this->source = new FakeSubmissionSource;
     app()->instance(SubmissionSource::class, $this->source);
@@ -64,7 +64,7 @@ beforeEach(function (): void {
  */
 function bfEntry(int $n, string $visit = '2026-04-14', ?string $version = null, ?string $facility = null): array
 {
-    $entry = json_decode((string) file_get_contents(base_path('tests/Fixtures/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
+    $entry = json_decode((string) file_get_contents(base_path('tests/Fixtures/sources/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
     $entry['__id'] = $entry['meta']['instanceID'] = "uuid:bf-{$n}";
     $entry['__system']['submissionDate'] = CarbonImmutable::parse('2026-04-20T10:00:00.000Z')->addMinutes($n)->format('Y-m-d\TH:i:s.v\Z');
     $entry['__system']['deviceId'] = "collect:bf{$n}";
@@ -80,14 +80,14 @@ function bfEntry(int $n, string $visit = '2026-04-14', ?string $version = null, 
     return $entry;
 }
 
-function bfRun(?int $fromPage = null, ?int $throttle = null): OdkPullRun
+function bfRun(?int $fromPage = null, ?int $throttle = null): PullRun
 {
     return app(BackfillSubmissions::class)->execute($fromPage, $throttle)->run->refresh();
 }
 
-function bfSync(): OdkFormSync
+function bfSync(): SourceSync
 {
-    return OdkFormSync::query()->where('project_id', 7)->where('form_id', 'dqa')->sole();
+    return SourceSync::query()->where('form_ref', '7/dqa')->sole();
 }
 
 /** @return Builder<Submission> */
@@ -105,7 +105,7 @@ it('loads every submission from the start, page by page, checkpointing each page
         ->and($run->outcome)->toBe(PullOutcome::Succeeded)
         ->and($run->only(['fetched', 'duplicates', 'accepted', 'flagged', 'quarantined']))->toBe(['fetched' => 7, 'duplicates' => 0, 'accepted' => 7, 'flagged' => 0, 'quarantined' => 0])
         ->and(bfStored()->count())->toBe(7)
-        ->and(bfSync()->backfill_skip)->toBe(7)
+        ->and(bfSync()->backfill_checkpoint)->toBe(7)
         ->and(bfSync()->submission_count)->toBe(7)
         // The feed from the start, no filter, by $skip: pages at 0, 3 and 6.
         ->and(array_column($this->source->calls, 'skip'))->toBe([0, 3, 6])
@@ -116,7 +116,7 @@ it('loads every submission from the start, page by page, checkpointing each page
 });
 
 it('throttles by ODK_BACKFILL_THROTTLE when no --throttle is given', function (): void {
-    config(['edqa.odk.backfill.throttle_seconds' => 5]);
+    config(['edqa.sources.odk.backfill_throttle_seconds' => 5]);
     $this->source->add(...array_map(fn (int $n): array => bfEntry($n), range(1, 4)));
 
     bfRun();
@@ -134,10 +134,10 @@ it('resumes at the checkpoint after a crash at page N, with no duplicates', func
     });
 
     expect(fn () => bfRun())->toThrow(RuntimeException::class);
-    $failed = OdkPullRun::query()->sole();
+    $failed = PullRun::query()->sole();
     expect($failed->outcome)->toBe(PullOutcome::Failed)
         ->and($failed->fetched)->toBe(3)
-        ->and(bfSync()->backfill_skip)->toBe(3) // page 1 committed, page 2 rolled back
+        ->and(bfSync()->backfill_checkpoint)->toBe(3) // page 1 committed, page 2 rolled back
         ->and(bfStored()->count())->toBe(3);
 
     $crash = false;
@@ -148,7 +148,7 @@ it('resumes at the checkpoint after a crash at page N, with no duplicates', func
         ->and($run->only(['fetched', 'duplicates', 'accepted']))->toBe(['fetched' => 4, 'duplicates' => 0, 'accepted' => 4])
         ->and(bfStored()->count())->toBe(7)
         ->and(bfStored()->distinct()->count('instance_id'))->toBe(7)
-        ->and(bfSync()->backfill_skip)->toBe(7);
+        ->and(bfSync()->backfill_checkpoint)->toBe(7);
 });
 
 it('starts at --from-page instead of the checkpoint', function (): void {
@@ -174,7 +174,7 @@ it('stores nothing twice when it overlaps the incremental pull, either way round
     // The pull after it starts from what the backfill reached: only the boundary row again.
     $pull = app(PullSubmissions::class)->execute(PullTrigger::Scheduled)->refresh();
     expect($pull->only(['fetched', 'duplicates', 'accepted']))->toBe(['fetched' => 1, 'duplicates' => 1, 'accepted' => 0])
-        ->and(bfSync()->last_pulled_at?->equalTo(CarbonImmutable::parse('2026-04-20T10:07:00Z')))->toBeTrue();
+        ->and(bfSync()->cursor_at?->equalTo(CarbonImmutable::parse('2026-04-20T10:07:00Z')))->toBeTrue();
 });
 
 it('quarantines a visit outside every round, or in a closed one, under ROUND_WINDOW: never guessed into a round', function (): void {
@@ -215,7 +215,7 @@ it('records attachments without fetching them', function (): void {
 
     bfRun();
 
-    expect(OdkAttachment::query()->sole()->status)->toBe(AttachmentStatus::Pending)
+    expect(SubmissionAttachment::query()->sole()->status)->toBe(AttachmentStatus::Pending)
         ->and($this->source->downloads)->toBe([]);
     Queue::assertNothingPushed();
 });
@@ -228,7 +228,7 @@ it('refuses to start before any historical round exists, and points at the surve
 
     expect(fn () => bfRun())->toThrow(BackfillRefused::class);
     $this->artisan('edqa:backfill')->expectsOutputToContain('edqa:backfill --survey')->assertFailed();
-    expect(OdkPullRun::query()->count())->toBe(0)
+    expect(PullRun::query()->count())->toBe(0)
         ->and(bfStored()->count())->toBe(0)
         ->and($this->source->calls)->toBe([]);
 });
@@ -259,8 +259,8 @@ it('surveys submissions per quarter and form version without writing anything', 
         ->assertSuccessful();
 
     expect(DB::table('submissions')->count())->toBe($before)
-        ->and(OdkPullRun::query()->count())->toBe(0)
-        ->and(OdkFormSync::query()->count())->toBe(0);
+        ->and(PullRun::query()->count())->toBe(0)
+        ->and(SourceSync::query()->count())->toBe(0);
 });
 
 it('dry-runs the whole history without writing anything', function (): void {
@@ -273,7 +273,7 @@ it('dry-runs the whole history without writing anything', function (): void {
         ->assertSuccessful();
 
     expect([DB::table('submissions')->count(), DB::table('assessments')->count(), DB::table('quarantined_records')->count()])->toBe($before)
-        ->and(OdkPullRun::query()->count())->toBe(0);
+        ->and(PullRun::query()->count())->toBe(0);
 });
 
 it('runs on the low queue in chunks, each carrying on the same run from the checkpoint', function (): void {
@@ -284,7 +284,7 @@ it('runs on the low queue in chunks, each carrying on the same run from the chec
     expect($job->queue)->toBe('low');
     BackfillOdkSubmissionsJob::dispatchSync(); // the sync queue runs each next chunk at once
 
-    $run = OdkPullRun::query()->sole();
+    $run = PullRun::query()->sole();
     expect($run->outcome)->toBe(PullOutcome::Succeeded)
         ->and($run->fetched)->toBe(7)
         ->and(bfStored()->count())->toBe(7)
@@ -298,9 +298,9 @@ it('queues the next chunk with its run when the time is up', function (): void {
 
     (new BackfillOdkSubmissionsJob(throttle: 3))->handle(app(BackfillSubmissions::class), app(BackfillLock::class));
 
-    $run = OdkPullRun::query()->sole();
+    $run = PullRun::query()->sole();
     expect($run->outcome)->toBeNull()
-        ->and(bfSync()->backfill_skip)->toBe(3);
+        ->and(bfSync()->backfill_checkpoint)->toBe(3);
     Queue::assertPushed(BackfillOdkSubmissionsJob::class, fn (BackfillOdkSubmissionsJob $next): bool => $next->runId === $run->id && $next->fromPage === null && $next->throttle === 3);
 });
 

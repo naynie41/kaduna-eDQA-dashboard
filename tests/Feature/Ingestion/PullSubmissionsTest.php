@@ -11,8 +11,8 @@ use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Events\PullFailed;
 use App\Domain\Ingestion\Jobs\PullSubmissionsJob;
-use App\Domain\Ingestion\Models\OdkFormSync;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
+use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Ingestion\Odk\PullLock;
 use App\Domain\Scoring\CurrentRuleVersion;
@@ -39,7 +39,7 @@ use Tests\Support\Rows;
 
 // The ODK pull (ARCHITECTURE.md §5.3): resumable, idempotent, one page per transaction, the cursor
 // last. The source is an in-memory Central (FakeSubmissionSource); OdkMockTest runs the same pull
-// over HTTP against the mock. Entries are tests/Fixtures/odk/valid/clean-visit.json, one facility
+// over HTTP against the mock. Entries are tests/Fixtures/sources/odk/valid/clean-visit.json, one facility
 // and one assessor each, submitted a minute apart.
 
 beforeEach(function (): void {
@@ -50,7 +50,7 @@ beforeEach(function (): void {
     foreach (range(1, 20) as $n) {
         Rows::facility(['code' => sprintf('FX-2%03d', $n), 'name' => "Pull facility {$n}", 'lga_id' => $chikun, 'ward_id' => $kujama]);
     }
-    config(['edqa.odk' => [...config('edqa.odk'),
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'),
         'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'secret-for-tests', 'project_id' => '7', 'form_id' => 'dqa', 'page_size' => 3,
     ]]);
     config(['edqa.heartbeats.odk_pull' => null]);
@@ -66,7 +66,7 @@ beforeEach(function (): void {
  */
 function pullEntry(int $n, string $kind = 'valid'): array
 {
-    $entry = json_decode((string) file_get_contents(base_path('tests/Fixtures/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
+    $entry = json_decode((string) file_get_contents(base_path('tests/Fixtures/sources/odk/valid/clean-visit.json')), true, flags: JSON_THROW_ON_ERROR);
     $entry['__id'] = $entry['meta']['instanceID'] = "uuid:pull-{$n}";
     $entry['__system']['submissionDate'] = CarbonImmutable::parse('2026-04-15T10:00:00.000Z')->addMinutes($n)->format('Y-m-d\TH:i:s.v\Z');
     $entry['__system']['deviceId'] = "collect:pull{$n}";
@@ -89,14 +89,14 @@ function pullEdit(array $entry, string $updatedAt = '2026-04-20T08:00:00.000Z'):
     return $entry;
 }
 
-function pullNow(PullTrigger $trigger = PullTrigger::Scheduled, ?int $userId = null): OdkPullRun
+function pullNow(PullTrigger $trigger = PullTrigger::Scheduled, ?int $userId = null): PullRun
 {
     return app(PullSubmissions::class)->execute($trigger, $userId)->refresh();
 }
 
-function pullSync(): OdkFormSync
+function pullSync(): SourceSync
 {
-    return OdkFormSync::query()->where('project_id', 7)->where('form_id', 'dqa')->sole();
+    return SourceSync::query()->where('form_ref', '7/dqa')->sole();
 }
 
 /** Assessments made from pulled submissions (FixtureWorld's own have submissions of their own). */
@@ -135,7 +135,7 @@ it('pulls three pages: every submission stored once, processed, counted, the cur
         ->and(pulledAssessments())->toBe(6)
         ->and(QuarantinedRecord::query()->sole()->instance_id)->toBe('uuid:pull-3')
         ->and(Submission::query()->where('instance_id', 'uuid:pull-5')->value('status'))->toBe(SubmissionStatus::Flagged)
-        ->and(pullSync()->last_pulled_at?->equalTo(CarbonImmutable::parse('2026-04-15T10:07:00Z')))->toBeTrue()
+        ->and(pullSync()->cursor_at?->equalTo(CarbonImmutable::parse('2026-04-15T10:07:00Z')))->toBeTrue()
         ->and(pullSync()->submission_count)->toBe(7)
         ->and(pullSync()->last_error)->toBeNull();
 
@@ -143,7 +143,7 @@ it('pulls three pages: every submission stored once, processed, counted, the cur
     $passOne = array_values(array_filter($this->source->calls, fn (array $c): bool => $c['by'] === 'submissionDate'));
     expect(array_column($passOne, 'since'))->toBe([null, '2026-04-15T10:03:00.000Z', '2026-04-15T10:05:00.000Z'])
         ->and(array_column($passOne, 'inclusive'))->toBe([false, true, true])
-        ->and(collect($this->source->calls)->where('by', 'updatedAt')->count())->toBe(1);
+        ->and(collect($this->source->calls)->where('by', 'changedSince')->count())->toBe(1);
 });
 
 it('stores the raw entry verbatim', function (): void {
@@ -153,7 +153,7 @@ it('stores the raw entry verbatim', function (): void {
 
     expect(pulled()->sole()->payload)->toEqual($entry)
         ->and(pulled()->sole()->form_version)->toBe('2026.1')
-        ->and(pulled()->sole()->form_id)->toBe('dqa');
+        ->and(pulled()->sole()->form_ref)->toBe('dqa');
 });
 
 it('replays a page that crashed, with no duplicates and the cursor where the last good page left it', function (): void {
@@ -168,12 +168,12 @@ it('replays a page that crashed, with no duplicates and the cursor where the las
 
     expect(fn () => pullNow())->toThrow(RuntimeException::class, 'Simulated crash in page 2');
 
-    $failed = OdkPullRun::query()->sole();
+    $failed = PullRun::query()->sole();
     expect($failed->outcome)->toBe(PullOutcome::Failed)
         ->and($failed->error)->toContain('Simulated crash in page 2')
         ->and([$failed->fetched, $failed->accepted])->toBe([3, 3])
         ->and(pulled()->pluck('instance_id')->sort()->values()->all())->toBe(['uuid:pull-1', 'uuid:pull-2', 'uuid:pull-3'])
-        ->and(pullSync()->last_pulled_at?->equalTo(CarbonImmutable::parse('2026-04-15T10:03:00Z')))->toBeTrue();
+        ->and(pullSync()->cursor_at?->equalTo(CarbonImmutable::parse('2026-04-15T10:03:00Z')))->toBeTrue();
 
     $crash = false;
     $run = pullNow();
@@ -183,7 +183,7 @@ it('replays a page that crashed, with no duplicates and the cursor where the las
         ->and(pulled()->count())->toBe(7)
         ->and(pulled()->distinct()->count('instance_id'))->toBe(7)
         ->and(pulledAssessments())->toBe(7)
-        ->and(pullSync()->last_pulled_at?->equalTo(CarbonImmutable::parse('2026-04-15T10:07:00Z')))->toBeTrue();
+        ->and(pullSync()->cursor_at?->equalTo(CarbonImmutable::parse('2026-04-15T10:07:00Z')))->toBeTrue();
 });
 
 it('leaves nothing of a page that crashed half way: one transaction', function (): void {
@@ -202,9 +202,9 @@ it('leaves nothing of a page that crashed half way: one transaction', function (
         ->and(DB::table('item_responses')->count())->toBe($before['item_responses'])
         ->and(AssessmentScore::query()->count())->toBe($before['assessment_scores'])
         ->and($after['assessments'])->toBe($before['assessments'])
-        ->and(pullSync()->last_pulled_at)->toBeNull()
+        ->and(pullSync()->cursor_at)->toBeNull()
         ->and(pullSync()->submission_count)->toBe(0)
-        ->and(OdkPullRun::query()->sole()->accepted)->toBe(0);
+        ->and(PullRun::query()->sole()->accepted)->toBe(0);
 });
 
 it('inserts nothing when the same pull runs again', function (): void {
@@ -216,7 +216,7 @@ it('inserts nothing when the same pull runs again', function (): void {
 
     expect($again->outcome)->toBe(PullOutcome::Succeeded)
         ->and([$again->fetched, $again->duplicates, $again->accepted, $again->flagged, $again->quarantined])->toBe([1, 1, 0, 0, 0])
-        ->and(Arr::except(pullTableCounts(), ['odk_pull_runs', 'activity_log']))->toBe(Arr::except($before, ['odk_pull_runs', 'activity_log']));
+        ->and(Arr::except(pullTableCounts(), ['pull_runs', 'activity_log']))->toBe(Arr::except($before, ['pull_runs', 'activity_log']));
 });
 
 it('never loses rows that share the cursor timestamp, even a whole page of them', function (): void {
@@ -258,11 +258,65 @@ it('applies an ODK edit: the original is superseded and its assessment updated i
         ->and((float) $before)->toBe(75.0)
         ->and((float) AssessmentScore::query()->where('assessment_id', $assessment->id)->where('dimension', Dimension::Availability->value)->where('month_slot', 1)->value('score'))->toBe(50.0)
         ->and(Activity::query()->forSubject($assessment)->where('event', 'updated')->exists())->toBeTrue()
-        ->and(pullSync()->last_edit_at?->equalTo(CarbonImmutable::parse('2026-04-20T08:00:00Z')))->toBeTrue();
+        ->and(pullSync()->edit_cursor_at?->equalTo(CarbonImmutable::parse('2026-04-20T08:00:00Z')))->toBeTrue();
 
     // The edit is not applied twice.
     $again = pullNow();
     expect([$again->accepted, $again->duplicates])->toBe([0, 2]);
+});
+
+it('catches an edit that keeps the original submissionDate on the next pull, by its updatedAt', function (): void {
+    $this->source->add($original = pullEntry(1));
+    pullNow();
+
+    $edit = pullEdit($original, '2026-04-21T09:30:00.000Z');
+    expect($edit['__system']['submissionDate'])->toBe($original['__system']['submissionDate']); // before the cursor
+    $this->source->add($edit);
+    pullNow();
+
+    $new = Submission::query()->where('instance_id', 'uuid:pull-1-v2')->sole();
+    expect($new->source_updated_at?->equalTo(CarbonImmutable::parse('2026-04-21T09:30:00Z')))->toBeTrue()
+        ->and($new->external_id)->toBe('uuid:pull-1')
+        ->and(Submission::query()->where('instance_id', 'uuid:pull-1')->sole()->status)->toBe(SubmissionStatus::Superseded)
+        // Both pulls asked for every edit (no edit seen yet); the second found it.
+        ->and(collect($this->source->calls)->where('by', 'changedSince')->pluck('since')->all())->toBe([null, null]);
+
+    // From then on the edits pass starts at that edit.
+    pullNow();
+    expect(collect($this->source->calls)->where('by', 'changedSince')->pluck('since')->last())->toBe('2026-04-21T09:30:00.000Z');
+});
+
+it('treats a known external ID with a new instance ID as an edit even without deprecatedID', function (): void {
+    $this->source->add($original = pullEntry(1));
+    pullNow();
+    $assessment = Assessment::query()->whereHas('submission', fn ($q) => $q->where('instance_id', 'uuid:pull-1'))->sole();
+
+    $edit = pullEdit($original);
+    unset($edit['meta']['deprecatedID']); // a source (or an older Central) that does not send it
+    $edit['availability']['avail_m1_nhmis_summary'] = 'no';
+    $this->source->add($edit);
+    pullNow();
+
+    $old = Submission::query()->where('instance_id', 'uuid:pull-1')->sole();
+    $new = Submission::query()->where('instance_id', 'uuid:pull-1-v2')->sole();
+    expect($new->deprecated_id)->toBe('uuid:pull-1') // inferred; the payload is as sent
+        ->and($new->payload['meta'])->toBe(['instanceID' => 'uuid:pull-1-v2'])
+        ->and($old->status)->toBe(SubmissionStatus::Superseded)
+        ->and($old->superseded_by_id)->toBe($new->id)
+        ->and($assessment->refresh()->submission_id)->toBe($new->id)
+        ->and(pulledAssessments())->toBe(1)
+        ->and((float) AssessmentScore::query()->where('assessment_id', $assessment->id)->where('dimension', Dimension::Availability->value)->where('month_slot', 1)->value('score'))->toBe(50.0);
+});
+
+it('does not take a new submission for an edit: another external ID, or the same instance again', function (): void {
+    $this->source->add(pullEntry(1));
+    pullNow();
+    $this->source->add(pullEntry(2));
+    pullNow();
+
+    expect(Submission::query()->whereNotNull('deprecated_id')->count())->toBe(0)
+        ->and(Submission::query()->where('status', SubmissionStatus::Superseded)->count())->toBe(0)
+        ->and(pulledAssessments())->toBe(2);
 });
 
 it('resolves the quarantined original when its edit arrives (fix at source)', function (): void {
@@ -299,7 +353,7 @@ it('counts the run row exactly, and audits a manual pull with its administrator'
 });
 
 it('records a pull without credentials as skipped, not failed, and asks the source nothing', function (): void {
-    config(['edqa.odk.url' => null]);
+    config(['edqa.sources.odk.url' => null]);
     $this->source->add(pullEntry(1));
 
     $run = pullNow();
@@ -308,7 +362,7 @@ it('records a pull without credentials as skipped, not failed, and asks the sour
         ->and($run->error)->toContain('ODK_CENTRAL_URL')
         ->and($this->source->calls)->toBe([])
         ->and(pulled()->count())->toBe(0)
-        ->and(OdkFormSync::query()->count())->toBe(0);
+        ->and(SourceSync::query()->count())->toBe(0);
 });
 
 it('pings the heartbeat after a successful pull only', function (): void {
@@ -346,7 +400,7 @@ it('lets one pull run at a time: a second waits, then goes back on the queue', f
     $job->handle(app(PullLock::class), app(PullSubmissions::class));
 
     $job->assertReleased(60);
-    expect(OdkPullRun::query()->count())->toBe(0)
+    expect(PullRun::query()->count())->toBe(0)
         ->and(pulled()->count())->toBe(0);
     $this->artisan('edqa:pull')->expectsOutputToContain(__('odk.pull.busy'))->assertFailed();
 
@@ -374,7 +428,7 @@ it('records the final failure on the sync row and raises PullFailed', function (
     $this->source->failOn = fn (int $call): ?Throwable => new RuntimeException('Central is down');
 
     expect(fn () => PullSubmissionsJob::dispatchSync())->toThrow(RuntimeException::class);
-    $run = OdkPullRun::query()->sole();
+    $run = PullRun::query()->sole();
     (new PullSubmissionsJob)->failed(new RuntimeException('Central is down'));
 
     expect($run->outcome)->toBe(PullOutcome::Failed)
@@ -389,7 +443,7 @@ it('records the final failure on the sync row and raises PullFailed', function (
 });
 
 it('runs a bounded number of queries per page', function (): void {
-    config(['edqa.odk.page_size' => 50]);
+    config(['edqa.sources.odk.page_size' => 50]);
     $this->source->add(...array_map(fn (int $n): array => pullEntry($n), range(1, 5)));
     DB::enableQueryLog();
     pullNow();
@@ -414,7 +468,7 @@ it('dry-runs: fetches, parses and validates, prints outcomes by rule code, and w
     pullNow();
     $this->source->add(pullEntry(3), pullEntry(4, 'broken'), pullEntry(5, 'short'), pullEntry(6, 'broken'));
     $before = pullTableCounts();
-    $sync = DB::table('odk_form_syncs')->get()->all();
+    $sync = DB::table('source_syncs')->get()->all();
 
     $this->artisan('edqa:pull', ['--dry-run' => true, '--limit' => 200])
         ->expectsOutputToContain(__('odk.pull.dry_run_title'))
@@ -423,7 +477,7 @@ it('dry-runs: fetches, parses and validates, prints outcomes by rule code, and w
         ->assertSuccessful();
 
     expect(pullTableCounts())->toBe($before)
-        ->and(DB::table('odk_form_syncs')->get()->all())->toEqual($sync);
+        ->and(DB::table('source_syncs')->get()->all())->toEqual($sync);
 });
 
 it('dry-runs at most --limit submissions', function (): void {
@@ -433,7 +487,7 @@ it('dry-runs at most --limit submissions', function (): void {
         ->expectsOutputToContain('Fetched 4; 0 already stored; of the rest 4 would be accepted')
         ->assertSuccessful();
     expect(pulled()->count())->toBe(0)
-        ->and(OdkPullRun::query()->count())->toBe(0);
+        ->and(PullRun::query()->count())->toBe(0);
 });
 
 it('pulls synchronously from the console, as a manual pull', function (): void {
@@ -442,7 +496,7 @@ it('pulls synchronously from the console, as a manual pull', function (): void {
     $this->artisan('edqa:pull')
         ->expectsOutputToContain('Pull succeeded: fetched 2, 0 already stored, 1 accepted, 0 flagged, 1 quarantined.')
         ->assertSuccessful();
-    expect(OdkPullRun::query()->sole()->trigger_type)->toBe(PullTrigger::Manual);
+    expect(PullRun::query()->sole()->trigger_type)->toBe(PullTrigger::Manual);
 });
 
 it('schedules the pull every ten minutes only when ODK is configured', function (): void {
@@ -459,7 +513,7 @@ it('schedules the pull every ten minutes only when ODK is configured', function 
         ->and($scheduled[0]->expression)->toBe('*/10 * * * *')
         ->and($scheduled[0]->withoutOverlapping)->toBeTrue();
 
-    config(['edqa.odk.url' => null]);
+    config(['edqa.sources.odk.url' => null]);
     expect($pulls())->toBe([]);
 });
 
@@ -471,7 +525,7 @@ it('never puts SQL or payload values in the error administrators see', function 
 
     expect(fn () => pullNow())->toThrow(QueryException::class);
 
-    $error = (string) OdkPullRun::query()->sole()->error;
+    $error = (string) PullRun::query()->sole()->error;
     expect($error)->toStartWith('QueryException: SQLSTATE')
         ->and($error)->not->toContain('insert into')
         ->and($error)->not->toContain('Assessor 1');

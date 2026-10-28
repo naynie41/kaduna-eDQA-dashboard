@@ -58,11 +58,13 @@ final readonly class OdkConfig
         );
     }
 
+    /** The adapter's tuning (edqa.odk) with the source itself (edqa.sources.odk: URL, credentials, form, page size). */
     public static function fromConfig(): self
     {
         $odk = config('edqa.odk');
+        $source = config('edqa.sources.odk');
 
-        return self::fromArray(is_array($odk) ? $odk : [], (string) app()->environment());
+        return self::fromArray([...(is_array($odk) ? $odk : []), ...(is_array($source) ? $source : [])], (string) app()->environment());
     }
 
     /**
@@ -96,6 +98,12 @@ final readonly class OdkConfig
     public function isConfigured(): bool
     {
         return $this->problems() === [];
+    }
+
+    /** The form the cursor follows (source_syncs.form_ref): "project/form". */
+    public function formRef(): string
+    {
+        return "{$this->projectId}/{$this->formId}";
     }
 
     /**

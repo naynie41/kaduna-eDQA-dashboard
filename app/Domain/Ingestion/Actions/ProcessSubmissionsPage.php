@@ -6,14 +6,16 @@ namespace App\Domain\Ingestion\Actions;
 
 use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\DTOs\AttachmentRef;
+use App\Domain\Ingestion\DTOs\SubmissionEnvelope;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
+use App\Domain\Ingestion\FieldMap;
 use App\Domain\Ingestion\Jobs\FetchAttachmentsJob;
-use App\Domain\Ingestion\Models\OdkFormSync;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
+use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Models\Submission;
-use App\Domain\Ingestion\Odk\FieldMap;
 use App\Domain\Ingestion\Odk\OdkRow;
-use App\Domain\Ingestion\Odk\SubmissionParser;
+use App\Domain\Ingestion\SourceRegistry;
+use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Validation\Actions\MarkSuperseded;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -34,16 +36,17 @@ use InvalidArgumentException;
  *
  * The sync row is updated atomically, because a pull and a backfill may both write it:
  * submission_count is incremented in SQL, a timestamp cursor only ever moves forward (GREATEST),
- * and backfill_skip is set as given.
+ * and backfill_checkpoint is set as given.
  */
 final class ProcessSubmissionsPage
 {
     /** The sync columns a page may move. */
-    private const CURSORS = ['last_pulled_at', 'last_edit_at'];
+    private const CURSORS = ['cursor_at', 'edit_cursor_at'];
 
     public function __construct(
         private readonly SubmissionSource $source,
         private readonly SubmissionParser $parser,
+        private readonly SourceRegistry $sources,
         private readonly ProcessParsedBatch $batch,
         private readonly MarkSuperseded $superseded,
         private readonly RecordAttachments $attachments,
@@ -51,22 +54,28 @@ final class ProcessSubmissionsPage
 
     /**
      * @param  list<array<array-key, mixed>>  $rows  raw entries, each at most once in a run
-     * @param  array<string, CarbonImmutable|int|null>  $changes  last_pulled_at / last_edit_at (moved forward
-     *                                                            only), backfill_skip (set); null leaves it
+     * @param  array<string, CarbonImmutable|int|null>  $changes  cursor_at / edit_cursor_at (moved forward
+     *                                                            only), backfill_checkpoint (set); null leaves it
      */
-    public function execute(OdkPullRun $run, OdkFormSync $sync, array $rows, array $changes = [], bool $fetchAttachments = true): void
+    public function execute(PullRun $run, SourceSync $sync, array $rows, array $changes = [], bool $fetchAttachments = true): void
     {
         $expected = $this->expectedAttachments($rows);
 
         $withFiles = DB::transaction(function () use ($run, $sync, $rows, $changes, $expected): array {
-            $inserted = $this->insert($rows, (string) $sync->form_id);
+            $normaliser = $this->sources->normaliser((string) $sync->source()->value('key'));
+            $envelopes = array_map($normaliser->normalise(...), $rows);
+            $inserted = $this->insert($envelopes, $rows, $sync->source_id, $sync->formId());
+            $edits = self::editsByExternalId(array_values($inserted));
             $submissions = $inserted === [] ? [] : Submission::query()->whereIn('id', array_values($inserted))->get()->keyBy('instance_id')->all();
 
             $batch = [];
-            foreach ($rows as $row) {
-                $submission = $submissions[OdkRow::instanceId($row)] ?? null;
+            foreach ($envelopes as $envelope) {
+                $submission = $submissions[$envelope->meta->instanceId] ?? null;
                 if ($submission instanceof Submission) {
-                    $batch[] = [$submission, $this->parser->parse($submission->payload)];
+                    // The stored payload, read again: what reprocessing will read (hard rule 8).
+                    $parsed = $this->parser->parse($normaliser->normalise($submission->payload));
+                    $previous = $edits[$submission->id] ?? null;
+                    $batch[] = [$submission, $previous === null ? $parsed : $parsed->asEditOf($previous)];
                 }
             }
 
@@ -118,12 +127,12 @@ final class ProcessSubmissionsPage
      * @param  array<string, CarbonImmutable|int|null>  $changes
      * @param  list<array<array-key, mixed>>  $rows
      */
-    private function moveSync(OdkFormSync $sync, array $changes, array $rows, int $inserted): void
+    private function moveSync(SourceSync $sync, array $changes, array $rows, int $inserted): void
     {
         $pdo = DB::connection()->getPdo();
         $update = ['submission_count' => DB::raw('submission_count + '.$inserted), 'updated_at' => now()];
         if ($rows !== []) {
-            $update['last_instance_id'] = OdkRow::instanceId($rows[array_key_last($rows)]);
+            $update['cursor_instance_id'] = OdkRow::instanceId($rows[array_key_last($rows)]);
         }
         foreach ($changes as $column => $value) {
             if ($value === null) {
@@ -133,14 +142,14 @@ final class ProcessSubmissionsPage
                 // In the app's zone with microseconds, as the connection reads it (D-30).
                 $time = $pdo->quote($value->setTimezone((string) config('app.timezone'))->format('Y-m-d H:i:s.uP'));
                 $update[$column] = DB::raw("GREATEST(COALESCE({$column}, {$time}::timestamptz), {$time}::timestamptz)");
-            } elseif ($column === 'backfill_skip' && is_int($value)) {
+            } elseif ($column === 'backfill_checkpoint' && is_int($value)) {
                 $update[$column] = $value;
             } else {
                 throw new InvalidArgumentException("The page cannot move the sync column {$column}.");
             }
         }
 
-        DB::table('odk_form_syncs')->where('id', $sync->id)->update($update);
+        DB::table('source_syncs')->where('id', $sync->id)->update($update);
     }
 
     /**
@@ -176,11 +185,14 @@ final class ProcessSubmissionsPage
 
     /**
      * The raw rows, verbatim, in one statement; rows already stored are skipped by the database.
+     * Identity and times come from each row's envelope: external_id is the source's logical ID (the
+     * same for every version of a submission), source_updated_at when it was last edited there.
      *
+     * @param  list<SubmissionEnvelope>  $envelopes  one per row, in order
      * @param  list<array<array-key, mixed>>  $rows
      * @return array<string, int> instance ID => submission ID, for the rows actually inserted
      */
-    private function insert(array $rows, string $formId): array
+    private function insert(array $envelopes, array $rows, int $sourceId, string $formId): array
     {
         if ($rows === []) {
             return [];
@@ -189,23 +201,27 @@ final class ProcessSubmissionsPage
         $now = now()->toIso8601String();
         $values = [];
         $bindings = [];
-        foreach ($rows as $row) {
-            $values[] = '(?, ?, ?, ?, ?::jsonb, ?, ?, ?)';
-            $submitted = OdkRow::time(FieldMap::get($row, '__system.submissionDate')) ?? CarbonImmutable::createFromTimestampUTC(0);
+        foreach ($rows as $i => $row) {
+            $meta = $envelopes[$i]->meta;
+            $values[] = '(?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)';
+            $submitted = $meta->submittedAt ?? CarbonImmutable::createFromTimestampUTC(0);
             array_push($bindings,
-                OdkRow::instanceId($row),
-                OdkRow::text(FieldMap::get($row, 'meta.deprecatedID')),
+                $sourceId,
+                $meta->externalId,
+                $meta->instanceId,
+                $meta->deprecatedId,
                 $formId,
-                OdkRow::text(FieldMap::get($row, '__system.formVersion')) ?? '',
+                $meta->formVersion,
                 json_encode($row, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                 $submitted->toIso8601String(),
+                $meta->updatedAt?->toIso8601String(),
                 $now,
                 SubmissionStatus::Received->value,
             );
         }
 
         $inserted = DB::select(
-            'INSERT INTO submissions (instance_id, deprecated_id, form_id, form_version, payload, submitted_at, received_at, status) VALUES '
+            'INSERT INTO submissions (source_id, external_id, instance_id, deprecated_id, form_ref, form_version, payload, submitted_at, source_updated_at, received_at, status) VALUES '
             .implode(', ', $values).' ON CONFLICT (instance_id) DO NOTHING RETURNING id, instance_id',
             $bindings,
         );
@@ -216,5 +232,42 @@ final class ProcessSubmissionsPage
         }
 
         return $ids;
+    }
+
+    /**
+     * Edits a source sent without deprecatedID (D-23 in the new numbering): a new row whose
+     * external_id the source already sent, under another instance ID, replaces the latest version
+     * not yet replaced. Its deprecated_id is set to that version (the payload is untouched), so
+     * the edit takes the path every edit takes (MarkSuperseded, the assessment updated in place).
+     *
+     * @param  list<int>  $ids  submissions this page inserted
+     * @return array<int, string> submission ID => instance ID it replaces
+     */
+    private static function editsByExternalId(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $found = DB::select(<<<'SQL'
+            SELECT n.id, prev.instance_id
+            FROM submissions n
+            JOIN LATERAL (
+                SELECT p.instance_id FROM submissions p
+                WHERE p.source_id = n.source_id AND p.external_id = n.external_id AND p.id < n.id
+                    AND p.instance_id <> n.instance_id AND p.superseded_by_id IS NULL
+                ORDER BY p.id DESC LIMIT 1
+            ) prev ON true
+            WHERE n.id = ANY(?::bigint[]) AND n.deprecated_id IS NULL AND n.external_id IS NOT NULL
+            ORDER BY n.id
+            SQL, ['{'.implode(',', $ids).'}']);
+
+        $edits = [];
+        foreach ($found as $row) {
+            $edits[(int) $row->id] = (string) $row->instance_id;
+            DB::update('UPDATE submissions SET deprecated_id = ? WHERE id = ?', [(string) $row->instance_id, (int) $row->id]);
+        }
+
+        return $edits;
     }
 }

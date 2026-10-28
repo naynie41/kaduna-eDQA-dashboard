@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AdminOdkController;
+use App\Http\Controllers\Assessments\CorrectAssessmentController;
 use App\Http\Controllers\Attachments\ShowAttachmentController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
 use App\Http\Controllers\Dashboard;
@@ -10,14 +11,17 @@ use App\Http\Controllers\Dashboard\DashboardRedirectController;
 use App\Http\Controllers\DevComponentsController;
 use App\Http\Controllers\Facilities\CascadeExportController;
 use App\Http\Controllers\Facilities\FacilityDetailController;
+use App\Http\Controllers\Facilities\FacilityOptionsController;
 use App\Http\Controllers\Odk\BackfillReportDownloadController;
 use App\Http\Controllers\Odk\OdkPullController;
 use App\Http\Controllers\Odk\OdkStatusController;
 use App\Http\Controllers\OdkWebhookController;
 use App\Http\Controllers\Quarantine\BulkResolveQuarantineController;
+use App\Http\Controllers\Quarantine\DataIssuesPageController;
 use App\Http\Controllers\Quarantine\OverrideSoftFlagController;
 use App\Http\Controllers\Quarantine\QuarantineIndexController;
 use App\Http\Controllers\Quarantine\ResolveQuarantineController;
+use App\Http\Controllers\Quarantine\ShowQuarantinedRecordController;
 use App\Http\Controllers\Rounds\RoundController;
 use App\Http\Controllers\Scoring\RescoreController;
 use App\Http\Controllers\Scoring\ScoringRuleController;
@@ -64,7 +68,7 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
     Route::redirect('admin', '/admin/odk')->name('admin');
     Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('odk', AdminOdkController::class)->name('odk');
-        Route::inertia('data-issues', 'admin/data-issues')->name('data-issues');
+        Route::get('data-issues', DataIssuesPageController::class)->name('data-issues');
         Route::inertia('rounds', 'admin/rounds')->name('rounds');
         Route::inertia('facilities', 'admin/facilities')->name('facilities');
         Route::inertia('scoring-rules', 'admin/scoring-rules')->name('scoring-rules');
@@ -98,8 +102,11 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
         Route::get('facility-list/export-cascade/{file}', [CascadeExportController::class, 'download'])
             ->middleware('signed')->where('file', '[A-Za-z0-9.-]+')->name('facility-list.cascade.download');
         Route::get('quarantine', QuarantineIndexController::class)->name('quarantine.index');
+        Route::get('quarantine/{record}', ShowQuarantinedRecordController::class)->whereNumber('record')->name('quarantine.show');
+        Route::get('facility-options', FacilityOptionsController::class)->name('facility-options');
         Route::post('quarantine/bulk-resolve', BulkResolveQuarantineController::class)->name('quarantine.bulk-resolve');
         Route::post('quarantine/{record}/resolve', ResolveQuarantineController::class)->whereNumber('record')->name('quarantine.resolve');
+        Route::post('assessments/{assessment}/corrections', CorrectAssessmentController::class)->whereNumber('assessment')->name('assessments.corrections.store');
         Route::post('assessments/{assessment}/flags/{code}/override', OverrideSoftFlagController::class)
             ->whereNumber('assessment')->name('assessments.flags.override');
 

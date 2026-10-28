@@ -10,6 +10,8 @@ use Carbon\CarbonImmutable;
 function parsedSubmission(array $overrides = []): ParsedSubmission
 {
     return new ParsedSubmission(...[
+        'source' => 'odk',
+        'externalId' => 'uuid:7c1f0e4a-1111-4a2b-9c3d-000000000000',
         'instanceId' => 'uuid:7c1f0e4a-1111-4a2b-9c3d-000000000001',
         'deprecatedId' => 'uuid:7c1f0e4a-1111-4a2b-9c3d-000000000000',
         'formVersion' => '2026.1',

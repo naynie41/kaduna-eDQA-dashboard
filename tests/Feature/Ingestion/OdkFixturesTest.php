@@ -7,13 +7,13 @@ use App\Domain\Ingestion\Actions\ProcessParsedBatch;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Models\Submission;
-use App\Domain\Ingestion\Odk\SubmissionParser;
 use App\Domain\Scoring\CurrentRuleVersion;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use Tests\Support\FixtureWorld;
+use Tests\Support\Rows;
 
-// The golden ODK fixtures (tests/Fixtures/README.md). Every raw ODK entry parses into exactly its
-// parsed fixture, and, run through the parser and the real pipeline against FixtureWorld, ends
+// The golden ODK fixtures (tests/Fixtures/README.md). Every raw ODK entry, through ODK's
+// normaliser and then the parser (odkParse, as the pipeline reads it), is exactly its parsed fixture, and, run through the parser and the real pipeline against FixtureWorld, ends
 // with exactly the outcome Phase 2A expects of it.
 
 beforeEach(function (): void {
@@ -26,7 +26,7 @@ function odkFixtures(): array
 {
     $cases = [];
     // __DIR__, not base_path(): datasets are built before the application boots.
-    foreach (glob(dirname(__DIR__, 2).'/Fixtures/odk/*/*.json') ?: [] as $file) {
+    foreach (glob(dirname(__DIR__, 2).'/Fixtures/sources/odk/*/*.json') ?: [] as $file) {
         $kind = basename(dirname($file));
         $name = basename($file, '.json');
         $cases["{$kind}/{$name}"] = [$kind, $name];
@@ -50,7 +50,7 @@ it('has every case three times: raw, parsed and the expected outcome', function 
 });
 
 it('parses the raw ODK entry into exactly its parsed fixture', function (string $kind, string $name): void {
-    $parsed = app(SubmissionParser::class)->parse(fixtureJson("odk/{$kind}/{$name}.json"));
+    $parsed = odkParse(fixtureJson("sources/odk/{$kind}/{$name}.json"));
 
     expect($parsed->toArray())->toBe(fixtureJson("parsed/{$kind}/{$name}.json"));
 })->with(odkFixtures());
@@ -62,11 +62,11 @@ it('keeps every parsed fixture a valid ParsedSubmission', function (string $kind
 })->with(odkFixtures());
 
 it('ends with the outcome 2A expects, through the parser and the real pipeline', function (string $kind, string $name): void {
-    $raw = fixtureJson("odk/{$kind}/{$name}.json");
+    $raw = fixtureJson("sources/odk/{$kind}/{$name}.json");
     ['status' => $status, 'codes' => $codes] = fixtureJson("parsed/{$kind}/{$name}.expected.json");
-    $parsed = app(SubmissionParser::class)->parse($raw);
+    $parsed = odkParse($raw);
     $submission = Submission::query()->create([
-        'instance_id' => $parsed->instanceId, 'form_id' => 'dqa', 'form_version' => $parsed->formVersion,
+        'source_id' => Rows::sourceId(), 'external_id' => $parsed->instanceId, 'instance_id' => $parsed->instanceId, 'form_ref' => 'dqa', 'form_version' => $parsed->formVersion,
         'payload' => $raw, 'submitted_at' => $parsed->submittedAt, 'received_at' => now(), 'status' => SubmissionStatus::Received,
     ]);
 

@@ -6,7 +6,7 @@ namespace App\Domain\Ingestion\Jobs;
 
 use App\Domain\Ingestion\Actions\FetchAttachments;
 use App\Domain\Ingestion\Enums\AttachmentStatus;
-use App\Domain\Ingestion\Models\OdkAttachment;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -45,7 +45,7 @@ final class FetchAttachmentsJob implements ShouldQueue
 
     public function failed(?Throwable $e): void
     {
-        OdkAttachment::query()
+        SubmissionAttachment::query()
             ->where('submission_id', $this->submissionId)
             ->where('status', AttachmentStatus::Pending)
             ->update(['status' => AttachmentStatus::Failed]);

@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Domain\Ingestion\Models\OdkAttachment;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * An attachment not yet fetched. 'pending' is a placeholder: status values are an open
  * question.
  *
- * @extends Factory<OdkAttachment>
+ * @extends Factory<SubmissionAttachment>
  */
-final class OdkAttachmentFactory extends Factory
+final class SubmissionAttachmentFactory extends Factory
 {
-    protected $model = OdkAttachment::class;
+    protected $model = SubmissionAttachment::class;
 
     public function definition(): array
     {

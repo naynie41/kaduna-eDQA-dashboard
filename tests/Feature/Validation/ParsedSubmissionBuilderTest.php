@@ -18,7 +18,7 @@ it('builds a submission that every lookup resolves', function (): void {
     $facility = $context->activeFacility($submission->facilityRef);
     $round = $context->roundFor($submission);
 
-    expect($context->isKnownFormVersion($submission->formVersion))->toBeTrue()
+    expect($context->isKnownFormVersion($submission->source, $submission->formVersion))->toBeTrue()
         ->and($submission->formVersionKnown)->toBeTrue()
         ->and($context->lga($submission->lgaRef)?->id)->toBe($facility?->lgaId)
         ->and($round?->isOpen())->toBeTrue()
@@ -68,10 +68,10 @@ it('breaks exactly one thing at a time', function (Closure $break, array $change
     $valid = $builder->build()->toArray();
     $broken = $break($builder)->build()->toArray();
 
-    // instance_id and device_id are fresh on every build.
+    // instance_id (and external_id, which follows it) and device_id are fresh on every build.
     $diff = array_keys(array_diff_assoc(array_map(serialize(...), $valid), array_map(serialize(...), $broken)));
 
-    expect(array_values(array_diff($diff, ['instance_id', 'device_id'])))->toBe($changed);
+    expect(array_values(array_diff($diff, ['instance_id', 'external_id', 'device_id'])))->toBe($changed);
 })->with([
     'no LGA' => [fn (ParsedSubmissionBuilder $b) => $b->withLga(null), ['lga_ref']],
     'facility 2019.00' => [fn (ParsedSubmissionBuilder $b) => $b->withFacilityRef('2019.00'), ['facility_ref']],

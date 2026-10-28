@@ -9,11 +9,12 @@ use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Exceptions\OdkException;
 use App\Domain\Ingestion\Exceptions\OdkNotConfigured;
-use App\Domain\Ingestion\Models\OdkFormSync;
-use App\Domain\Ingestion\Models\OdkPullRun;
-use App\Domain\Ingestion\Odk\FieldMap;
+use App\Domain\Ingestion\FieldMap;
+use App\Domain\Ingestion\Models\PullRun;
+use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Odk\OdkConfig;
 use App\Domain\Ingestion\Odk\OdkRow;
+use App\Domain\Ingestion\SourceRegistry;
 use App\Models\User;
 use App\Support\Audit\AuditLog;
 use Carbon\CarbonImmutable;
@@ -25,9 +26,9 @@ use Throwable;
 /**
  * One ODK pull (ARCHITECTURE.md §5.3), resumable and idempotent. The caller holds PullLock.
  *
- * Two passes over the form, each with its own cursor on odk_form_syncs (Q-32, D-51):
- *   new submissions  __system/submissionDate ge last_pulled_at
- *   edits            __system/updatedAt      ge last_edit_at (an edit keeps its submissionDate)
+ * Two passes over the form, each with its own cursor on source_syncs (Q-32, D-51):
+ *   new submissions  __system/submissionDate ge cursor_at
+ *   edits            __system/updatedAt      ge edit_cursor_at (an edit keeps its submissionDate)
  *
  * Each page commits in ONE transaction through ProcessSubmissionsPage, the path the backfill takes
  * too, with the cursor last. A crash anywhere in a page rolls all of it back, cursor included, so
@@ -39,16 +40,17 @@ final class PullSubmissions
     public function __construct(
         private readonly SubmissionSource $source,
         private readonly ProcessSubmissionsPage $page,
+        private readonly SourceRegistry $sources,
     ) {}
 
     /** @param  int|null  $runId  a run row created when the pull was asked for (StartManualPull), still open */
-    public function execute(PullTrigger $trigger, ?int $userId = null, ?int $runId = null): OdkPullRun
+    public function execute(PullTrigger $trigger, ?int $userId = null, ?int $runId = null): PullRun
     {
-        $run = $runId === null ? null : OdkPullRun::query()->whereKey($runId)->whereNull('finished_at')->first();
+        $run = $runId === null ? null : PullRun::query()->whereKey($runId)->whereNull('finished_at')->first();
         if ($run !== null) {
             $run->update(['started_at' => now()]); // asked for earlier: the pull starts now
         } else {
-            $run = OdkPullRun::query()->create(['trigger_type' => $trigger, 'triggered_by' => $userId, 'started_at' => now()]);
+            $run = PullRun::query()->create(['source_id' => $this->sources->id('odk'), 'trigger_type' => $trigger, 'triggered_by' => $userId, 'started_at' => now()]);
         }
         if ($trigger === PullTrigger::Manual && $runId === null) {
             // SECURITY.md §4: a manual pull is audited; from the console the causer is empty.
@@ -60,7 +62,7 @@ final class PullSubmissions
             return $this->finish($run, PullOutcome::SkippedNotConfigured, (new OdkNotConfigured($config->problems()))->getMessage());
         }
 
-        $sync = OdkFormSync::query()->firstOrCreate(['project_id' => (int) $config->projectId, 'form_id' => (string) $config->formId]);
+        $sync = SourceSync::forForm($this->sources->id('odk'), $config->formRef());
 
         try {
             $seen = [];
@@ -74,7 +76,7 @@ final class PullSubmissions
             throw $e;
         }
 
-        $sync->update(['last_error' => null]);
+        $sync->update(['last_error' => null, 'last_success_at' => now()]);
         $this->finish($run, PullOutcome::Succeeded, null);
         $this->heartbeat();
 
@@ -88,16 +90,18 @@ final class PullSubmissions
      * @param  'submissionDate'|'updatedAt'  $by
      * @param  array<string, true>  $seen  instance IDs already handled in this run (both passes)
      */
-    private function pass(OdkPullRun $run, OdkFormSync $sync, string $by, array &$seen): void
+    private function pass(PullRun $run, SourceSync $sync, string $by, array &$seen): void
     {
-        $column = $by === 'updatedAt' ? 'last_edit_at' : 'last_pulled_at';
+        $column = $by === 'updatedAt' ? 'edit_cursor_at' : 'cursor_at';
         $cursor = $sync->{$column};
         $cursor = $cursor instanceof CarbonImmutable ? $cursor : null;
-        $top = max(1, (int) config('edqa.odk.page_size', 500));
+        $top = max(1, (int) config('edqa.sources.odk.page_size', 500));
         $skip = 0;
 
         while (true) {
-            $page = $this->source->submissionsPage($cursor, $top, $skip, inclusive: $cursor !== null, by: $by);
+            $page = $by === 'updatedAt'
+                ? $this->source->changedSince($cursor, $top, $skip)
+                : $this->source->submissionsPage($cursor, $top, $skip, inclusive: $cursor !== null);
             if ($page->rows === []) {
                 return;
             }
@@ -128,7 +132,7 @@ final class PullSubmissions
         }
     }
 
-    private function finish(OdkPullRun $run, PullOutcome $outcome, ?string $error): OdkPullRun
+    private function finish(PullRun $run, PullOutcome $outcome, ?string $error): PullRun
     {
         $run->update(['outcome' => $outcome, 'finished_at' => now(), 'error' => $error]);
 

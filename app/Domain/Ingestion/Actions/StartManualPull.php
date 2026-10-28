@@ -6,7 +6,8 @@ namespace App\Domain\Ingestion\Actions;
 
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Jobs\PullSubmissionsJob;
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
+use App\Domain\Ingestion\SourceRegistry;
 use App\Models\User;
 use App\Support\Audit\AuditLog;
 use Illuminate\Support\Facades\Cache;
@@ -20,14 +21,18 @@ use Illuminate\Support\Facades\Cache;
  */
 final class StartManualPull
 {
-    /** @return array{run: OdkPullRun, running: bool} running: an existing pull was returned */
+    public function __construct(
+        private readonly SourceRegistry $sources,
+    ) {}
+
+    /** @return array{run: PullRun, running: bool} running: an existing pull was returned */
     public function execute(User $actor): array
     {
         // Two requests at the same instant must not both see "nothing running".
         return Cache::lock('odk-pull-request', 10)->block(5, function () use ($actor): array {
             $running = self::running();
-            $run = $running ?? OdkPullRun::query()->create([
-                'trigger_type' => PullTrigger::Manual, 'triggered_by' => $actor->id, 'started_at' => now(),
+            $run = $running ?? PullRun::query()->create([
+                'source_id' => $this->sources->id('odk'), 'trigger_type' => PullTrigger::Manual, 'triggered_by' => $actor->id, 'started_at' => now(),
             ]);
 
             AuditLog::record($run, $actor, 'pull_requested', old: [], new: ['trigger' => PullTrigger::Manual->value], extra: ['joined_running' => $running !== null]);
@@ -41,9 +46,9 @@ final class StartManualPull
     }
 
     /** The pull in progress: an open run, not a backfill, younger than the pull lock. */
-    public static function running(): ?OdkPullRun
+    public static function running(): ?PullRun
     {
-        return OdkPullRun::query()
+        return PullRun::query()
             ->whereNull('finished_at')
             ->where('trigger_type', '!=', PullTrigger::Backfill)
             ->where('started_at', '>=', now()->subSeconds((int) config('edqa.odk.pull.lock_seconds', 900)))

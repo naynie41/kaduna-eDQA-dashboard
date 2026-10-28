@@ -8,8 +8,8 @@ use App\Domain\Ingestion\Attachments\AttachmentRules;
 use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\Enums\AttachmentStatus;
 use App\Domain\Ingestion\Exceptions\OdkException;
-use App\Domain\Ingestion\Models\OdkAttachment;
 use App\Domain\Ingestion\Models\Submission;
+use App\Domain\Ingestion\Models\SubmissionAttachment;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -50,10 +50,10 @@ final class FetchAttachments
         $allowed = array_values((array) config('edqa.odk.attachments.allowed_mimes', []));
         // Central lists a submission's files under its root ID (__id), the current version's files.
         $rootId = is_string($submission->payload['__id'] ?? null) ? $submission->payload['__id'] : $submission->instance_id;
-        $directory = AttachmentRules::directory((string) $submission->instance_id);
+        $directory = AttachmentRules::directory((string) $submission->instance_id, (string) $submission->source?->key);
 
         $error = null;
-        $rows = OdkAttachment::query()->where('submission_id', $submissionId)
+        $rows = SubmissionAttachment::query()->where('submission_id', $submissionId)
             ->whereIn('status', [AttachmentStatus::Pending, AttachmentStatus::Failed])->orderBy('id')->get();
         foreach ($rows as $attachment) {
             $name = (string) $attachment->filename;
@@ -123,7 +123,7 @@ final class FetchAttachments
         return $mime === null ? 'type_not_allowed' : ['mime' => $mime, 'size' => $size];
     }
 
-    private function reject(OdkAttachment $attachment, string $reason): void
+    private function reject(SubmissionAttachment $attachment, string $reason): void
     {
         $attachment->update(['status' => AttachmentStatus::Rejected, 'reason' => $reason, 'path' => null, 'fetched_at' => null]);
     }

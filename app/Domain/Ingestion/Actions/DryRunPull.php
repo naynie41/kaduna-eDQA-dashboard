@@ -8,9 +8,11 @@ use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\DTOs\DryRunReport;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Ingestion\Exceptions\OdkException;
-use App\Domain\Ingestion\Models\OdkFormSync;
+use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Odk\OdkConfig;
-use App\Domain\Ingestion\Odk\SubmissionParser;
+use App\Domain\Ingestion\Odk\OdkPayloadNormalizer;
+use App\Domain\Ingestion\SourceRegistry;
+use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Validation\ValidationContextFactory;
 use App\Domain\Validation\ValidationPipeline;
 use Illuminate\Support\Facades\DB;
@@ -33,8 +35,10 @@ final class DryRunPull
     public function __construct(
         private readonly SubmissionSource $source,
         private readonly SubmissionParser $parser,
+        private readonly OdkPayloadNormalizer $normaliser,
         private readonly ValidationContextFactory $contexts,
         private readonly ValidationPipeline $pipeline,
+        private readonly SourceRegistry $sources,
     ) {}
 
     /** @throws OdkException */
@@ -43,9 +47,9 @@ final class DryRunPull
         $limit = max(1, $limit);
         $config = OdkConfig::fromConfig();
         $sync = $config->isConfigured() && ! $fromStart
-            ? OdkFormSync::query()->where('project_id', (int) $config->projectId)->where('form_id', (string) $config->formId)->first()
+            ? SourceSync::current($this->sources->id('odk'), $config->formRef())
             : null;
-        $cursor = $sync?->last_pulled_at;
+        $cursor = $sync?->cursor_at;
 
         $fetched = 0;
         $stored = 0;
@@ -58,7 +62,7 @@ final class DryRunPull
             $skip += count($page->rows);
 
             /** @var list<ParsedSubmission> $parsed */
-            $parsed = array_map(fn (array $row): ParsedSubmission => $this->parser->parse($row), $page->rows);
+            $parsed = array_map(fn (array $row): ParsedSubmission => $this->parser->parse($this->normaliser->normalise($row)), $page->rows);
             $known = $parsed === [] ? [] : DB::table('submissions')
                 ->whereIn('instance_id', array_map(fn (ParsedSubmission $p): string => $p->instanceId, $parsed))
                 ->pluck('instance_id')->flip()->all();

@@ -32,7 +32,7 @@ final class RecordAttachments
             return [];
         }
 
-        DB::table('odk_attachments')->insertOrIgnore($rows);
+        DB::table('submission_attachments')->insertOrIgnore($rows);
 
         return array_values(array_unique(array_map(fn (array $row): int => $row['submission_id'], $rows)));
     }

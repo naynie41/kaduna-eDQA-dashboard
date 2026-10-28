@@ -73,7 +73,8 @@ export default function FacilityDrawer({ facilityId, name, year, quarter, onClos
                     )}
                 </div>
             ) : (
-                <FacilityDetailView detail={current.detail} />
+                // key: a reload after a correction starts correction mode afresh from the new values.
+                <FacilityDetailView key={key} detail={current.detail} onCorrected={() => setAttempt((n) => n + 1)} />
             )}
         </Drawer>
     );

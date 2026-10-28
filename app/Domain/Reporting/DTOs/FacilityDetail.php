@@ -11,9 +11,9 @@ use App\Domain\Scoring\DTOs\ScoreValue;
  * score is a ScoreValue; the frontend never rounds or bands.
  *
  * @phpstan-type Facility array{id: int, code: string, name: string, lga: string, ward: string, level: string, level_label: string, ownership: string, ownership_label: string, active: bool}
- * @phpstan-type RoundRef array{id: int, label: string, year: int, quarter: int}
- * @phpstan-type AssessmentRef array{id: int, assessed_on: string, assessor: string, status: string}
- * @phpstan-type Item array{code: string, label: ?string, result: ?string}
+ * @phpstan-type RoundRef array{id: int, label: string, year: int, quarter: int, open: bool}
+ * @phpstan-type AssessmentRef array{id: int, assessed_on: string, assessor: string, status: string, started_at: string, ended_at: string}
+ * @phpstan-type Item array{code: string, key: string, label: ?string, result: ?string}
  * @phpstan-type ItemGroup array{dimension: string, dimension_label: string, slot: int, month: string, score: ScoreValue, items: list<Item>}
  * @phpstan-type HistoryPoint array{round_id: int, label: string, overall: ScoreValue, selected: bool}
  * @phpstan-type Flag array{code: string, label: string, overridden: array{by: ?string, at: string, reason: ?string}|null}

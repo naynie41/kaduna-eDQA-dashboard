@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Validation;
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Ingestion\FieldMap;
 use App\Domain\Reporting\Queries\FacilityRoundOverallsQuery;
 use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Scoring\DTOs\RuleConfig;
@@ -210,8 +211,13 @@ final class ValidationContextFactory
     /** @return array<string, true> */
     private function knownFormVersions(): array
     {
-        $versions = config('edqa_field_maps.versions');
+        $known = [];
+        foreach (FieldMap::known() as $source => $versions) {
+            foreach ($versions as $version) {
+                $known["{$source}|{$version}"] = true;
+            }
+        }
 
-        return array_fill_keys(array_map(strval(...), array_keys(is_array($versions) ? $versions : [])), true);
+        return $known;
     }
 }

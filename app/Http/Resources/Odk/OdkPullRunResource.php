@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Odk;
 
-use App\Domain\Ingestion\Models\OdkPullRun;
+use App\Domain\Ingestion\Models\PullRun;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * outcome. status is running until it finishes: succeeded, failed or skipped_not_configured.
  * error is the run's own safe description (PullSubmissions::describe), never a payload.
  *
- * @mixin OdkPullRun
+ * @mixin PullRun
  */
 final class OdkPullRunResource extends JsonResource
 {

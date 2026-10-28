@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Reporting never reads this (CLAUDE.md hard rule 6). The audit trail records corrections and
  * resolution, not the payload.
  *
+ * @property int $source_id
  * @property int|null $round_id
  * @property array<string, mixed> $payload
  * @property list<array<string, mixed>> $failures
@@ -42,7 +43,7 @@ final class QuarantinedRecord extends Model
     use HasFactory;
 
     protected $fillable = [
-        'submission_id', 'instance_id', 'round_id', 'facility_ref', 'lga_ref', 'payload', 'failures',
+        'source_id', 'submission_id', 'instance_id', 'round_id', 'facility_ref', 'lga_ref', 'payload', 'failures',
         'parsed', 'corrections', 'status', 'resolution', 'resolved_by', 'resolved_at', 'resolution_note',
     ];
 
