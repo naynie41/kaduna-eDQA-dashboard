@@ -17,20 +17,6 @@ return [
         'unexpected_body' => 'ODK Central sent an answer the portal cannot read (HTTP :status, :what).',
     ],
 
-    'check' => [
-        'title' => 'ODK Central',
-        'server' => 'Server: :url, project :project, form :form',
-        'not_configured' => 'Not configured. Set in .env: :problems',
-        'ok' => 'Connected as :account. Project ":project", form ":form", current version :version.',
-        'failed' => 'Failed (:status): :message',
-        'versions' => 'Published form versions (:count):',
-        'version_mapped' => '  :version  published :published  field map: yes',
-        'version_unmapped' => '  :version  published :published  field map: NO, its submissions will be quarantined (UNKNOWN_FORM_VERSION)',
-        'unknown_date' => 'unknown',
-        'none' => 'none',
-        'unmapped_summary' => ':count published version(s) have no field map: add them to config/edqa_field_maps.php before the first pull.',
-    ],
-
     // edqa:pull (ARCHITECTURE.md §5.3).
     'pull' => [
         'dry_run_title' => 'Dry run: nothing was written (no submission, cursor or run row).',

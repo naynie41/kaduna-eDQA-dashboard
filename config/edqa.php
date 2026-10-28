@@ -84,6 +84,23 @@ return [
         ],
     ],
 
+    'kobo' => [
+        // How the KoboToolbox client talks to the server (ARCHITECTURE.md §5.3, SECURITY.md §6);
+        // the source itself (URL, token, asset, page size) is under sources.kobo.
+
+        // Seconds: connect, and the whole request (one page).
+        'timeouts' => ['connect' => 10, 'total' => 60],
+
+        // Per request: 3 attempts on 429, 5xx and connection errors, waiting base × 2^n ms (or
+        // the server's Retry-After), at most max_ms. No retry on any other 4xx; a 401 or 403 stops
+        // the source until the token is fixed.
+        'retry' => ['attempts' => 3, 'base_ms' => 1000, 'max_ms' => 30000],
+
+        // Local development only: lets KOBO_BASE_URL be plain http, for a mock server. Honoured only
+        // when APP_ENV=local; set elsewhere it is refused and Kobo counts as not configured.
+        'allow_insecure_local' => filter_var(env('KOBO_ALLOW_INSECURE_LOCAL', false), FILTER_VALIDATE_BOOL),
+    ],
+
     'odk' => [
         // How the ODK Central adapter talks to Central (ARCHITECTURE.md §5, SECURITY.md §6); the
         // source itself (URL, credentials, form, page size) is under sources.odk.

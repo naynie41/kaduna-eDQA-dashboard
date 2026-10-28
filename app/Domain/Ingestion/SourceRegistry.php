@@ -9,6 +9,7 @@ use App\Domain\Ingestion\Contracts\SubmissionSource as SourceAdapter;
 use App\Domain\Ingestion\Enums\SourceType;
 use App\Domain\Ingestion\Exceptions\SourceRefused;
 use App\Domain\Ingestion\Kobo\KoboConfig;
+use App\Domain\Ingestion\Kobo\KoboSource;
 use App\Domain\Ingestion\Models\SubmissionSource;
 use App\Domain\Ingestion\Odk\OdkCentralSource;
 use App\Domain\Ingestion\Odk\OdkConfig;
@@ -24,8 +25,7 @@ use Illuminate\Contracts\Container\Container;
  * - enabled(): configured, switched on in config, and its row enabled: these are the sources
  *   that pull.
  *
- * The KoboToolbox adapter and normaliser arrive with Phase 2C step 4; until then adapter('kobo')
- * and normaliser('kobo') are refused.
+ * KoboToolbox's normaliser arrives with its own step; until then normaliser('kobo') is refused.
  */
 final class SourceRegistry
 {
@@ -83,7 +83,7 @@ final class SourceRegistry
     {
         return match ($this->type($key)) {
             SourceType::OdkCentral => $this->container->make(OdkCentralSource::class),
-            SourceType::Kobo => throw SourceRefused::noAdapter($key, SourceType::Kobo->value),
+            SourceType::Kobo => $this->container->make(KoboSource::class),
         };
     }
 

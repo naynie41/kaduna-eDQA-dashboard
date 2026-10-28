@@ -8,6 +8,7 @@ use App\Domain\Assessment\Events\AssessmentCorrected;
 use App\Domain\Assessment\Events\AssessmentScored;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Ingestion\Contracts\SubmissionSource;
+use App\Domain\Ingestion\Kobo\KoboConfig;
 use App\Domain\Ingestion\Odk\OdkCentralSource;
 use App\Domain\Ingestion\Odk\OdkConfig;
 use App\Domain\Ingestion\Odk\SessionTokenCache;
@@ -45,6 +46,7 @@ final class AppServiceProvider extends ServiceProvider
         // ODK (ARCHITECTURE.md §5.2): settings read from config each time, so nothing stale is
         // held; the source behind the contract is ODK Central (another adapter if Q-01 says so).
         $this->app->bind(OdkConfig::class, fn (): OdkConfig => OdkConfig::fromConfig());
+        $this->app->bind(KoboConfig::class, fn (): KoboConfig => KoboConfig::fromConfig());
         $this->app->bind(SessionTokenCache::class, fn ($app): SessionTokenCache => new SessionTokenCache($app->make(OdkConfig::class)->refreshMinutes));
         $this->app->bind(SubmissionSource::class, OdkCentralSource::class);
     }

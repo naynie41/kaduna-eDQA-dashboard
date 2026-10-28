@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Ingestion\Enums\SourceType;
 use App\Domain\Ingestion\Exceptions\SourceRefused;
+use App\Domain\Ingestion\Kobo\KoboSource;
 use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Models\SubmissionSource;
 use App\Domain\Ingestion\Odk\OdkCentralSource;
@@ -35,16 +36,17 @@ it('knows each configured source by key, with its type, name, row and adapter', 
         ->and($registry->config('kobo')['name'])->toBe('KoboToolbox')
         ->and($registry->model('odk')->key)->toBe('odk')
         ->and($registry->id('odk'))->toBe(SubmissionSource::query()->where('key', 'odk')->value('id'))
-        ->and($registry->adapter('odk'))->toBeInstanceOf(OdkCentralSource::class);
+        ->and($registry->adapter('odk'))->toBeInstanceOf(OdkCentralSource::class)
+        ->and($registry->adapter('kobo'))->toBeInstanceOf(KoboSource::class);
 });
 
-it('refuses a key that is not configured, a source not registered yet, and an adapter not built yet', function (): void {
+it('refuses a key that is not configured, a source not registered yet, and a normaliser not built yet', function (): void {
     $registry = app(SourceRegistry::class);
 
     expect(fn () => $registry->config('aggregate'))->toThrow(fn (SourceRefused $e) => expect($e->errorCode)->toBe('unknown_source'))
         ->and(fn () => $registry->model('aggregate'))->toThrow(SourceRefused::class)
         ->and(fn () => $registry->model('kobo'))->toThrow(fn (SourceRefused $e) => expect($e->errorCode)->toBe('not_registered'))
-        ->and(fn () => $registry->adapter('kobo'))->toThrow(fn (SourceRefused $e) => expect($e->errorCode)->toBe('no_adapter'));
+        ->and(fn () => $registry->normaliser('kobo'))->toThrow(fn (SourceRefused $e) => expect($e->errorCode)->toBe('no_adapter'));
 });
 
 it('lists as configured only the sources whose credentials are all set, never their values', function (): void {

@@ -20,6 +20,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   form version. An ODK edit is caught even though Central keeps its submission date: the pull asks
   for submissions edited since the last edit it saw, and an edit Central sends without
   `deprecatedID` is recognised by the submission's logical ID.
+- The KoboToolbox client and source adapter (Phase 2C step 3), read only, over the KPI API v2:
+  submissions by submission time, the form's deployed versions, attachments from the Kobo server
+  only (never another host, never plain http). `edqa:source:check` checks every source
+  (`edqa:odk:check` still works for one more release). Kobo is not pulled yet.
+- New env key: `KOBO_ALLOW_INSECURE_LOCAL` (local mock only).
 - New env keys: `ODK_ENABLED`, `KOBO_BASE_URL`, `KOBO_API_TOKEN`, `KOBO_ASSET_UID`,
   `KOBO_PULL_PAGE_SIZE`, `KOBO_BACKFILL_THROTTLE`, `KOBO_ENABLED`.
 

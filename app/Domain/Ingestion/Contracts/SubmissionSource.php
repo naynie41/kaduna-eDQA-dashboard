@@ -9,7 +9,7 @@ use App\Domain\Ingestion\DTOs\AttachmentRef;
 use App\Domain\Ingestion\DTOs\FormVersion;
 use App\Domain\Ingestion\DTOs\SourcePing;
 use App\Domain\Ingestion\DTOs\SubmissionPage;
-use App\Domain\Ingestion\Exceptions\OdkException;
+use App\Domain\Ingestion\Exceptions\SourceException;
 use Carbon\CarbonImmutable;
 
 /**
@@ -17,15 +17,16 @@ use Carbon\CarbonImmutable;
  * client turns out to run ODK Aggregate (Q-01), a second adapter implements the same contract.
  * Read-only: nothing here writes to the source (SECURITY.md §6).
  *
- * Every method throws an OdkException subclass, never a transport exception: OdkNotConfigured
- * when credentials are missing, OdkAuthFailed, OdkUnreachable or OdkUnexpectedResponse.
+ * Every method throws a SourceException subclass, never a transport exception: the source's
+ * NotConfigured when credentials are missing, AuthFailed, Unreachable or UnexpectedResponse
+ * (Odk… on ODK Central, Kobo… on KoboToolbox).
  */
 interface SubmissionSource
 {
     /**
      * Signs in and reads the project and form: proves the credentials and the role.
      *
-     * @throws OdkException
+     * @throws SourceException
      */
     public function ping(): SourcePing;
 
@@ -34,7 +35,7 @@ interface SubmissionSource
      *
      * @return list<FormVersion>
      *
-     * @throws OdkException
+     * @throws SourceException
      */
     public function formVersions(): array;
 
@@ -42,7 +43,7 @@ interface SubmissionSource
      * One page of submissions received after $since (at or after when $inclusive; all when
      * null), ordered by when they were received, oldest first, with the total that matches.
      *
-     * @throws OdkException
+     * @throws SourceException
      */
     public function submissionsPage(?CarbonImmutable $since, int $top, int $skip, bool $inclusive = false): SubmissionPage;
 
@@ -52,7 +53,7 @@ interface SubmissionSource
      * miss it. Ordered by the edit time (unedited ones after the edited), then the logical ID, with
      * the total that matches. With no cursor yet, every edited submission.
      *
-     * @throws OdkException
+     * @throws SourceException
      */
     public function changedSince(?CarbonImmutable $cursor, int $top, int $skip): SubmissionPage;
 
@@ -61,14 +62,14 @@ interface SubmissionSource
      *
      * @return list<AttachmentRef>
      *
-     * @throws OdkException
+     * @throws SourceException
      */
     public function attachmentList(string $instanceId): array;
 
     /**
      * Streams one attachment to $sinkPath (the caller chooses and checks the path).
      *
-     * @throws OdkException
+     * @throws SourceException
      */
     public function downloadAttachment(string $instanceId, string $name, string $sinkPath): AttachmentDownload;
 }

@@ -530,6 +530,26 @@ the sources apart.
   (open question Q-17).
 - Check parameter names, page-size limits and rate limits against the current KPI API docs when
   building the adapter; record what was verified in the adapter's docblock.
+- **Built (Phase 2C step 3):** `Kobo\KoboClient` and `Kobo\KoboSource`. They were checked
+  against the KPI OpenAPI schema (`/api/v2/schema/`, api_v2 2.0.0, 28 Oct 2026), recorded in
+  `KoboClient`'s docblock.
+  - **Auth:** `Authorization: Token …`.
+  - **Data:** `GET /api/v2/assets/{uid}/data/?format=json&query={"_submission_time":{"$gte":"…"}}&sort={"_submission_time":1,"_id":1}&start=&limit=`.
+    The limit is at most 1000 a page. Times are UTC, to the second, with no zone.
+  - **Paging** uses `start`/`limit`, and the answer's `next` URL is never followed.
+  - **Versions:** `/versions/`, those with a `date_deployed`. **Account:** `/me/`.
+  - **Rate limits:** none documented for these endpoints; 429/5xx are retried with Retry-After.
+  - **No last-edited field on Kobo submissions**, so `KoboSource::changedSince` returns none
+    without asking. The reconcile sweep (2C.5) is Kobo's edit path.
+  - **Attachments** come from the row's `_attachments`. A `download_url` is followed only over
+    https, on the configured host and port, with no credentials in the URL. Redirects are followed
+    only while they stay there; anything else is `KoboUnsafeUrl`.
+  - **Not confirmed by the docs:** whether the hosted servers' `download_url` redirects to file
+    storage on another host. If it does, that host must be allowed deliberately; check on
+    credentials day.
+  - `edqa:source:check {source?} {--all} {--json}` replaces `edqa:odk:check`, which stays one
+    release as an alias.
+  - Shared code catches `Exceptions\SourceException`, the parent of both the ODK and Kobo families.
 
 ### 5.4 Webhooks (optional, per source)
 

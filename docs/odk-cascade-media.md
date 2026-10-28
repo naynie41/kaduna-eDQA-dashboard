@@ -48,7 +48,7 @@ that a facility you know is under the right LGA and ward. A label that begins wi
 A new form version that the portal has no field map for is quarantined under
 `UNKNOWN_FORM_VERSION`, never guessed. Before publishing, add the version to
 `config/edqa_field_maps.php`. If only the media changed, an additive entry with no differences is
-enough. Then run `php artisan edqa:odk:check` to confirm the portal lists it as mapped.
+enough. Then run `php artisan edqa:source:check odk` to confirm the portal lists it as mapped.
 
 ## In the XLSForm
 

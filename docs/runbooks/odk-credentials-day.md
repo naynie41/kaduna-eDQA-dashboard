@@ -11,7 +11,7 @@ portal and the discovery tools only read (SECURITY.md §6).
 
 | Step | Writes to the portal database? | Undo |
 |---|---|---|
-| a. `.env` and `edqa:odk:check` | No (a cached session token) | Clear the values |
+| a. `.env` and `edqa:source:check odk` | No (a cached session token) | Clear the values |
 | b. Discovery tools | No (local files in `discovery/`) | Delete `discovery/data/` |
 | c. Field maps | No (a config file) | Revert the file |
 | d. Dry run | No | Nothing to undo |
@@ -22,7 +22,7 @@ portal and the discovery tools only read (SECURITY.md §6).
 
 ---
 
-## a. Fill `.env` and run `edqa:odk:check`
+## a. Fill `.env` and run `edqa:source:check odk`
 
 The account must be a **Project Viewer** on the one project and nothing more (SECURITY.md §6).
 
@@ -37,7 +37,7 @@ ODK_FORM_ID=dqa                                 # the form's xmlFormId
 
 ```bash
 make artisan c="config:clear"        # on a server the container caches config at start: restart it
-make artisan c="edqa:odk:check"
+make artisan c="edqa:source:check odk"
 ```
 
 **Check:** it prints `Connected as …`, the project and form names, and every published form
@@ -96,7 +96,7 @@ Open `discovery/out/edqa_field_maps.draft.php` beside `config/edqa_field_maps.ph
 
 ```bash
 make check                                         # the parser's golden tests still pass
-make artisan c="edqa:odk:check"                    # every version now says field map: yes
+make artisan c="edqa:source:check odk"                    # every version now says field map: yes
 ```
 
 **Undo:** `git checkout config/edqa_field_maps.php`. Nothing has been stored yet.

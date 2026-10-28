@@ -25,7 +25,7 @@ ODK_ALLOW_INSECURE_LOCAL=true
 ```
 
 ```bash
-make artisan c="edqa:odk:check"  # signs in, lists the form versions and which have a field map
+make artisan c="edqa:source:check odk"  # signs in, lists the form versions and which have a field map
 ```
 
 To put real credentials back, restore the five `ODK_*` values and remove
