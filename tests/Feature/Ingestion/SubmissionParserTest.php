@@ -98,6 +98,22 @@ it('reads ODK\'s GeoJSON point (lon, lat, alt) as lat and lng, with an accuracy 
     expect(parse($raw)->gps)->toBeNull();
 });
 
+it('reads the XForms text geopoint (lat lng [alt [accuracy]]), as Kobo sends it', function (mixed $gps, ?array $parsed): void {
+    $raw = rawVisit();
+    $raw['gps'] = $gps;
+
+    expect(parse($raw)->gps)->toBe($parsed);
+})->with([
+    'lat lng' => ['10.4806 7.4302', ['lat' => 10.4806, 'lng' => 7.4302]],
+    'with altitude' => ['10.4806 7.4302 612.3', ['lat' => 10.4806, 'lng' => 7.4302]],
+    'with accuracy' => ['10.4806 7.4302 612.3 4.8', ['lat' => 10.4806, 'lng' => 7.4302, 'accuracy' => 4.8]],
+    'latitude out of range' => ['97.1 7.4302', null],
+    'longitude out of range' => ['10.4806 187.4', null],
+    'one part' => ['10.4806', null],
+    'five parts' => ['1 2 3 4 5', null],
+    'not numbers' => ['north east', null],
+]);
+
 it('passes awkward references through as text for validation to judge', function (): void {
     $raw = rawVisit();
     $raw['facility'] = ['lga' => null, 'ward' => 'Quarterly', 'facility_code' => 2019.5];

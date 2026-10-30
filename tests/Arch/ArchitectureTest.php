@@ -99,9 +99,9 @@ arch('the parser and the field map know no source')
 
 // A normaliser is pure: no I/O, so reprocessing a stored payload always reads it the same way.
 arch('payload normalisers are pure')
-    ->expect('App\Domain\Ingestion\Odk\OdkPayloadNormalizer')
+    ->expect(['App\Domain\Ingestion\Odk\OdkPayloadNormalizer', 'App\Domain\Ingestion\Kobo\KoboPayloadNormalizer'])
     ->toImplement('App\Domain\Ingestion\Contracts\PayloadNormalizer')
-    ->not->toUse(['Illuminate\Support\Facades', 'Illuminate\Http', 'App\Domain\Ingestion\Odk\OdkCentralClient', 'App\Domain\Ingestion\Models']);
+    ->not->toUse(['Illuminate\Support\Facades', 'Illuminate\Http', 'App\Domain\Ingestion\Odk\OdkCentralClient', 'App\Domain\Ingestion\Kobo\KoboClient', 'App\Domain\Ingestion\Models']);
 
 // CLAUDE.md hard rule 1: data enters only from the configured sources (ODK Central, KoboToolbox),
 // through the shared pipeline.

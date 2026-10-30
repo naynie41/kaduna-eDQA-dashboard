@@ -24,6 +24,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   submissions by submission time, the form's deployed versions, attachments from the Kobo server
   only (never another host, never plain http). `edqa:source:check` checks every source
   (`edqa:odk:check` still works for one more release). Kobo is not pulled yet.
+- The KoboToolbox payload normaliser (Phase 2C step 4). A Kobo row is read into the same shape
+  as an ODK entry: flat `facility/lga` keys are nested, Kobo's own fields go into the
+  submission's metadata, and its zoneless submission times are read as UTC. Every test fixture
+  now has a Kobo version, and both versions must give the same result. The parser also reads
+  Kobo's text GPS points ("lat lng alt accuracy"). Kobo form versions are mapped with
+  placeholder IDs until the real deployments are known.
 - New env key: `KOBO_ALLOW_INSECURE_LOCAL` (local mock only).
 - New env keys: `ODK_ENABLED`, `KOBO_BASE_URL`, `KOBO_API_TOKEN`, `KOBO_ASSET_UID`,
   `KOBO_PULL_PAGE_SIZE`, `KOBO_BACKFILL_THROTTLE`, `KOBO_ENABLED`.

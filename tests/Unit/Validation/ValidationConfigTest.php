@@ -51,8 +51,10 @@ it('maps the current ODK form version to a full field map', function (): void {
         // Answers map through the rule version's choice_map (Q-25), never the field map.
         ->and(config('edqa_field_maps.maps')[$name])->not->toHaveKey('choices')
         ->and(config('edqa_field_maps.maps')[$name])->not->toHaveKey('extends')
-        // No Kobo version is known yet: every Kobo form version quarantines until it is mapped.
-        ->and(config('edqa_field_maps.sources')['kobo'])->toBe([]);
+        // The same XLSForms on Kobo, under fictional deployment uids (CONTRACT-ASSUMED), each
+        // pointing at a map that exists.
+        ->and(config('edqa_field_maps.sources')['kobo'])->toHaveCount(2)
+        ->and(array_diff(array_values(config('edqa_field_maps.sources')['kobo']), array_keys(config('edqa_field_maps.maps'))))->toBe([]);
 });
 
 it('names, explains and words a detail for every rule', function (string $code): void {

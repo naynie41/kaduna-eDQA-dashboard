@@ -1,6 +1,7 @@
 // The ODK fixture generator (tests/Fixtures/README.md): `node tests/Fixtures/generate.mjs`.
 // Writes, from one spec per case:
 //   sources/odk/{valid,broken}/<name>.json     one ODK Central OData Submissions entry
+//   sources/kobo/{valid,broken}/<name>.json    the same visit as one KPI API v2 data row
 //   parsed/{valid,broken}/<name>.json          ParsedSubmission::toArray() a correct parser gives
 //   parsed/{valid,broken}/<name>.expected.json the outcome 2A expects
 // The parsed side is written from the spec, never by the parser, so the golden tests stay a
@@ -170,10 +171,92 @@ const write = (file, data) => {
     fs.writeFileSync(file, JSON.stringify(data, null, 4) + '\n');
 };
 
-for (const [kind, name, changes, status, codes] of CASES) {
+// The same XLSForm versions deployed on KoboToolbox, under FICTIONAL deployment uids
+// (config/edqa_field_maps.php, CONTRACT-ASSUMED); any other version is an uid Kobo would give an
+// unmapped deployment.
+const KOBO_VERSIONS = { '2026.1': 'vKd26Q1aBcDeFgHiJkLmNo', '2025.2': 'vKd25Q4pQrStUvWxYzAbCd' };
+const koboVersion = (version) => KOBO_VERSIONS[version] ?? `vKdUnmapped${version.replace(/\W/g, '')}`;
+const koboTime = (date, time) => `${date}T${time}:00`; // _submission_time: UTC, no zone
+
+/**
+ * One row of the KPI API v2 data endpoint for the same visit: flat group paths, every answer a
+ * string, unanswered questions absent, Kobo's own underscore fields. The geopoint is the XForms
+ * text without accuracy, so the pair parses identically (ODK Central's OData omits accuracy).
+ */
+function kobo(c, id) {
+    const row = {
+        _id: id,
+        'formhub/uuid': '5f1c0a9be1d24c4b8a7e3d2f6b0c9a11',
+        start: c.startRaw ?? iso(c.date, c.start, '+01:00'),
+        end: iso(c.date, c.end, '+01:00'),
+        deviceid: c.device,
+    };
+    const prefix = c.version === '2025.2' ? 'fac' : 'facility';
+    const facility = c.version === '2025.2'
+        ? { lga_name: c.lga, ward_name: c.ward, fac_code: c.facility }
+        : { lga: c.lga, ward: c.ward, facility_code: c.facility };
+    for (const [field, value] of Object.entries(facility)) {
+        if (value !== null) row[`${prefix}/${field}`] = String(value);
+    }
+    row[c.version === '2025.2' ? 'assessor' : 'assessor_name'] = c.assessor;
+    row.round_year = String(c.roundYear);
+    row.round_quarter = String(c.roundQuarter);
+    row.gps = '10.4806 7.4302 612.3';
+    if (!c.onlyTyped) {
+        for (const [rawName, , dim, , , value] of questions(c)) {
+            row[`${dim}/${rawName}`] = value;
+        }
+    }
+    for (const [name, value] of Object.entries({ ...(c.typed ?? {}), ...(c.onlyTyped ?? {}) })) {
+        row[`availability/${name}`] = String(value);
+    }
+
+    return {
+        ...row,
+        __version__: koboVersion(c.version),
+        'meta/instanceID': c.instance,
+        'meta/rootUuid': c.instance,
+        _xform_id_string: 'aKdDqaForm2026',
+        _uuid: c.instance.replace(/^uuid:/, ''),
+        _attachments: [],
+        _status: 'submitted_via_web',
+        _geolocation: [10.4806, 7.4302],
+        _submission_time: koboTime(c.date, c.submitted),
+        _tags: [],
+        _notes: [],
+        _validation_status: {},
+        _submitted_by: c.submitter[1],
+    };
+}
+
+/** parsed(c) as it reads from Kobo: its source, its _id, its version label. */
+function parsedKobo(c, id) {
+    const known = ['2026.1', '2025.2'].includes(c.version);
+    return { ...parsed(c), source: 'kobo', external_id: String(id), form_version: koboVersion(c.version), form_version_known: known };
+}
+
+// Cases only Kobo produces: parsed and expected for the Kobo row alone.
+//   kobo-missing-meta-block   an older Kobo row with no meta/* keys: the instance ID comes from _uuid
+//   kobo-select-multiple-answer  a scored question answered "yes no" (a select_multiple's
+//                                space-separated choices): not a known choice, so ITEMS_INCOMPLETE
+const KOBO_ONLY = [
+    ['valid', 'kobo-missing-meta-block', {}, (row) => { delete row['meta/instanceID']; delete row['meta/rootUuid']; }, 'accepted', []],
+    ['broken', 'kobo-select-multiple-answer', { override: { avail_m1_tally_sheet: 'yes no' } }, () => {}, 'quarantined', ['ITEMS_INCOMPLETE']],
+];
+
+CASES.forEach(([kind, name, changes, status, codes], i) => {
     const c = { ...base(name), ...changes };
     write(path.join(ROOT, 'tests/Fixtures/sources/odk', kind, `${name}.json`), raw(c));
+    write(path.join(ROOT, 'tests/Fixtures/sources/kobo', kind, `${name}.json`), kobo(c, 1001 + i));
     write(path.join(ROOT, 'tests/Fixtures/parsed', kind, `${name}.json`), parsed(c));
     write(path.join(ROOT, 'tests/Fixtures/parsed', kind, `${name}.expected.json`), { status, codes });
-}
-console.log(`${CASES.length} cases written`);
+});
+KOBO_ONLY.forEach(([kind, name, changes, oddity, status, codes], i) => {
+    const c = { ...base(name), ...changes };
+    const row = kobo(c, 2001 + i);
+    oddity(row);
+    write(path.join(ROOT, 'tests/Fixtures/sources/kobo', kind, `${name}.json`), row);
+    write(path.join(ROOT, 'tests/Fixtures/parsed', kind, `${name}.json`), parsedKobo(c, 2001 + i));
+    write(path.join(ROOT, 'tests/Fixtures/parsed', kind, `${name}.expected.json`), { status, codes });
+});
+console.log(`${CASES.length} cases written for ODK and Kobo, ${KOBO_ONLY.length} for Kobo only`);

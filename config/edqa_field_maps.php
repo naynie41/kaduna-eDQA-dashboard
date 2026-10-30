@@ -73,9 +73,13 @@ return [
             '2026.1' => 'xls-2026.1', // CONTRACT-ASSUMED: replace when the real form is audited.
             '2025.2' => 'xls-2025.2', // CONTRACT-ASSUMED: replace when the real form is audited.
         ],
-        // __version__ (the Kobo deployment) => map. None known yet: every Kobo submission
-        // quarantines under UNKNOWN_FORM_VERSION until the deployed versions are listed (§5.5).
-        'kobo' => [],
+        // __version__ (the Kobo deployment's uid) => map. FICTIONAL uids for the same XLSForms
+        // deployed on Kobo, until the real deployed versions are listed (§5.5): any other uid
+        // quarantines under UNKNOWN_FORM_VERSION.
+        'kobo' => [
+            'vKd26Q1aBcDeFgHiJkLmNo' => 'xls-2026.1', // CONTRACT-ASSUMED: replace when the real form is audited.
+            'vKd25Q4pQrStUvWxYzAbCd' => 'xls-2025.2', // CONTRACT-ASSUMED: replace when the real form is audited.
+        ],
     ],
 
     // The version each source's current form carries, for code that writes a submission itself

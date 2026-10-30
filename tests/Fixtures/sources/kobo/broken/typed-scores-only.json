@@ -1,0 +1,31 @@
+{
+    "_id": 1011,
+    "formhub/uuid": "5f1c0a9be1d24c4b8a7e3d2f6b0c9a11",
+    "start": "2026-04-14T09:00:00.000+01:00",
+    "end": "2026-04-14T09:45:00.000+01:00",
+    "deviceid": "collect:hauwa01",
+    "facility/lga": "CHK",
+    "facility/ward": "CHK-KUJ",
+    "facility/facility_code": "FX-0001",
+    "assessor_name": "Hauwa Ibrahim",
+    "round_year": "2026",
+    "round_quarter": "2",
+    "gps": "10.4806 7.4302 612.3",
+    "availability/avail_m1_score": "92.5",
+    "__version__": "vKd26Q1aBcDeFgHiJkLmNo",
+    "meta/instanceID": "uuid:fx-typed-scores-only",
+    "meta/rootUuid": "uuid:fx-typed-scores-only",
+    "_xform_id_string": "aKdDqaForm2026",
+    "_uuid": "fx-typed-scores-only",
+    "_attachments": [],
+    "_status": "submitted_via_web",
+    "_geolocation": [
+        10.4806,
+        7.4302
+    ],
+    "_submission_time": "2026-04-14T08:50:00",
+    "_tags": [],
+    "_notes": [],
+    "_validation_status": {},
+    "_submitted_by": "hauwa.ibrahim"
+}

@@ -1,10 +1,11 @@
-# ODK fixtures
+# Ingestion fixtures
 
-Golden fixtures for ingestion (ARCHITECTURE.md §5): what ODK Central sends, what the parser must
-read from it, and what validation must then decide. Each case is three files with one name:
+Golden fixtures for ingestion (ARCHITECTURE.md §5): what each source sends, what the parser must
+read from it, and what validation must then decide. Each case has the same name in every file:
 
 | File | What it is |
 |---|---|
+| `sources/kobo/{valid,broken}/<name>.json` | The same visit as one row of a KoboToolbox KPI v2 data response (`GET /api/v2/assets/{uid}/data/?format=json`): flat slash keys (`facility/lga`, `availability/avail_m1_…`), every value text, `meta/instanceID`, `formhub/uuid`, `__version__` (the deployment uid) and Kobo's own underscore fields (`_id`, `_uuid`, `_submission_time` with no zone, `_submitted_by`, `_attachments`, `_status`, `_geolocation`, `_tags`, `_notes`, `_validation_status`, `_xform_id_string`) |
 | `sources/odk/{valid,broken}/<name>.json` | One entry of an ODK Central OData Submissions response (`GET …/forms/{form}.svc/Submissions`): `__id`, `__system` (submissionDate, updatedAt, submitterId, submitterName, attachmentsPresent, attachmentsExpected, status, reviewState, deviceId, edits, formVersion), `meta.instanceID`, groups as nested objects, scored questions inside their dimension group |
 | `parsed/{valid,broken}/<name>.json` | `ParsedSubmission::toArray()` of that entry, exactly (with `source` and `external_id`, its `__id`) |
 | `parsed/{valid,broken}/<name>.expected.json` | The outcome: `status` (`accepted`, `flagged` or `quarantined`) and `codes`, in rule order |
@@ -26,6 +27,25 @@ read from it, and what validation must then decide. Each case is three files wit
 2. The parsed fixture round-trips through `ParsedSubmission`.
 3. Run through the parser and `ProcessParsedBatch` against `FixtureWorld`, the case ends with
    exactly its expected outcome.
+
+**Kobo rows, checked against the KPI API v2 schema (October 2026):** groups come as flat
+"group/question" keys, `_id` is a number (the same through edits), `_submission_time` has no
+zone (UTC), and a geopoint is the XForms text "lat lng alt accuracy". The parity rows have
+"lat lng alt" so they match ODK's accuracy-less point. The `__version__` uids are **fictional**
+(`config/edqa_field_maps.php`, CONTRACT-ASSUMED). An unmapped version is written
+`vKdUnmapped<version>`.
+
+`tests/Feature/Ingestion/SourceParityTest.php` holds the two sources to the same answer
+(CONVENTION.md §8):
+
+1. Every ODK case has a Kobo row.
+2. Each row through its own normaliser gives the same `ParsedSubmission`, apart from what each
+   source names its own way: `source`, `external_id` (Kobo's `_id`) and `form_version`
+   (`2026.1` against a deployment uid).
+3. Every Kobo row, through `ProcessParsedBatch` as a `kobo` submission, ends with the same
+   `.expected.json` outcome.
+
+The Kobo-only cases have no ODK row and are compared with their parsed fixture exactly.
 
 The outcomes are the Phase 2A ones. 2A built its cases in code (`tests/Support/BrokenSubmissions.php`,
 against factory data); these files are the same cases, fixed to one world.
@@ -69,10 +89,18 @@ the last answered "no", so each slot scores 75.
 | `broken/twelve-minute-visit` | 09:00 to 09:12 | flagged VISIT_TOO_SHORT |
 | `broken/seventh-visit-of-the-day` | A. Bello's seventh visit on 14 April | flagged ASSESSOR_VOLUME |
 
+**Kobo only** (`sources/kobo/` and `parsed/` only):
+
+| Case | What is odd | Outcome |
+|---|---|---|
+| `valid/kobo-missing-meta-block` | No `meta/*` keys at all: the instance ID comes from `_uuid` | accepted |
+| `broken/kobo-select-multiple-answer` | `avail_m1_tally_sheet: "yes no"`, a select_multiple's space-separated answer in a select_one question, parsed as `invalid` | ITEMS_INCOMPLETE |
+
 ## Changing them
 
 Add or change a case in `generate.mjs` (one line in `CASES`), then run
-`node tests/Fixtures/generate.mjs` from the repo root. It writes all three files from the case's
+`node tests/Fixtures/generate.mjs` from the repo root. A Kobo-only case goes in `KOBO_ONLY`. It
+writes every file (the ODK entry, the Kobo row, parsed and expected) from the case's
 spec, **never through the parser**, so the golden test is a check on the parser, not a copy of it.
 If a case needs database state, add it to `FixtureWorld`.
 

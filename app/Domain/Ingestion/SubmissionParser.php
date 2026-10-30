@@ -156,14 +156,31 @@ final class SubmissionParser
     }
 
     /**
-     * A geopoint as GeoJSON ({"type": "Point", "coordinates": [lng, lat, alt]}) to lat and lng;
-     * null when it is not one. An accuracy given in properties.accuracy is kept (ODK Central's
-     * OData leaves it out today).
+     * A geopoint to lat and lng, from either of its two standard forms: GeoJSON ({"type": "Point",
+     * "coordinates": [lng, lat, alt]}, as ODK Central's OData serves it) or the XForms text
+     * "lat lng [alt [accuracy]]" (as KoboToolbox's data API serves it). Null when it is neither.
+     * An accuracy is kept when given (GeoJSON properties.accuracy, or the text's fourth part).
      *
      * @return array<string, float>|null
      */
     private static function gps(mixed $value): ?array
     {
+        if (is_string($value)) {
+            $parts = preg_split('/\s+/', trim($value)) ?: [];
+            if (count($parts) < 2 || count($parts) > 4 || array_filter($parts, fn (string $p): bool => ! is_numeric($p)) !== []) {
+                return null;
+            }
+            [$lat, $lng] = [(float) $parts[0], (float) $parts[1]];
+            if (abs($lat) > 90 || abs($lng) > 180) {
+                return null;
+            }
+            $gps = ['lat' => $lat, 'lng' => $lng];
+            if (isset($parts[3])) {
+                $gps['accuracy'] = (float) $parts[3];
+            }
+
+            return $gps;
+        }
         $coordinates = is_array($value) ? ($value['coordinates'] ?? null) : null;
         if (! is_array($coordinates) || ! is_numeric($coordinates[0] ?? null) || ! is_numeric($coordinates[1] ?? null)) {
             return null;

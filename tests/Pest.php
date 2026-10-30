@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domain\Ingestion\Actions\ProcessParsedBatch;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
+use App\Domain\Ingestion\Kobo\KoboPayloadNormalizer;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Ingestion\Odk\OdkPayloadNormalizer;
 use App\Domain\Ingestion\SubmissionParser;
@@ -104,6 +105,12 @@ function submissionRow(ParsedSubmission $parsed): Submission
 function odkParse(array $raw): ParsedSubmission
 {
     return app(SubmissionParser::class)->parse(app(OdkPayloadNormalizer::class)->normalise($raw));
+}
+
+/** A raw KoboToolbox data row read as the pipeline reads it: its normaliser, then the parser. */
+function koboParse(array $raw): ParsedSubmission
+{
+    return app(SubmissionParser::class)->parse(app(KoboPayloadNormalizer::class)->normalise($raw));
 }
 
 /**

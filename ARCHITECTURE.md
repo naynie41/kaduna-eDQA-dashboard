@@ -414,9 +414,9 @@ flowchart TD
     stored payload through its own source's normaliser (`ReadSubmission::fromStored`).
   - **`ParsedSubmission`** carries `source` and `externalId`.
   - **Field maps** are now named maps with `extends`, plus `sources` (source → version → map
-    name). `FieldMap::for(source, version)` gives null for any unmapped pair; no Kobo version is
-    mapped yet. Paths stay dot paths into the envelope's `data`; the Kobo normaliser (step 4) will
-    nest its `facility/lga` keys. UNKNOWN_FORM_VERSION names the source ("kobo form version vQ8x…
+    name). `FieldMap::for(source, version)` gives null for any unmapped pair (Kobo versions were
+    mapped in step 4). Paths stay dot paths into the envelope's `data`; the Kobo normaliser
+    (step 4) nests its `facility/lga` keys. UNKNOWN_FORM_VERSION names the source ("kobo form version vQ8x…
     has no field map").
   - **Edits (D-23 in the new numbering).** `SubmissionSource::changedSince(cursor)` is the pull's
     second pass. On ODK it filters `__system/submissionDate ge X or __system/updatedAt ge X` and
@@ -479,6 +479,31 @@ objects per group and a `__system` block; Kobo returns flat keys like `facility/
 system fields (`_id`, `_submission_time`, `__version__`, `_attachments`, `_submitted_by`) and
 timestamps without a timezone suffix (treat as UTC). After normalisation the parser cannot tell
 the sources apart.
+
+- **Built (Phase 2C step 4):** `Kobo\KoboPayloadNormalizer`, returned by
+  `SourceRegistry::normaliser('kobo')`.
+  - **Meta:** `_id` → externalId. The instance ID is `meta/instanceID`, else the nested
+    `meta.instanceID`, else `"uuid:" + _uuid`; `meta/deprecatedID` likewise.
+  - **Times:** a zoneless `_submission_time` is read as UTC; a time that carries a zone is read
+    as written. updatedAt is always null.
+  - **Other meta:** `__version__` → formVersion; `_submitted_by` and the form's `deviceid`.
+  - **Attachments:** `_attachments` → attachments (`media_file_basename`, else the file's
+    basename; `mimetype`; `download_url`). Deleted entries are skipped.
+  - **Answers:** slash keys are nested into groups, and each repeat row is nested to the
+    repeat's own path. Every underscore field, `meta/*`, `formhub/*` and `deviceid` stay out of
+    the answers. The stored payload is untouched.
+  - **Clashes:** a key that can't be nested (a malformed path such as `a//b`, or one that clashes
+    with an answer or a group) stays flat under its full key. The one clash with nowhere flat to
+    go, a top-level answer named like a group, keeps the group; the raw payload keeps both.
+  - **Never throws**, like the parser (500-row property test).
+  - **The parser** also reads the XForms text geopoint `"lat lng [alt [accuracy]]"`, as Kobo
+    sends it. Out-of-range or malformed values give null.
+  - **Source parity** (CONVENTION.md §8): every fixture has a Kobo KPI-v2-shaped row in
+    `tests/Fixtures/sources/kobo/`. It parses to the ODK row's `ParsedSubmission` apart from
+    source, external_id and form_version, and ends with the same outcome. There are two
+    Kobo-only cases: a missing meta block, and a select_multiple-style "yes no" answer.
+  - **Version uids:** the two Kobo `__version__` uids in the field maps are fictional
+    (CONTRACT-ASSUMED) until the real deployments are listed (§5.5).
 
 ### 5.3 Pull mechanics
 
