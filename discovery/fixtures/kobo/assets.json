@@ -1,0 +1,43 @@
+{
+    "count": 3,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "uid": "aKdDqaMock2026",
+            "name": "Data Quality Assessment (fixture)",
+            "asset_type": "survey",
+            "owner__username": "dqa-owner",
+            "has_deployment": true,
+            "deployment_status": "deployed",
+            "deployment__active": true,
+            "deployed_version_id": "vKd26Q1aBcDeFgHiJkLmNo",
+            "deployment__submission_count": 8,
+            "date_modified": "2026-01-05T09:00:00Z",
+            "effective_permissions": [
+                {
+                    "codename": "view_asset"
+                },
+                {
+                    "codename": "view_submissions"
+                }
+            ]
+        },
+        {
+            "uid": "aKdScratchTest01",
+            "name": "Scratch test form",
+            "asset_type": "survey",
+            "owner__username": "edqa-reader",
+            "has_deployment": false,
+            "deployment_status": "draft",
+            "deployment__submission_count": 0,
+            "date_modified": "2026-03-02T10:00:00Z"
+        },
+        {
+            "uid": "aKdLibraryBlock1",
+            "name": "Facility block",
+            "asset_type": "block",
+            "owner__username": "dqa-owner"
+        }
+    ]
+}

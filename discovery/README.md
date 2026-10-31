@@ -74,7 +74,7 @@ Only `start`/`end` (from their preload) and `meta/instanceID` are taken as certa
 
 The second source has its own read-only client, [`kobo.py`](kobo.py). It allows GET only and
 raises before anything else is sent. The API token travels in a header and never appears in
-output, reports or exception messages. Paged requests are throttled by `KOBO_THROTTLE_SECONDS`.
+output, reports or exception messages. Every request waits `KOBO_THROTTLE_SECONDS` (default 1) after the last. A 429 backs off (`Retry-After`, else 2, 4, 8 … s). A 401, 403 or 404 stops with what to check. Requests go to the configured host only.
 The variables go in `.env` beside the ODK ones:
 
 | Variable | Meaning |
@@ -92,13 +92,14 @@ carrying an unknown version. Until credentials arrive, run the tools on that.
 
 | Tool | ODK counterpart | What it does | Writes |
 |---|---|---|---|
-| `kobo_inventory.py` | `probe.py`, `form_versions.py`, `submission_profile.py` | Lists the asset, its deployed versions (drafts left out) and the submissions per quarter, by visit start and by `_submission_time`, per version. Also names any row carrying a version that is not deployed. Saves the data rows | `out/kobo_inventory.md`, `out/kobo_form_versions.json`, `data/kobo/submissions/` |
+| `kobo_inventory.py` | `probe.py`, `form_versions.py`, `submission_profile.py` | Credentials-day check. It reports:<ul><li>who the token authenticates as (username only);</li><li>with no asset chosen, the survey assets it can see, then it stops;</li><li>the asset's owner, deployment and deployed versions with dates;</li><li>the submission count, and the submissions per quarter by `_submission_time` (only that field is fetched);</li><li>the account's permissions: **VIEW-ONLY: safe** or a **WARNING**, plus how many other assets it owns;</li><li>the REST Services (names and settings only, never their URLs);</li><li>the server region (Q-17).</li></ul>`--download` also saves the full rows for `rule_preview.py` | `out/kobo_inventory.md`, `out/kobo_inventory.json`, `out/kobo_form_versions.json` (and `data/kobo/submissions/` with `--download`) |
 | `kobo_forms.py` | `form_versions.py` | Rebuilds each deployed version as an XLSForm from the version content Kobo keeps (Kobo exports only the current one). The `version` setting is the deployment uid | `data/kobo/forms/<uid>.xlsx`, `out/kobo_forms.md` |
 | `field_diff.py --source kobo` | `field_diff.py` | Reads those XLSForms (it now reads `.xlsx` as well as XForm `.xml`): contract check, drift and renames between versions, and a draft map per deployment uid | `out/kobo_field_diff.md`, `out/kobo_edqa_field_maps.draft.php`, `out/kobo_field_map.draft.json` |
 | `rule_preview.py --source kobo` | `rule_preview.py` | The defect scan over Kobo's rows. They are read as Kobo sends them: flat `group/question` keys, `__version__`, `_submission_time` in UTC, and `meta/instanceID`/`meta/deprecatedID` as in ODK | `out/kobo_rule_preview.md` |
 
 ```bash
 python kobo_inventory.py --offline fixtures/kobo     # or without --offline, against the server
+python kobo_inventory.py --download                  # live, also saving the rows for rule_preview.py
 python kobo_forms.py --offline fixtures/kobo
 python field_diff.py --source kobo
 python rule_preview.py --source kobo --calendar-rounds

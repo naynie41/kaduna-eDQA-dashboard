@@ -86,7 +86,7 @@ def main() -> None:
     with open_source(args) as kobo:
         asset = kobo.asset()
         title = str(asset.get("name", ""))
-        for v in deployed_versions(asset, kobo.versions()):
+        for v in deployed_versions(kobo.versions()):
             uid = str(v.get("uid"))
             content = kobo.version(uid).get("content") or {}
             workbook(content, uid, title, kobo.asset_uid).save(FORMS_DIR / f"{uid}.xlsx")

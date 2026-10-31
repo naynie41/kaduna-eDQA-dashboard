@@ -2,8 +2,19 @@
     "uid": "aKdDqaMock2026",
     "name": "Data Quality Assessment (fixture)",
     "asset_type": "survey",
+    "owner__username": "dqa-owner",
     "has_deployment": true,
+    "deployment_status": "deployed",
     "deployment__active": true,
     "deployed_version_id": "vKd26Q1aBcDeFgHiJkLmNo",
-    "deployment__submission_count": 8
+    "deployment__submission_count": 8,
+    "date_modified": "2026-01-05T09:00:00Z",
+    "effective_permissions": [
+        {
+            "codename": "view_asset"
+        },
+        {
+            "codename": "view_submissions"
+        }
+    ]
 }
