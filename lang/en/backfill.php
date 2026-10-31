@@ -18,6 +18,8 @@ return [
         'version' => 'Form version',
         'mapped' => 'Field map',
         'round' => 'Round',
+        'visits' => 'Visit dates',
+        'visit_range' => ':from to :to',
         'submissions' => 'Submissions',
         'yes' => 'yes',
         'no' => 'NO',
@@ -27,6 +29,8 @@ return [
         'create_rounds' => 'No round yet for these quarters (submissions in each): :quarters. Create the rounds these visits belong to before the backfill; a visit in a quarter left without one quarantines under ROUND_WINDOW.',
         'closed_rounds' => 'These rounds are closed, so their visits would quarantine as "round closed": reopen them for the backfill, then close them again: :quarters.',
         'unmapped' => 'No field map for :versions: those submissions will quarantine under UNKNOWN_FORM_VERSION.',
+        'outside_window' => 'Some visits fall outside the window of the round they review, so they would quarantine under ROUND_WINDOW until the window covers it: :rounds.',
+        'outside_window_round' => ':round (window :from to :to): :outside of :submissions visit(s) fall outside it',
         'ready' => 'Every quarter has an open round.',
     ],
 

@@ -8,10 +8,11 @@ namespace App\Domain\Ingestion\DTOs;
 final readonly class BackfillSurvey
 {
     /**
-     * $rows: by visit quarter and form version, oldest first; round is that quarter's round
-     * status, null when it has none.
+     * $rows: by the quarter each visit is held to (declared, else visited) and form version, oldest
+     * first; round and window are that quarter's round, null when it has none; outside_window
+     * counts the visits its window misses.
      *
-     * @param  list<array{year: int, quarter: int, version: string, mapped: bool, round: ?string, submissions: int}>  $rows
+     * @param  list<array{year: int, quarter: int, version: string, mapped: bool, round: ?string, window: ?array{0: string, 1: string}, first_visit: string, last_visit: string, outside_window: int, submissions: int}>  $rows
      */
     public function __construct(
         public int $total,
@@ -30,6 +31,27 @@ final readonly class BackfillSurvey
         return $this->quarters(fn (array $row): bool => $row['round'] === 'closed');
     }
 
+    /** @return list<array{year: int, quarter: int, window: array{0: string, 1: string}, outside: int, submissions: int}> rounds whose window misses some of their visits, all versions */
+    public function windowsMissingVisits(): array
+    {
+        $rounds = [];
+        foreach ($this->rows as $row) {
+            if ($row['window'] === null) {
+                continue;
+            }
+            $key = "{$row['year']}Q{$row['quarter']}";
+            $rounds[$key] = [
+                'year' => $row['year'],
+                'quarter' => $row['quarter'],
+                'window' => $row['window'],
+                'outside' => ($rounds[$key]['outside'] ?? 0) + $row['outside_window'],
+                'submissions' => ($rounds[$key]['submissions'] ?? 0) + $row['submissions'],
+            ];
+        }
+
+        return array_values(array_filter($rounds, fn (array $round): bool => $round['outside'] > 0));
+    }
+
     /** @return list<string> form versions with no field map: their submissions will quarantine */
     public function unmappedVersions(): array
     {
@@ -37,7 +59,7 @@ final readonly class BackfillSurvey
     }
 
     /**
-     * @param  callable(array{year: int, quarter: int, version: string, mapped: bool, round: ?string, submissions: int}): bool  $filter
+     * @param  callable(array{year: int, quarter: int, version: string, mapped: bool, round: ?string, window: ?array{0: string, 1: string}, first_visit: string, last_visit: string, outside_window: int, submissions: int}): bool  $filter
      * @return list<array{year: int, quarter: int, submissions: int}> with the submissions in each, all versions
      */
     private function quarters(callable $filter): array

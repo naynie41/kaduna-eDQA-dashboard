@@ -21,8 +21,9 @@ use Throwable;
  * The historical backfill of one source (ARCHITECTURE.md §5.6), in the foreground; one source at a
  * time (a second source is refused while one is running). The order on day one, per source:
  *
- *   --survey   read every submission, write nothing: counts per quarter and form version, and
- *              which quarters still need a round
+ *   --survey   read every submission, write nothing: counts per quarter (the one each visit is
+ *              held to) and form version, with the visit dates, which quarters still need a
+ *              round and which round windows miss some of their visits
  *   (create the historical rounds)
  *   --dry-run  optional: what the backfill would accept, flag and quarantine, writing nothing
  *   (no flag)  the backfill itself, resumable: run it again after a stop and it carries on from
@@ -69,10 +70,12 @@ final class Backfill extends Command
 
         $this->info($t('title', ['total' => $result->total, 'source' => $name]));
         $this->table(
-            [$t('quarter'), $t('version'), $t('mapped'), $t('round'), $t('submissions')],
+            [$t('quarter'), $t('version'), $t('mapped'), $t('round'), $t('visits'), $t('submissions')],
             array_map(fn (array $row): array => [
                 "{$row['year']} Q{$row['quarter']}", $row['version'], $t($row['mapped'] ? 'yes' : 'no'),
-                $t('round_'.($row['round'] ?? 'none')), $row['submissions'],
+                $t('round_'.($row['round'] ?? 'none')),
+                $row['first_visit'] === $row['last_visit'] ? $row['first_visit'] : $t('visit_range', ['from' => $row['first_visit'], 'to' => $row['last_visit']]),
+                $row['submissions'],
             ], $result->rows),
         );
 
@@ -80,16 +83,23 @@ final class Backfill extends Command
         $missing = $result->quartersWithoutRound();
         $closed = $result->quartersClosed();
         $unmapped = $result->unmappedVersions();
+        $windows = $result->windowsMissingVisits();
         if ($missing !== []) {
             $this->warn($t('create_rounds', ['quarters' => $quarters($missing)]));
         }
         if ($closed !== []) {
             $this->warn($t('closed_rounds', ['quarters' => $quarters($closed)]));
         }
+        if ($windows !== []) {
+            $this->warn($t('outside_window', ['rounds' => implode('; ', array_map(fn (array $r): string => $t('outside_window_round', [
+                'round' => "{$r['year']} Q{$r['quarter']}", 'from' => $r['window'][0], 'to' => $r['window'][1],
+                'outside' => $r['outside'], 'submissions' => $r['submissions'],
+            ]), $windows))]));
+        }
         if ($unmapped !== []) {
             $this->warn($t('unmapped', ['versions' => implode(', ', $unmapped)]));
         }
-        if ($missing === [] && $closed === []) {
+        if ($missing === [] && $closed === [] && $windows === []) {
             $this->info($t('ready'));
         }
 

@@ -23,6 +23,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `discovery/kobo_item_rules.py`: the item rules and the form's facility choices
   (`data/forms/kobo/facility_choices.csv`), for the client's sign-off.
 
+### Changed
+
+- `edqa:backfill {source} --survey` counts each visit under the round it will be held to: the
+  quarter the form declares it reviews, else the quarter of the visit. Each row now shows the
+  visit dates, and the survey warns when an existing round's window misses some of its visits.
+  The real Kobo form is filled in after the period it reviews, so its visits used to be counted
+  in the wrong quarter.
+
 ## [0.6.0] - 2026-10-31
 
 KoboToolbox support (Phase 2C, D-59): the portal pulls from both of the client's field-collection

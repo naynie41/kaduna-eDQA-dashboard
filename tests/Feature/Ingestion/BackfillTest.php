@@ -246,11 +246,11 @@ it('surveys submissions per quarter and form version without writing anything', 
 
     $this->artisan('edqa:backfill', ['source' => 'odk', '--survey' => true])
         ->expectsOutputToContain('Survey: 5 submission(s)')
-        ->expectsTable(['Quarter', 'Form version', 'Field map', 'Round', 'Submissions'], [
-            ['2025 Q3', '2025.2', 'yes', 'none', 2],
-            ['2026 Q1', '2026.1', 'yes', 'closed', 1],
-            ['2026 Q2', '2019.9', 'NO', 'open', 1],
-            ['2026 Q2', '2026.1', 'yes', 'open', 1],
+        ->expectsTable(['Quarter', 'Form version', 'Field map', 'Round', 'Visit dates', 'Submissions'], [
+            ['2025 Q3', '2025.2', 'yes', 'none', '2025-08-12 to 2025-08-20', 2],
+            ['2026 Q1', '2026.1', 'yes', 'closed', '2026-02-10', 1],
+            ['2026 Q2', '2019.9', 'NO', 'open', '2026-04-20', 1], // no map, so no start: the submission day
+            ['2026 Q2', '2026.1', 'yes', 'open', '2026-04-14', 1],
         ])
         ->expectsOutputToContain('No round yet for these quarters (submissions in each): 2025 Q3 (2).')
         ->expectsOutputToContain('closed, so their visits would quarantine')
@@ -260,6 +260,23 @@ it('surveys submissions per quarter and form version without writing anything', 
     expect(DB::table('submissions')->count())->toBe($before)
         ->and(PullRun::query()->count())->toBe(0)
         ->and(SourceSync::query()->count())->toBe(0);
+});
+
+it('surveys by the quarter a visit declares it reviews, and warns when a round\'s window misses its visits', function (): void {
+    // Reviewed after the quarter ends (the real Kobo form, D-71): the visits belong to the quarter
+    // they review, so that is the round they need, and its window must cover when they were made.
+    $late = bfEntry(1, '2026-07-03');
+    [$late['round_year'], $late['round_quarter']] = [2026, 2];
+    $alsoLate = bfEntry(2, '2026-07-09');
+    [$alsoLate['round_year'], $alsoLate['round_quarter']] = [2026, 2];
+    $this->source->add($late, $alsoLate, bfEntry(3, '2026-05-02'));
+
+    $this->artisan('edqa:backfill', ['source' => 'odk', '--survey' => true])
+        ->expectsTable(['Quarter', 'Form version', 'Field map', 'Round', 'Visit dates', 'Submissions'], [
+            ['2026 Q2', '2026.1', 'yes', 'open', '2026-05-02 to 2026-07-09', 3],
+        ])
+        ->expectsOutputToContain('2026 Q2 (window 2026-04-01 to 2026-06-30): 2 of 3 visit(s) fall outside it')
+        ->assertSuccessful();
 });
 
 it('dry-runs the whole history without writing anything', function (): void {

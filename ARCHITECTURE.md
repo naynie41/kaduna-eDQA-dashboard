@@ -723,6 +723,10 @@ source at a time**.
   `ROUND_WINDOW`, never guessed into the nearest round.
 - Throttle between pages per source (default 5 s); run out of hours on the first pass.
 - Commands: `edqa:backfill {source} {--survey} {--from-page=} {--throttle=} {--dry-run}`.
+- The survey counts each visit under the round `ROUND_WINDOW` will hold it to: the declared
+  quarter (D-71), else the visit's own. It shows the visit dates per row and warns when a round's
+  window misses some of its visits. A form filled in after the period it reviews needs a window
+  that runs past the quarter's end (Q-10).
 - The **backfill report** breaks results down by source, round, year, rule and form version.
 - If both sources hold history for the same quarters, expect `DUPLICATE_ASSESSMENT` and
   `cross_source_duplicate` counts; the report lists them so the client can decide which copy is
@@ -1298,7 +1302,7 @@ real month names for single-quarter views, LGA tile grid, Data issues "why it ex
 | Q-07 | VPS acceptable (Postgres ≥ 14)? Who pays? | Deployment |
 | Q-08 | How many administrator logins? (> 3 → revisit roles before launch) | Launch |
 | Q-09 | Display rounding: half-up or truncate? (explains 73 vs 74) | Phase 3 tests |
-| Q-10 | Round assessment windows for historical quarters — exact dates? | Backfill |
+| Q-10 | Round assessment windows for historical quarters — exact dates?<br>**Kobo finding (2026-10-31):** the real form is filled in after the period it reviews (all 4 Q3 2026 visits were made 22–25 Oct), and `ROUND_WINDOW` needs the visit date inside the reviewed quarter's window. Locally, 2026 Q3 runs 1 Jul–31 Oct (one month's lag, assumed). To confirm: how long after a quarter ends may its visits still be made? If always one month, windows run Jul–Oct, Nov–Jan and so on, and the next window starts the day after the last one ends. | Backfill, every round window |
 | Q-11 | Webhooks available on their ODK Central host? Kobo REST Services enabled on their Kobo account? | Optional latency |
 | Q-15 | Why both ODK and Kobo? Split by LGA, by period (e.g. history on Kobo, current on ODK), by partner, or overlapping? Which is authoritative if the same facility+round appears on both? | Duplicate handling, backfill triage |
 | Q-16 | Is the same XLSForm deployed on both platforms, and are versions kept in step?<br>**Kobo side known (2026-10-31):** the real form on Kobo is not the contract form (D-65); which form ODK Central carries waits for its credentials. | Field-map effort |
