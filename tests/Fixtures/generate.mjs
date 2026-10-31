@@ -132,7 +132,7 @@ function parsed(c) {
             instance_id: c.instance, deprecated_id: null, form_version: c.version, form_version_known: false,
             submitted_at: submitted, started_at: null, ended_at: null, raw_start: '', raw_end: '',
             lga_ref: null, ward_ref: null, facility_ref: null, round_year: null, round_quarter: null,
-            assessor_name: '', device_id: c.device, gps: null, items: [], raw_numeric_scores: null,
+            assessor_name: '', device_id: c.device, gps: null, items: [], raw_numeric_scores: null, month_slots: null, out_of_scope: null,
         };
     }
     const items = c.onlyTyped ? [] : questions(c).map(([, , dim, slot, code, value]) => {
@@ -163,6 +163,8 @@ function parsed(c) {
         gps: { lat: 10.4806, lng: 7.4302 },
         items,
         raw_numeric_scores: Object.keys(typed).length === 0 ? null : typed,
+        month_slots: null, // every ODK fixture covers its round's three months (D-70)
+        out_of_scope: null,
     };
 }
 

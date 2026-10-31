@@ -65,6 +65,34 @@ return [
                 'avail_m3_nhmis_form' => 'avail_m3_nhmis_summary', // CONTRACT-ASSUMED: replace when the real form is audited.
             ],
         ],
+
+        // The real KoboToolbox form (asset aWHonAjWVohv43zzdrvrRt, "Kaduna State eDQA"; D-65): it does not
+        // follow the contract, so its scored items come from item rules (config/edqa_item_rules.php,
+        // generated from the form's own score formulas: D-66–D-68). Read from the form's content on
+        // 2026-10-31 (discovery/out/kobo_form_diff.md).
+        'kobo-2024010101' => [
+            // The form's own slugs, matched to master-list codes through facility_source_refs (D-72).
+            'facility_code' => 'description_facility.healthfacility',
+            'lga_code' => 'description_facility.lga',
+            'ward_code' => 'description_facility.ward',
+            // The reviewed period (D-71): the year, and the quarter (q1–q4) or the month (january…).
+            'round_year' => 'description_facility.review_year',
+            'round_quarter' => 'review_quarter',
+            'round_quarter_format' => 'q',
+            'review_month' => 'review_month',
+            'started_at' => 'start',
+            'ended_at' => 'end',
+            'assessor' => 'details_ass.name_ass',
+            'gps' => 'details_ass.location',
+            'item_rules' => 'kobo-2024010101',
+            'visit_mode' => ['path' => 'period_visit', 'monthly' => 'monthly_dqa', 'quarterly' => 'quarterly_dqa'],
+            // Not facility assessments (D-74): stored, never scored.
+            'out_of_scope' => [
+                'community_visit' => ['path' => 'field_visit_type', 'value' => 'community_visit'],
+                'ddu' => ['path' => 'ddu_dqa', 'value' => 'ddu'],
+            ],
+            'renames' => [],
+        ],
     ],
 
     'sources' => [
@@ -79,6 +107,15 @@ return [
         'kobo' => [
             'vKd26Q1aBcDeFgHiJkLmNo' => 'xls-2026.1', // CONTRACT-ASSUMED: replace when the real form is audited.
             'vKd25Q4pQrStUvWxYzAbCd' => 'xls-2025.2', // CONTRACT-ASSUMED: replace when the real form is audited.
+            // The real form's seven deployments (discovery/out/kobo_inventory.md). They ask the same questions;
+            // v5 and v7 changed when some show or must be answered, which the item rules read as they are.
+            'vJFgGxS4Taw5EZuBt39iBJ' => 'kobo-2024010101', // deployed 2026-09-25
+            'vcfuAHiKcZNtqZDtUi3Mdu' => 'kobo-2024010101', // deployed 2026-09-27
+            'vgegCDwmG8zxcqTESJ5emv' => 'kobo-2024010101', // deployed 2026-09-28
+            'vN8qMQcp7WqWED5xjRHvUg' => 'kobo-2024010101', // deployed 2026-09-28
+            'vEekbX34vXcFRPz6JqrdUE' => 'kobo-2024010101', // deployed 2026-10-07
+            'vuqLpSWS4Kd5T2XrCKxV8A' => 'kobo-2024010101', // deployed 2026-10-15
+            'vBnJSJRKjVuT4yDaRhKXye' => 'kobo-2024010101', // deployed 2026-10-22, current
         ],
     ],
 

@@ -24,7 +24,7 @@ final readonly class SubmissionScorer
     public function scoreCard(ParsedSubmission $submission, ValidationContext $context): ?ScoreCard
     {
         $rules = $context->ruleConfig();
-        if ($rules === null || ! ItemCoverage::isComplete($submission->items)) {
+        if ($rules === null || ! ItemCoverage::isComplete($submission->items, $submission->coveredSlots())) {
             return null;
         }
 

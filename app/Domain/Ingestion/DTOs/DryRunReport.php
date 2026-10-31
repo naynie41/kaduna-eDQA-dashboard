@@ -8,7 +8,7 @@ namespace App\Domain\Ingestion\DTOs;
 final readonly class DryRunReport
 {
     /**
-     * @param  array{accepted: int, flagged: int, quarantined: int}  $outcomes  of the submissions not yet stored
+     * @param  array{accepted: int, flagged: int, quarantined: int, out_of_scope: int}  $outcomes  of the submissions not yet stored
      * @param  array<string, array{severity: string, count: int}>  $rules  rule code => submissions it hit
      */
     public function __construct(

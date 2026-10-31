@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Domain\Ingestion\DTOs\ItemResponseData;
+use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Scoring\Enums\Dimension;
 use App\Domain\Validation\Enums\Severity;
 use App\Domain\Validation\Rules\ItemsIncompleteRule;
@@ -96,4 +98,47 @@ it('reports a slot answered only with invalid answers as missing too', function 
     $failures = checkRule(ItemsIncompleteRule::class, $builder->build());
 
     expect($failures[0]->detail)->toStartWith('missing validity_m2; an answer the form does not allow: validity_m2 register_present, validity_m2 summary_form');
+});
+
+// ---- A monthly visit (D-70): it covers the one slot of its month
+
+/** A full submission cut down to the slots of a visit that covers only $slots. */
+function onlySlots(array $slots, ?ParsedSubmission $submission = null): ParsedSubmission
+{
+    $submission ??= ParsedSubmissionBuilder::new()->build();
+
+    return new ParsedSubmission(...[...get_object_vars($submission),
+        'items' => array_values(array_filter($submission->items, fn (ItemResponseData $i): bool => in_array($i->monthSlot, $slots, true))),
+        'monthSlots' => $slots,
+    ]);
+}
+
+it('passes a monthly visit whose one slot has items in every dimension', function (): void {
+    expect(checkRule(ItemsIncompleteRule::class, onlySlots([2])))->toBe([]);
+});
+
+it('requires a monthly visit\'s own slot in every dimension, and nothing else', function (): void {
+    $submission = onlySlots([2]);
+    $submission = new ParsedSubmission(...[...get_object_vars($submission),
+        'items' => array_values(array_filter($submission->items, fn (ItemResponseData $i): bool => $i->dimension !== Dimension::Validity)),
+    ]);
+
+    expect(checkRule(ItemsIncompleteRule::class, $submission)[0]->detail)->toBe('missing validity_m2');
+});
+
+it('still fails a monthly visit whose one slot is all N/A in a dimension: nothing to score', function (): void {
+    $submission = onlySlots([1]);
+    $submission = new ParsedSubmission(...[...get_object_vars($submission),
+        'items' => array_map(fn (ItemResponseData $i): ItemResponseData => $i->dimension === Dimension::Consistency
+            ? new ItemResponseData($i->dimension, $i->monthSlot, $i->itemCode, 'na', false) : $i, $submission->items),
+    ]);
+
+    expect(checkRule(ItemsIncompleteRule::class, $submission)[0]->detail)->toContain('consistency');
+});
+
+it('still requires all nine slots of a visit that does not say otherwise (every ODK form)', function (): void {
+    $submission = onlySlots([2]);
+    $submission = new ParsedSubmission(...[...get_object_vars($submission), 'monthSlots' => null]);
+
+    expect(checkRule(ItemsIncompleteRule::class, $submission)[0]->detail)->toContain('availability_m1')->toContain('validity_m3');
 });

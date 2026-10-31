@@ -277,5 +277,7 @@
     ],
     "raw_numeric_scores": {
         "avail_m1_score": 347.66
-    }
+    },
+    "month_slots": null,
+    "out_of_scope": null
 }

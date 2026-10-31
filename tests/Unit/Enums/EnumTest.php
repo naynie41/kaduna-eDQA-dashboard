@@ -22,7 +22,7 @@ dataset('enums', [
     'Severity' => [Severity::class, ['hard', 'soft']],
     'RoundStatus' => [RoundStatus::class, ['open', 'closed']],
     'SubmissionStatus' => [SubmissionStatus::class, [
-        'received', 'parsed', 'validated', 'accepted', 'flagged', 'quarantined', 'rejected', 'superseded',
+        'received', 'parsed', 'validated', 'accepted', 'flagged', 'quarantined', 'rejected', 'superseded', 'out_of_scope',
     ]],
     'QuarantineStatus' => [QuarantineStatus::class, ['open', 'resolved']],
     'QuarantineResolution' => [QuarantineResolution::class, ['reprocessed', 'rejected', 'superseded']],

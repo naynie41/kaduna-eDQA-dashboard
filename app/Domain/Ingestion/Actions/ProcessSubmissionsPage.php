@@ -91,7 +91,7 @@ final class ProcessSubmissionsPage
                 }
             }
 
-            $counts = [SubmissionStatus::Accepted->value => 0, SubmissionStatus::Flagged->value => 0, SubmissionStatus::Quarantined->value => 0];
+            $counts = [SubmissionStatus::Accepted->value => 0, SubmissionStatus::Flagged->value => 0, SubmissionStatus::Quarantined->value => 0, SubmissionStatus::OutOfScope->value => 0];
             foreach ($batch === [] ? [] : $this->batch->execute($batch) as $outcome) {
                 $counts[$outcome->status->value] = ($counts[$outcome->status->value] ?? 0) + 1;
             }
@@ -113,6 +113,7 @@ final class ProcessSubmissionsPage
                 'accepted' => $run->accepted + $counts[SubmissionStatus::Accepted->value],
                 'flagged' => $run->flagged + $counts[SubmissionStatus::Flagged->value],
                 'quarantined' => $run->quarantined + $counts[SubmissionStatus::Quarantined->value],
+                'out_of_scope' => $run->out_of_scope + $counts[SubmissionStatus::OutOfScope->value],
             ]);
 
             $this->moveSync($sync, $changes, $envelopes, count($inserted));

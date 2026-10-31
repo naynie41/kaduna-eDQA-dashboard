@@ -32,6 +32,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $duplicates
  * @property int $cross_source_duplicates
  * @property int $deletions_detected
+ * @property int $out_of_scope submissions that are not facility assessments (D-74)
  * @property string|null $error
  * @property PullTrigger $trigger_type
  * @property PullOutcome|null $outcome
@@ -48,11 +49,11 @@ final class PullRun extends Model
 
     protected $fillable = [
         'source_id', 'triggered_by', 'trigger_type', 'started_at', 'finished_at', 'fetched', 'parsed', 'accepted',
-        'flagged', 'quarantined', 'duplicates', 'cross_source_duplicates', 'deletions_detected', 'error', 'outcome',
+        'flagged', 'quarantined', 'duplicates', 'cross_source_duplicates', 'deletions_detected', 'out_of_scope', 'error', 'outcome',
     ];
 
     /** Mirrors the column defaults, so a new model matches its stored row. */
-    protected $attributes = ['fetched' => 0, 'parsed' => 0, 'accepted' => 0, 'flagged' => 0, 'quarantined' => 0, 'duplicates' => 0, 'cross_source_duplicates' => 0, 'deletions_detected' => 0];
+    protected $attributes = ['fetched' => 0, 'parsed' => 0, 'accepted' => 0, 'flagged' => 0, 'quarantined' => 0, 'duplicates' => 0, 'cross_source_duplicates' => 0, 'deletions_detected' => 0, 'out_of_scope' => 0];
 
     /** @return array<string, string> */
     protected function casts(): array
@@ -71,6 +72,7 @@ final class PullRun extends Model
             'duplicates' => 'integer',
             'cross_source_duplicates' => 'integer',
             'deletions_detected' => 'integer',
+            'out_of_scope' => 'integer',
         ];
     }
 

@@ -9,7 +9,9 @@ use App\Support\Enums\HasLabel;
 /**
  * Submission lifecycle (ARCHITECTURE.md §3):
  * received → parsed → validated → accepted | flagged | quarantined → (reprocessed) | rejected;
- * any state → superseded when an ODK edit replaces it.
+ * any state → superseded when an ODK edit replaces it;
+ * received → out_of_scope for a submission that is not a facility assessment (D-74): stored, never
+ * validated, scored or quarantined.
  */
 enum SubmissionStatus: string
 {
@@ -23,6 +25,7 @@ enum SubmissionStatus: string
     case Quarantined = 'quarantined';
     case Rejected = 'rejected';
     case Superseded = 'superseded';
+    case OutOfScope = 'out_of_scope';
 
     protected static function labelGroup(): string
     {

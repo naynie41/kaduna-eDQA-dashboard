@@ -7,6 +7,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The real KoboToolbox form is read as it is (D-65–D-74):
+  - its 1,192 scored items come from item rules generated from the form's own score formulas:
+    availability yes/no, consistency as k of 3 checks, and validity as a three-number match;
+  - monthly visits cover their own month and quarterly visits their quarter's three months;
+  - the round comes from the reviewed period;
+  - community visits and DDU at LGA level are stored as `out_of_scope`, never scored, and
+    counted on each pull run.
+- `edqa:facilities:source-refs {source} {file}`: loads a source's facility slugs matched to
+  master-list codes (`facility_source_refs`). It is all or nothing, and audited.
+- Migrations: `add_out_of_scope_submissions` (the status, and `pull_runs.out_of_scope`) and
+  `create_facility_source_refs_table`.
+- `discovery/kobo_item_rules.py`: the item rules and the form's facility choices
+  (`data/forms/kobo/facility_choices.csv`), for the client's sign-off.
+
 ## [0.6.0] - 2026-10-31
 
 KoboToolbox support (Phase 2C, D-59): the portal pulls from both of the client's field-collection

@@ -66,7 +66,10 @@ final class ValidationContextFactory
     }
 
     /**
-     * Only the facilities the batch refers to, active or not.
+     * Only the facilities the batch refers to, active or not: by master-list code, and by a
+     * source's own reference (D-72: facility_source_refs, for that source only). A real code wins
+     * over a reference that happens to equal it; a reference two sources in the batch map to
+     * different facilities is left out, so it stays unknown.
      *
      * @param  list<ParsedSubmission>  $submissions
      * @return array<string, FacilitySnapshot>
@@ -85,6 +88,36 @@ final class ValidationContextFactory
         $rows = DB::table('facilities')->whereIn('code', array_keys($codes))->get(['id', 'code', 'lga_id', 'is_active']);
         foreach ($rows as $row) {
             $facilities[(string) $row->code] = new FacilitySnapshot((int) $row->id, (string) $row->code, (int) $row->lga_id, (bool) $row->is_active);
+        }
+
+        $bySource = [];
+        foreach ($submissions as $submission) {
+            $ref = trim((string) $submission->facilityRef);
+            if ($ref !== '' && ! isset($facilities[$ref])) {
+                $bySource[$submission->source][$ref] = true;
+            }
+        }
+        $mapped = [];
+        foreach ($bySource as $source => $refs) {
+            $rows = DB::table('facility_source_refs as r')
+                ->join('submission_sources as s', 's.id', '=', 'r.source_id')
+                ->join('facilities as f', 'f.id', '=', 'r.facility_id')
+                ->where('s.key', $source)->whereIn('r.ref', array_keys($refs))
+                ->get(['r.ref', 'f.id', 'f.code', 'f.lga_id', 'f.is_active']);
+            foreach ($rows as $row) {
+                $snapshot = new FacilitySnapshot((int) $row->id, (string) $row->code, (int) $row->lga_id, (bool) $row->is_active);
+                $ref = (string) $row->ref;
+                if (! array_key_exists($ref, $mapped)) {
+                    $mapped[$ref] = $snapshot;
+                } elseif ($mapped[$ref] !== null && $mapped[$ref]->id !== $snapshot->id) {
+                    $mapped[$ref] = null; // two sources map it to different facilities: ambiguous, stays unknown
+                }
+            }
+        }
+        foreach ($mapped as $ref => $snapshot) {
+            if ($snapshot !== null) {
+                $facilities[$ref] = $snapshot;
+            }
         }
 
         return $facilities;

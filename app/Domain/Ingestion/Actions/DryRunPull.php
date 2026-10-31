@@ -53,7 +53,7 @@ final class DryRunPull
 
         $fetched = 0;
         $stored = 0;
-        $outcomes = ['accepted' => 0, 'flagged' => 0, 'quarantined' => 0];
+        $outcomes = ['accepted' => 0, 'flagged' => 0, 'quarantined' => 0, 'out_of_scope' => 0];
         $rules = [];
         $skip = 0;
         while ($fetched < $limit) {
@@ -72,6 +72,11 @@ final class DryRunPull
             // As ProcessParsedBatch does it: one context, accepted ones registered as they pass.
             $context = $this->contexts->forBatch($fresh);
             foreach ($fresh as $submission) {
+                if ($submission->outOfScope !== null) {
+                    $outcomes['out_of_scope']++; // not a facility assessment (D-74): never validated
+
+                    continue;
+                }
                 $result = $this->pipeline->validate($submission, $context);
                 $outcomes[! $result->passed() ? 'quarantined' : ($result->isFlagged() ? 'flagged' : 'accepted')]++;
                 if ($result->passed()) {

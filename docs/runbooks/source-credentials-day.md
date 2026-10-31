@@ -322,6 +322,32 @@ make artisan c="edqa:source:check kobo"       # every deployed version now says 
 
 **Undo:** `git checkout config/edqa_field_maps.php`.
 
+**The real form (done 31 Oct 2026, D-65).** It does not follow the contract, so the scored
+items come from **item rules** generated from the form's own score formulas, not a renames map:
+
+```bash
+python kobo_forms.py && python kobo_item_rules.py     # writes out/edqa_item_rules.kobo.draft.php
+cp out/edqa_item_rules.kobo.draft.php ../config/edqa_item_rules.php   # after reviewing out/kobo_item_rules.md: 0 terms not read
+```
+
+Re-run both whenever the form is redeployed, and add the new deployment uid under `sources.kobo`.
+
+**Facilities (D-72).** `kobo_item_rules.py` also writes `data/forms/kobo/facility_choices.csv`:
+the form's slugs, with their names, wards and LGAs, and an empty `facility_code` column. Fill in
+the codes (`facility_reconcile.py` helps), have the client sign it off, then load it:
+
+```bash
+make artisan c="edqa:facilities:source-refs kobo /path/facility_refs.csv --dry-run"   # checks only
+make artisan c="edqa:facilities:source-refs kobo /path/facility_refs.csv"
+```
+
+It needs the columns `ref,facility_code`. One bad row refuses the whole file. Until it is loaded,
+every Kobo submission quarantines as `FACILITY_UNKNOWN`.
+
+**Round windows.** A Kobo visit reviews a month that has already passed: a visit in October can
+review July. Set each round's window to cover when its visits happen, not only the quarter's
+months, or `ROUND_WINDOW` holds them.
+
 ### B4. Dry run: `edqa:pull kobo --dry-run --limit=500`
 
 The same as A4, for Kobo. It writes nothing. Read the table as in A4.

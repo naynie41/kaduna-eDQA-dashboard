@@ -16,6 +16,13 @@ use App\Domain\Scoring\Enums\Dimension;
  * version's map (CLAUDE.md hard rule 12). A map may extend another: it lists only what differs,
  * plus 'renames' for scored questions it names differently ([name in this form => name in the
  * base]). Paths are dot paths through nested groups.
+ *
+ * A form that does not follow the contract's scored-question naming (the real KoboToolbox form,
+ * D-65) is read through **item rules** instead: 'item_rules' names a set in
+ * config/edqa_item_rules.php, each rule saying which question(s) make one item and how they score
+ * (D-66–D-68). Such a map can also say where the visit's mode is ('visit_mode': monthly or
+ * quarterly, D-70), when a submission is not a facility assessment ('out_of_scope', D-74), and that
+ * the quarter is written q1–q4 ('round_quarter_format' => 'q', D-71).
  */
 final readonly class FieldMap
 {
@@ -26,12 +33,16 @@ final readonly class FieldMap
         'valid' => Dimension::Validity,
     ];
 
+    /** Keys that configure the map rather than name a field's path. */
+    private const OPTIONS = ['scored_prefix_pattern', 'extends', 'renames', 'item_rules', 'visit_mode', 'out_of_scope', 'round_quarter_format'];
+
     /** How deep "extends" may go: a cycle or a long chain is a config error, not a map. */
     private const MAX_DEPTH = 8;
 
     /**
      * @param  array<string, string>  $paths  field => dot path
      * @param  array<string, string>  $renames  name in this form => name in the base form
+     * @param  array<string, mixed>  $options  item_rules, visit_mode, out_of_scope, round_quarter_format
      */
     private function __construct(
         public string $source,
@@ -40,6 +51,7 @@ final readonly class FieldMap
         private array $paths,
         private string $scoredPattern,
         private array $renames,
+        private array $options = [],
     ) {}
 
     public static function for(string $source, ?string $version): ?self
@@ -76,14 +88,20 @@ final readonly class FieldMap
         }
 
         $paths = [];
+        $options = [];
         foreach ($merged as $field => $path) {
-            if (is_string($field) && is_string($path) && ! in_array($field, ['scored_prefix_pattern', 'extends'], true)) {
+            if (! is_string($field)) {
+                continue;
+            }
+            if (in_array($field, self::OPTIONS, true)) {
+                $options[$field] = $path;
+            } elseif (is_string($path)) {
                 $paths[$field] = $path;
             }
         }
         $pattern = is_string($merged['scored_prefix_pattern'] ?? null) ? $merged['scored_prefix_pattern'] : '/(?!)/';
 
-        return new self($source, $version, $name, $paths, $pattern, $renames);
+        return new self($source, $version, $name, $paths, $pattern, $renames, $options);
     }
 
     /**
@@ -112,6 +130,79 @@ final readonly class FieldMap
             }
             $name = $parent;
         }
+    }
+
+    /**
+     * The map's item rules (config/edqa_item_rules.php), or null for a map read by the scored-name
+     * pattern. A rule set that is named but missing gives [], so nothing is scored and
+     * ITEMS_INCOMPLETE holds the submission: never a fallback to the pattern.
+     *
+     * @return list<array{dimension: string, mode: string, slot: ?int, quarter: ?int, kind: string, code: string, paths: list<string>, service: ?string}>|null
+     */
+    public function itemRules(): ?array
+    {
+        $name = $this->options['item_rules'] ?? null;
+        if (! is_string($name)) {
+            return null;
+        }
+        $sets = config('edqa_item_rules');
+        $rules = is_array($sets) && is_array($sets[$name] ?? null) ? $sets[$name] : [];
+
+        /** @var list<array{dimension: string, mode: string, slot: ?int, quarter: ?int, kind: string, code: string, paths: list<string>, service: ?string}> */
+        return array_values(array_filter($rules, is_array(...)));
+    }
+
+    /**
+     * The visit's mode, 'monthly' or 'quarterly', from the map's visit_mode; null when the map has
+     * none (every visit covers its round's three months) or the answer is neither.
+     *
+     * @param  array<array-key, mixed>  $data
+     */
+    public function visitMode(array $data): ?string
+    {
+        $mode = $this->options['visit_mode'] ?? null;
+        if (! is_array($mode) || ! is_string($mode['path'] ?? null)) {
+            return null;
+        }
+        $value = self::get($data, $mode['path']);
+        foreach (['monthly', 'quarterly'] as $kind) {
+            if ($value !== null && $value === ($mode[$kind] ?? null)) {
+                return $kind;
+            }
+        }
+
+        return null;
+    }
+
+    /** Whether the map has a visit mode at all (a form with monthly and quarterly visits). */
+    public function hasVisitMode(): bool
+    {
+        return is_array($this->options['visit_mode'] ?? null);
+    }
+
+    /**
+     * Why the submission is not a facility assessment (D-74), the first of the map's out_of_scope
+     * reasons whose answer matches; null when none does.
+     *
+     * @param  array<array-key, mixed>  $data
+     */
+    public function outOfScope(array $data): ?string
+    {
+        foreach (is_array($this->options['out_of_scope'] ?? null) ? $this->options['out_of_scope'] : [] as $reason => $test) {
+            if (is_string($reason) && is_array($test) && is_string($test['path'] ?? null) && self::get($data, $test['path']) === ($test['value'] ?? null)) {
+                return $reason;
+            }
+        }
+
+        return null;
+    }
+
+    /** How the form writes the quarter: 'q' for q1–q4, null for a number. */
+    public function quarterFormat(): ?string
+    {
+        $format = $this->options['round_quarter_format'] ?? null;
+
+        return is_string($format) ? $format : null;
     }
 
     /** The dot path of a field, null when the map has none. */

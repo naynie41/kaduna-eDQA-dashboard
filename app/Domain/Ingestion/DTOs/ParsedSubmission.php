@@ -16,6 +16,12 @@ use Carbon\CarbonImmutable;
  * COLUMN_DRIFT can name the bad value. rawNumericScores holds a number found in a scored question
  * (a legacy typed score, Q-16), keyed by the question's name in the default form ("avail_m1_score");
  * it is checked (SCORE_RANGE) but never used as a score.
+ *
+ * monthSlots: the month slots the visit covers. Null is all three (a quarterly visit, and every
+ * ODK form); a monthly visit (D-70) covers the one slot of its month, and only that slot must have
+ * items (ITEMS_INCOMPLETE). outOfScope: why the submission is not a facility assessment at all
+ * (D-74: 'community_visit', 'ddu'), or null; such a submission is stored but never validated or
+ * scored.
  */
 final readonly class ParsedSubmission
 {
@@ -23,6 +29,7 @@ final readonly class ParsedSubmission
      * @param  array<string, float>|null  $gps  lat, lng and accuracy
      * @param  list<ItemResponseData>  $items
      * @param  array<string, float>|null  $rawNumericScores
+     * @param  list<int>|null  $monthSlots
      */
     public function __construct(
         public string $source,
@@ -46,7 +53,19 @@ final readonly class ParsedSubmission
         public ?array $gps,
         public array $items,
         public ?array $rawNumericScores,
+        public ?array $monthSlots = null,
+        public ?string $outOfScope = null,
     ) {}
+
+    /**
+     * The month slots the visit must cover: its own, or all three.
+     *
+     * @return list<int>
+     */
+    public function coveredSlots(): array
+    {
+        return $this->monthSlots ?? [1, 2, 3];
+    }
 
     /** The same submission as the version that replaces $deprecatedId (an edit found by external ID, D-61). */
     public function asEditOf(string $deprecatedId): self
@@ -90,6 +109,9 @@ final readonly class ParsedSubmission
             gps: $read->nullableFloatMap('gps'),
             items: array_map(ItemResponseData::fromArray(...), $read->listOfArrays('items')),
             rawNumericScores: $read->nullableFloatMap('raw_numeric_scores'),
+            // Absent from snapshots stored before monthly visits and exclusions existed: all slots, in scope.
+            monthSlots: is_array($data['month_slots'] ?? null) ? array_values(array_map(intval(...), $data['month_slots'])) : null,
+            outOfScope: is_string($data['out_of_scope'] ?? null) ? $data['out_of_scope'] : null,
         );
     }
 
@@ -122,6 +144,8 @@ final readonly class ParsedSubmission
             'gps' => $this->gps,
             'items' => array_map(fn (ItemResponseData $item): array => $item->toArray(), $this->items),
             'raw_numeric_scores' => $this->rawNumericScores,
+            'month_slots' => $this->monthSlots,
+            'out_of_scope' => $this->outOfScope,
         ];
     }
 }

@@ -24,5 +24,7 @@
     "items": [],
     "raw_numeric_scores": {
         "avail_m1_score": 92.5
-    }
+    },
+    "month_slots": null,
+    "out_of_scope": null
 }

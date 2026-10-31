@@ -15,7 +15,7 @@ meta/instanceID are taken as certain.
 
 Usage:
   python field_diff.py                 # ODK Central: data/forms
-  python field_diff.py --source kobo   # KoboToolbox: data/kobo/forms, versions keyed by deployment uid
+  python field_diff.py --source kobo   # KoboToolbox: data/forms/kobo, versions keyed by deployment uid
 """
 
 from __future__ import annotations
@@ -549,11 +549,11 @@ def effort(entry: dict, checks: list[Check], is_default: bool) -> str:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     p.add_argument("--source", choices=("odk", "kobo"), default="odk",
-                   help="which source's forms: odk (XForms, data/forms) or kobo (XLSForms, data/kobo/forms)")
+                   help="which source's forms: odk (XForms, data/forms) or kobo (XLSForms, data/forms/kobo)")
     p.add_argument("--forms", type=Path, help="the forms directory (default: the source's)")
     args = p.parse_args()
     kobo = args.source == "kobo"
-    forms_dir = args.forms or (HERE / "data" / "kobo" / "forms" if kobo else HERE / "data" / "forms")
+    forms_dir = args.forms or (HERE / "data" / "forms" / "kobo" if kobo else HERE / "data" / "forms")
     prefix = "kobo_" if kobo else ""
 
     published: dict[str, str] = {}

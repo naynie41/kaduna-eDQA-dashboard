@@ -5,8 +5,10 @@ survey, choices and settings rows). This rebuilds each deployed version's XLSFor
 content, so field_diff.py can check every version against the form contract and diff them, as
 it does for ODK Central's XForms.
 
-Reads out/kobo_form_versions.json (kobo_inventory.py) for the deployed versions, or lists them
-itself. Writes data/kobo/forms/<version uid>.xlsx (git-ignored) and out/kobo_forms.md. Each
+Kobo serves the XLSForm and XForm of the current version only (/api/v2/assets/{uid}/xls/, /xform/);
+older versions are exposed as their content, at /api/v2/assets/{uid}/versions/{version uid}/ (KPI
+schema: VersionRetrieveResponse.content = survey, choices, settings). Writes, per deployed version,
+data/forms/kobo/<version uid>.content.json and .xlsx (git-ignored) and out/kobo_forms.md. Each
 workbook's settings carry the version uid as `version`, which is what every Kobo submission
 names in `__version__` and what `sources.kobo` in config/edqa_field_maps.php is keyed by.
 
@@ -20,15 +22,16 @@ Then:
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import datetime
 
 from openpyxl import Workbook
 from rich.console import Console
 
-from kobo import DATA_DIR, OUT_DIR, add_source_args, deployed_versions, open_source, run
+from kobo import HERE, OUT_DIR, add_source_args, deployed_versions, open_source, run
 
 console = Console()
-FORMS_DIR = DATA_DIR / "forms"
+FORMS_DIR = HERE / "data" / "forms" / "kobo"
 SURVEY_COLUMNS = ["type", "name", "label", "required", "relevant", "calculation", "choice_filter",
                   "parameters", "read_only", "appearance"]
 SELECTS = ("select_one", "select_multiple")
@@ -89,6 +92,8 @@ def main() -> None:
         for v in deployed_versions(kobo.versions()):
             uid = str(v.get("uid"))
             content = kobo.version(uid).get("content") or {}
+            # The version as Kobo keeps it, and the XLSForm rebuilt from it (field_diff.py reads the latter).
+            (FORMS_DIR / f"{uid}.content.json").write_text(json.dumps(content, indent=1), encoding="utf-8")
             workbook(content, uid, title, kobo.asset_uid).save(FORMS_DIR / f"{uid}.xlsx")
             rows.append((uid, str(v.get("date_deployed", ""))[:10], len(content.get("survey", [])),
                          len(content.get("choices", []))))
@@ -99,7 +104,7 @@ def main() -> None:
         f"Generated {datetime.now():%Y-%m-%d %H:%M} by `discovery/kobo_forms.py`"
         + (f" from saved responses in `{args.offline}`." if args.offline else "."),
         "",
-        "Each deployed version rebuilt as an XLSForm in `data/kobo/forms/` (not committed). "
+        "Each deployed version, as Kobo keeps it and rebuilt as an XLSForm, in `data/forms/kobo/` (not committed). "
         "`field_diff.py --source kobo` reads them.",
         "",
         "| Version uid | Deployed | Survey rows | Choice rows |",
@@ -107,7 +112,7 @@ def main() -> None:
     ]
     lines += [f"| `{uid}` | {date} | {s} | {c} |" for uid, date, s, c in rows]
     (OUT_DIR / "kobo_forms.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    console.print(f"{len(rows)} version(s) exported to data/kobo/forms/. Wrote out/kobo_forms.md")
+    console.print(f"{len(rows)} version(s) exported to data/forms/kobo/. Wrote out/kobo_forms.md")
 
 
 if __name__ == "__main__":

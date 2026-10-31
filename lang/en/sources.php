@@ -23,6 +23,7 @@ return [
     'pull' => [
         'name_one' => 'Name a source (:sources) or pass --all, not both.',
         'cross_source' => ':count submission(s) were already stored from another source: counted as cross-source duplicates, not stored again.',
+        'out_of_scope' => ':count submission(s) were not facility assessments (community visits or DDU at LGA level): stored, not scored.',
     ],
     'reconcile' => [
         'done' => 'Reconciled the open round: :fetched read from the source, :parsed new or edited processed (:accepted accepted, :flagged flagged, :quarantined quarantined), :deleted newly flagged as deleted at source.',
@@ -65,5 +66,17 @@ return [
         'none' => 'none',
         'unmapped_summary' => ':count published version(s) have no field map: add them to config/edqa_field_maps.php (sources) before the first pull.',
         'deprecated_alias' => 'edqa:odk:check is now edqa:source:check odk. This alias goes in the next release.',
+    ],
+
+    // edqa:facilities:source-refs (D-72).
+    'refs' => [
+        'no_file' => 'No such file: :file',
+        'header' => 'The first line must be the header ref,facility_code.',
+        'blank' => 'Line :line: a ref and a facility code are both needed.',
+        'twice' => 'Line :line: :ref is in the file more than once.',
+        'unknown_code' => ':ref: no facility on the master list has the code :code.',
+        'refused' => 'Nothing was loaded: fix the file and run it again.',
+        'checked' => 'The file is good: :count reference(s) for :source. Nothing was loaded (--dry-run).',
+        'loaded' => ':count references loaded for :source; the ones it had before were replaced.',
     ],
 ];

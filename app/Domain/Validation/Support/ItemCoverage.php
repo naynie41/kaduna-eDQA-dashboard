@@ -19,12 +19,14 @@ use App\Domain\Scoring\Enums\Dimension;
 final class ItemCoverage
 {
     /**
-     * Slots with no valid item, as "consistency_m2", in dimension then month order.
+     * Slots with no valid item, as "consistency_m2", in dimension then month order. Only the month
+     * slots the visit covers are required: all three, or a monthly visit's one (D-70).
      *
      * @param  list<ItemResponseData>  $items
+     * @param  list<int>  $months  the month slots the visit covers
      * @return list<string>
      */
-    public static function missingSlots(array $items): array
+    public static function missingSlots(array $items, array $months = [1, 2, 3]): array
     {
         $present = [];
         foreach (self::valid($items) as $item) {
@@ -33,7 +35,7 @@ final class ItemCoverage
 
         $missing = [];
         foreach (Dimension::cases() as $dimension) {
-            foreach ([1, 2, 3] as $month) {
+            foreach ($months as $month) {
                 if (! isset($present[self::slotName($dimension, $month)])) {
                     $missing[] = self::slotName($dimension, $month);
                 }
@@ -77,10 +79,13 @@ final class ItemCoverage
         return array_values(array_filter($items, fn (ItemResponseData $item): bool => $item->value === ItemResponseData::INVALID));
     }
 
-    /** @param  list<ItemResponseData>  $items */
-    public static function isComplete(array $items): bool
+    /**
+     * @param  list<ItemResponseData>  $items
+     * @param  list<int>  $months  the month slots the visit covers
+     */
+    public static function isComplete(array $items, array $months = [1, 2, 3]): bool
     {
-        return self::missingSlots($items) === [] && self::unscorableDimensions($items) === [] && self::invalidItems($items) === [];
+        return self::missingSlots($items, $months) === [] && self::unscorableDimensions($items) === [] && self::invalidItems($items) === [];
     }
 
     public static function slotName(Dimension $dimension, int $month): string

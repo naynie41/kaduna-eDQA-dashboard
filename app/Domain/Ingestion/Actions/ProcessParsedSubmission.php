@@ -36,6 +36,9 @@ use Illuminate\Support\Facades\DB;
  *   flagged. An ODK edit (deprecatedID = an accepted submission) updates that assessment in
  *   place, audited, and supersedes the original.
  *
+ * A submission that is not a facility assessment (D-74: a community visit, DDU at LGA level) is
+ * marked out_of_scope and goes no further: no validation, no quarantine, no assessment.
+ *
  * Events dispatch after commit. The Submission row itself is created by the caller.
  */
 final class ProcessParsedSubmission
@@ -49,6 +52,12 @@ final class ProcessParsedSubmission
     /** @param  QuarantinedRecord|null  $reprocessing  the record being corrected (CorrectAndReprocess) */
     public function execute(Submission $submission, ParsedSubmission $parsed, ValidationContext $context, ?QuarantinedRecord $reprocessing = null): ProcessOutcome
     {
+        if ($parsed->outOfScope !== null) {
+            $submission->update(['status' => SubmissionStatus::OutOfScope, 'processed_at' => now()]);
+
+            return new ProcessOutcome(SubmissionStatus::OutOfScope, new ValidationResult([], []));
+        }
+
         $result = $this->pipeline->validate($parsed, $context);
 
         if (! $result->passed()) {

@@ -13,7 +13,8 @@ use App\Domain\Validation\Support\ItemCoverage;
 use App\Domain\Validation\ValidationContext;
 
 /**
- * ITEMS_INCOMPLETE: all nine dimension × month slots need at least one item response, and each
+ * ITEMS_INCOMPLETE: every dimension × month slot the visit covers (all nine, or a monthly visit's
+ * three, D-70) needs at least one item response, and each
  * dimension needs at least one applicable item (a missing dimension cannot be averaged).
  *
  * A legacy form with typed scores and no items lands here too (Q-16): scores are only ever
@@ -45,7 +46,7 @@ final class ItemsIncompleteRule implements ValidationRule
         }
 
         $parts = [];
-        $missing = ItemCoverage::missingSlots($submission->items);
+        $missing = ItemCoverage::missingSlots($submission->items, $submission->coveredSlots());
         if ($missing !== []) {
             $parts[] = $this->text('detail', ['slots' => implode(', ', $missing)]);
         }

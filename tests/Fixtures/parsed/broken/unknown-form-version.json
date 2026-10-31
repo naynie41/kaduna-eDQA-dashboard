@@ -19,5 +19,7 @@
     "device_id": "collect:hauwa01",
     "gps": null,
     "items": [],
-    "raw_numeric_scores": null
+    "raw_numeric_scores": null,
+    "month_slots": null,
+    "out_of_scope": null
 }

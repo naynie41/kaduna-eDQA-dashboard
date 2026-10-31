@@ -89,3 +89,24 @@ it('falls back to the submission time when the start did not parse', function ()
 
     expect($submission->visitDate()->toDateString())->toBe('2026-04-16');
 });
+
+it('round-trips the month slots a monthly visit covers and why a submission is out of scope (D-70, D-74)', function (): void {
+    $submission = new ParsedSubmission(...[...get_object_vars(parsedSubmission()), 'monthSlots' => [2], 'outOfScope' => 'community_visit']);
+
+    $restored = ParsedSubmission::fromArray(json_decode(json_encode($submission->toArray(), JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
+
+    expect($restored->monthSlots)->toBe([2])
+        ->and($restored->coveredSlots())->toBe([2])
+        ->and($restored->outOfScope)->toBe('community_visit');
+});
+
+it('reads a snapshot stored before monthly visits as covering all three slots, in scope', function (): void {
+    $array = parsedSubmission()->toArray();
+    unset($array['month_slots'], $array['out_of_scope']);
+
+    $restored = ParsedSubmission::fromArray($array);
+
+    expect($restored->monthSlots)->toBeNull()
+        ->and($restored->coveredSlots())->toBe([1, 2, 3])
+        ->and($restored->outOfScope)->toBeNull();
+});

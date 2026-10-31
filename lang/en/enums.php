@@ -32,6 +32,7 @@ return [
         'quarantined' => 'Quarantined',
         'rejected' => 'Rejected',
         'superseded' => 'Superseded',
+        'out_of_scope' => 'Not a facility assessment',
     ],
     'quarantine_status' => [
         'open' => 'Open',

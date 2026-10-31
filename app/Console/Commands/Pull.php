@@ -76,6 +76,9 @@ final class Pull extends Command
         $this->line((string) __('odk.pull.dry_run_summary', [
             'fetched' => $report->fetched, 'stored' => $report->alreadyStored, ...$report->outcomes,
         ]));
+        if ($report->outcomes['out_of_scope'] > 0) {
+            $this->line((string) __('sources.pull.out_of_scope', ['count' => $report->outcomes['out_of_scope']]));
+        }
         if ($report->rules === []) {
             $this->line((string) __('odk.pull.dry_run_no_rules'));
         } else {
@@ -116,6 +119,9 @@ final class Pull extends Command
         ]));
         if ($run->cross_source_duplicates > 0) {
             $this->line((string) __('sources.pull.cross_source', ['count' => $run->cross_source_duplicates]));
+        }
+        if ($run->out_of_scope > 0) {
+            $this->line((string) __('sources.pull.out_of_scope', ['count' => $run->out_of_scope]));
         }
 
         return true;

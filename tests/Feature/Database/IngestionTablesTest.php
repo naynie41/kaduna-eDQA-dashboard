@@ -161,3 +161,21 @@ it('records each file of a submission once', function (): void {
 it('rejects a negative parsed count on a pull run', function (): void {
     expectCheckViolation(fn () => Rows::pullRun(['parsed' => -1]), 'pull_runs_parsed_nonnegative');
 });
+
+it('stores a submission that is not a facility assessment as out_of_scope (D-74)', function (): void {
+    expect(Rows::submission(['status' => 'out_of_scope']))->toBeInt();
+});
+
+it('counts out-of-scope submissions per pull run, never below zero (D-74)', function (): void {
+    expect((int) DB::table('pull_runs')->where('id', Rows::pullRun())->value('out_of_scope'))->toBe(0);
+    expectCheckViolation(fn () => Rows::pullRun(['out_of_scope' => -1]), 'pull_runs_out_of_scope_nonnegative');
+});
+
+it('maps a source\'s facility reference to one facility, once per source (D-72)', function (): void {
+    $facility = Rows::facility();
+    $row = ['source_id' => Rows::sourceId('kobo'), 'ref' => 'kujama_phc_1', 'facility_id' => $facility, 'created_at' => now(), 'updated_at' => now()];
+    DB::table('facility_source_refs')->insert($row);
+
+    expectUniqueViolation(fn () => DB::table('facility_source_refs')->insert([...$row, 'facility_id' => Rows::facility()]), 'facility_source_refs_source_id_ref_unique');
+    expectCheckViolation(fn () => DB::table('facility_source_refs')->insert([...$row, 'ref' => '  ']), 'facility_source_refs_ref_not_blank');
+});
