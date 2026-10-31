@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Ingestion\DTOs;
 
-/** What `edqa:backfill --survey` found in ODK: nothing was written. */
+/** What `edqa:backfill {source} --survey` found in the source: nothing was written. */
 final readonly class BackfillSurvey
 {
     /**

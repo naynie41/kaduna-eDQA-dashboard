@@ -5,25 +5,26 @@ declare(strict_types=1);
 namespace App\Domain\Ingestion\Actions;
 
 use App\Domain\Ingestion\Attachments\AttachmentRules;
-use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\Enums\AttachmentStatus;
-use App\Domain\Ingestion\Exceptions\OdkException;
+use App\Domain\Ingestion\Exceptions\SourceException;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Ingestion\Models\SubmissionAttachment;
+use App\Domain\Ingestion\SourceRegistry;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
- * Fetches one submission's pending (or earlier failed) attachments from ODK to the private odk
- * disk (ARCHITECTURE.md §5.3, SECURITY.md §7). A fetched file is never fetched again.
+ * Fetches one submission's pending (or earlier failed) attachments from its own source to the
+ * private attachments disk (ARCHITECTURE.md §5.3, SECURITY.md §7), asking for them by the
+ * submission's logical ID (ODK's __id, Kobo's _id). A fetched file is never fetched again.
  *
  * Each file is downloaded to odk/.incoming first, then checked: its size against
  * edqa.odk.attachments.max_bytes and its sniffed type against the allow-list. A file that fails
  * is deleted and its row marked rejected with the reason; one that passes moves to
  * odk/{instance}/{filename}. A name that could leave its directory is rejected without a download.
  *
- * ODK errors leave the row pending with the reason and are rethrown once every file has been
+ * Source errors leave the row pending with the reason and are rethrown once every file has been
  * tried, so the job retries only what is still missing.
  */
 final class FetchAttachments
@@ -31,7 +32,7 @@ final class FetchAttachments
     public const INCOMING = '.incoming';
 
     public function __construct(
-        private readonly SubmissionSource $source,
+        private readonly SourceRegistry $sources,
     ) {}
 
     /** @return array{fetched: int, rejected: int, pending: int} */
@@ -48,9 +49,11 @@ final class FetchAttachments
         $maxBytes = (int) config('edqa.odk.attachments.max_bytes', 10 * 1024 * 1024);
         /** @var list<string> $allowed */
         $allowed = array_values((array) config('edqa.odk.attachments.allowed_mimes', []));
-        // Central lists a submission's files under its root ID (__id), the current version's files.
-        $rootId = is_string($submission->payload['__id'] ?? null) ? $submission->payload['__id'] : $submission->instance_id;
-        $directory = AttachmentRules::directory((string) $submission->instance_id, (string) $submission->source?->key);
+        // Each source lists a submission's files under its logical ID: the current version's files.
+        $key = (string) $submission->source?->key;
+        $logicalId = is_string($submission->external_id) && $submission->external_id !== '' ? $submission->external_id : (string) $submission->instance_id;
+        $directory = AttachmentRules::directory((string) $submission->instance_id, $key);
+        $adapter = null;
 
         $error = null;
         $rows = SubmissionAttachment::query()->where('submission_id', $submissionId)
@@ -69,8 +72,9 @@ final class FetchAttachments
             if (! $disk->exists($target)) {
                 $disk->makeDirectory(self::INCOMING);
                 try {
-                    $this->source->downloadAttachment($rootId, $name, $disk->path($incoming));
-                } catch (OdkException $e) {
+                    $adapter ??= $this->sources->adapter($key);
+                    $adapter->downloadAttachment($logicalId, $name, $disk->path($incoming));
+                } catch (SourceException $e) {
                     $disk->delete($incoming);
                     $attachment->update(['reason' => $e->status()]);
                     $error = $e;

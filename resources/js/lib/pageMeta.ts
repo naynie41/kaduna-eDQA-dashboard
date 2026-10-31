@@ -15,7 +15,7 @@ const META: Record<string, PageMeta> = {
     'dashboard/monitor': { title: 'dashboard.pages.monitor.title', subtitle: 'dashboard.pages.monitor.subtitle', dashboard: true },
     'dashboard/visuals': { title: 'dashboard.pages.visuals.title', subtitle: 'dashboard.pages.visuals.subtitle', dashboard: true },
     'dashboard/plan': { title: 'dashboard.pages.plan.title', subtitle: 'dashboard.pages.plan.subtitle', dashboard: true },
-    'admin/odk': { title: 'admin.pages.odk.title', subtitle: 'admin.pages.odk.subtitle', dashboard: false },
+    'admin/sources': { title: 'admin.pages.sources.title', subtitle: 'admin.pages.sources.subtitle', dashboard: false },
     'admin/data-issues': { title: 'admin.pages.data_issues.title', subtitle: 'admin.pages.data_issues.subtitle', dashboard: false },
     'admin/rounds': { title: 'admin.pages.rounds.title', subtitle: 'admin.pages.rounds.subtitle', dashboard: false },
     'admin/facilities': { title: 'admin.pages.facilities.title', subtitle: 'admin.pages.facilities.subtitle', dashboard: false },
@@ -30,7 +30,7 @@ export function pageMeta(component: string): PageMeta | null {
 
 /** The administration pages in tab order (ARCHITECTURE.md §9.3): path segment and lang key. */
 export const ADMIN_PAGES = [
-    { page: 'odk', key: 'odk' },
+    { page: 'sources', key: 'sources' },
     { page: 'data-issues', key: 'data_issues' },
     { page: 'rounds', key: 'rounds' },
     { page: 'facilities', key: 'facilities' },

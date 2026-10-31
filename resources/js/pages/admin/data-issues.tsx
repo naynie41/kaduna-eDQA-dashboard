@@ -5,6 +5,7 @@ import { useAnnounce } from '@/components/Announcer';
 import ConfirmWithReasonDialog, { type ConfirmOutcome } from '@/components/ConfirmWithReasonDialog';
 import CorrectIssueForm from '@/components/CorrectIssueForm';
 import DataIssueDrawer from '@/components/DataIssueDrawer';
+import DuplicateSides from '@/components/DuplicateSides';
 import Panel from '@/components/Panel';
 import PanelHeader from '@/components/PanelHeader';
 import RuleSummary from '@/components/RuleSummary';
@@ -21,6 +22,8 @@ export type AdminDataIssuesProps = {
     records: Paginated<DataIssueRow> | Paginated<FlaggedRow>;
     lgas: { code: string; name: string }[];
     rounds: (RoundRef & { status: string })[];
+    /** Every configured source, in config order: the source filter. */
+    sources: { key: string; name: string }[];
     correctable: CorrectableField[];
 };
 
@@ -35,14 +38,15 @@ const STATES: IssueState[] = ['open', 'resolved', 'rejected', 'superseded'];
  * time or in bulk when every selected record fails the same single rule. Soft tab: accepted
  * assessments whose flags can be overridden. Every resolution asks for a reason
  * (ConfirmWithReasonDialog), says what happened, reloads only the rows, the rule counts and the
- * badge, and links to the round's rescore. All filters are in the URL.
+ * badge, and links to the round's rescore. All filters are in the URL, the source among them: each
+ * row names its source and links to the submission there, and a duplicate shows both sides.
  */
-export default function AdminDataIssues({ issueFilters: filters, rules, records, lgas, rounds }: AdminDataIssuesProps) {
+export default function AdminDataIssues({ issueFilters: filters, rules, records, lgas, rounds, sources }: AdminDataIssuesProps) {
     const t = useTranslate();
     const announce = useAnnounce();
     const months = useTranslationList('common.months_short');
     const api = useApiAction<{ data: Resolution | Resolution[] }>();
-    const ids = { state: useId(), rule: useId(), lga: useId(), round: useId(), bulkField: useId(), bulkValue: useId(), mixed: useId() };
+    const ids = { state: useId(), rule: useId(), lga: useId(), round: useId(), source: useId(), bulkField: useId(), bulkValue: useId(), mixed: useId() };
     const when = (value: string | null) => (value === null ? '' : months.length === 12 ? formatDateTime(value, months) : value);
     const roundLabel = (round: RoundRef | null) => (round === null ? t('admin.issues.table.no_round') : t('admin.issues.filters.round_option', { quarter: round.quarter, year: round.year }));
 
@@ -220,7 +224,17 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                             ))}
                         </select>
                     </Labelled>
-                    <button type="button" className={button} onClick={() => visit({ state: 'open', rule: null, lga: null, round: null, page: 1 })}>
+                    <Labelled id={ids.source} label={t('admin.issues.filters.source')}>
+                        <select id={ids.source} className={select} value={filters.source ?? ''} onChange={(event) => visit({ source: event.target.value || null, page: 1 })}>
+                            <option value="">{t('admin.issues.filters.all_sources')}</option>
+                            {sources.map((source) => (
+                                <option key={source.key} value={source.key}>
+                                    {source.name}
+                                </option>
+                            ))}
+                        </select>
+                    </Labelled>
+                    <button type="button" className={button} onClick={() => visit({ state: 'open', rule: null, lga: null, round: null, source: null, page: 1 })}>
                         {t('admin.issues.filters.clear')}
                     </button>
                 </div>
@@ -278,6 +292,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                         columns={[
                             { key: 'select', header: '' },
                             { key: 'instance', header: t('admin.issues.table.instance') },
+                            { key: 'source', header: t('admin.issues.table.source') },
                             { key: 'rules', header: t('admin.issues.table.rules') },
                             { key: 'facility', header: t('admin.issues.table.facility') },
                             { key: 'lga', header: t('admin.issues.table.lga') },
@@ -311,6 +326,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                             {t('admin.issues.table.copy_short')}
                                         </button>
                                     </th>
+                                    <td className="px-3 py-2 whitespace-nowrap">{row.source?.name ?? t('admin.issues.table.source_unknown')}</td>
                                     <td className="px-3 py-2">
                                         <ul className="flex flex-wrap gap-1">
                                             {row.failures.map((failure, i) => (
@@ -331,6 +347,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                             {row.failures.map((failure, i) => (
                                                 <li key={`${failure.code}-${i}`}>
                                                     <code className="text-[12px] break-words">{failure.detail}</code>
+                                                    {failure.code === 'DUPLICATE_ASSESSMENT' && <DuplicateSides row={row} />}
                                                 </li>
                                             ))}
                                         </ul>
@@ -355,9 +372,9 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                             <button type="button" className={button} onClick={() => setDrawer(row)}>
                                                 {t('admin.issues.actions.details')}
                                             </button>
-                                            {row.odk_url !== null && (
-                                                <a href={row.odk_url} target="_blank" rel="noreferrer" className="text-[12.5px] text-deep underline">
-                                                    {t('admin.issues.actions.odk')} <span className="sr-only">{t('admin.issues.actions.new_tab')}</span>
+                                            {row.source !== null && row.source_url !== null && (
+                                                <a href={row.source_url} target="_blank" rel="noopener noreferrer" className="text-[12.5px] text-deep underline">
+                                                    {t('admin.issues.actions.open_in_source', { source: row.source.name })} <span className="sr-only">{t('admin.issues.actions.new_tab')}</span>
                                                 </a>
                                             )}
                                         </div>
@@ -365,7 +382,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                 </tr>
                                 {correcting === row.id && (
                                     <tr className="border-b border-rule">
-                                        <td colSpan={9} className="px-3 py-3">
+                                        <td colSpan={10} className="px-3 py-3">
                                             <CorrectIssueForm row={row} lgas={lgas} onReview={(corrections) => correct(row, corrections)} onCancel={() => setCorrecting(null)} />
                                         </td>
                                     </tr>
@@ -381,6 +398,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                             { key: 'facility', header: t('admin.issues.table.facility') },
                             { key: 'lga', header: t('admin.issues.table.lga') },
                             { key: 'round', header: t('admin.issues.table.round') },
+                            { key: 'source', header: t('admin.issues.table.source') },
                             { key: 'assessor', header: t('admin.issues.table.assessor') },
                             { key: 'visited', header: t('admin.issues.table.visited') },
                             { key: 'flags', header: t('admin.issues.table.flags') },
@@ -398,6 +416,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                 </th>
                                 <td className="px-3 py-2">{row.lga?.name ?? '–'}</td>
                                 <td className="px-3 py-2 whitespace-nowrap">{roundLabel(row.round)}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{row.source?.name ?? t('admin.issues.table.source_unknown')}</td>
                                 <td className="px-3 py-2">{row.assessor}</td>
                                 <td className="px-3 py-2 whitespace-nowrap">{months.length === 12 ? formatDate(row.started_at, months) : row.started_at}</td>
                                 <td className="px-3 py-2">

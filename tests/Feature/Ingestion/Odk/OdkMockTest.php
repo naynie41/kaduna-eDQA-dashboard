@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Ingestion\Actions\ProcessParsedBatch;
 use App\Domain\Ingestion\Actions\PullSubmissions;
-use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\Enums\AttachmentStatus;
 use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
@@ -14,6 +13,7 @@ use App\Domain\Ingestion\Exceptions\OdkAuthFailed;
 use App\Domain\Ingestion\Exceptions\OdkUnexpectedResponse;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Ingestion\Models\SubmissionAttachment;
+use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Scoring\CurrentRuleVersion;
 use App\Domain\Validation\Models\QuarantinedRecord;
@@ -77,7 +77,7 @@ it('writes the mix asked for: broken, flagged, edits and photos, for facilities 
 
 it('serves them through the real source, and the pipeline holds exactly the broken ones', function (): void {
     $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 10])->assertSuccessful();
-    $source = app(SubmissionSource::class);
+    $source = app(SourceRegistry::class)->adapter('odk');
     $parser = app(SubmissionParser::class);
 
     $statuses = [];
@@ -106,7 +106,7 @@ it('serves them through the real source, and the pipeline holds exactly the brok
 
 it('answers ping, the versions and the attachments like Central', function (): void {
     $this->artisan('edqa:odk-mock:generate', ['--count' => 30, '--broken' => 0])->assertSuccessful();
-    $source = app(SubmissionSource::class);
+    $source = app(SourceRegistry::class)->adapter('odk');
 
     $ping = $source->ping();
     $versions = array_map(fn ($v) => $v->version, $source->formVersions());
@@ -125,7 +125,7 @@ it('answers ping, the versions and the attachments like Central', function (): v
 
 it('filters on submissionDate, pages, and refuses a wrong password or form', function (): void {
     $this->artisan('edqa:odk-mock:generate', ['--count' => 40, '--broken' => 0])->assertSuccessful();
-    $source = app(SubmissionSource::class);
+    $source = app(SourceRegistry::class)->adapter('odk');
     $all = $source->submissionsPage(null, 100, 0)->rows;
     $dates = array_map(fn (array $r): string => $r['__system']['submissionDate'], $all);
     $middle = CarbonImmutable::parse($dates[19]);
@@ -137,15 +137,15 @@ it('filters on submissionDate, pages, and refuses a wrong password or form', fun
         ->and($source->submissionsPage(null, 10, 30)->hasMore)->toBeFalse();
 
     config(['edqa.sources.odk.form_id' => 'other']);
-    expect(fn () => app(SubmissionSource::class)->formVersions())->toThrow(OdkUnexpectedResponse::class);
+    expect(fn () => app(SourceRegistry::class)->adapter('odk')->formVersions())->toThrow(OdkUnexpectedResponse::class);
     config(['edqa.sources.odk.form_id' => 'dqa', 'edqa.sources.odk.password' => 'wrong']);
     Cache::flush();
-    expect(fn () => app(SubmissionSource::class)->formVersions())->toThrow(OdkAuthFailed::class);
+    expect(fn () => app(SourceRegistry::class)->adapter('odk')->formVersions())->toThrow(OdkAuthFailed::class);
 });
 
 it('shows an edit only once applied: same __id, a new instance ID that deprecates the old one', function (): void {
     $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 0])->assertSuccessful();
-    $source = app(SubmissionSource::class);
+    $source = app(SourceRegistry::class)->adapter('odk');
     $edit = json_decode((string) file_get_contents(glob($this->mock.'/edits/*.json')[0]), true);
 
     $before = collect($source->submissionsPage(null, 100, 0)->rows)->firstWhere('__id', $edit['__id']);
@@ -192,7 +192,7 @@ it('refuses outside local and testing, and a round it cannot read', function ():
 it('is pulled end to end: three pages, the broken ones quarantined, an edit applied in place, nothing twice', function (): void {
     config(['edqa.sources.odk.page_size' => 25]);
     $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 10])->assertSuccessful();
-    $pull = fn () => app(PullSubmissions::class)->execute(PullTrigger::Scheduled)->refresh();
+    $pull = fn () => app(PullSubmissions::class)->execute('odk', PullTrigger::Scheduled)->refresh();
 
     $first = $pull();
     expect($first->outcome)->toBe(PullOutcome::Succeeded)

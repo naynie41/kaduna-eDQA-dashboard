@@ -10,8 +10,7 @@ use App\Domain\Scoring\Enums\Dimension;
  * A form's field map (config/edqa_field_maps.php, ARCHITECTURE.md §5.5): where each field sits in
  * a submission's answers (SubmissionEnvelope::$data), and how scored questions are named. Maps
  * are named ("xls-2026.1"), and each source says which map a form version uses, so one XLSForm
- * on two platforms shares one map though each labels the version its own way (D-25 in the new
- * numbering).
+ * on two platforms shares one map though each labels the version its own way (D-63).
  *
  * for() returns null for a (source, version) pair with no entry, and never falls back to another
  * version's map (CLAUDE.md hard rule 12). A map may extend another: it lists only what differs,

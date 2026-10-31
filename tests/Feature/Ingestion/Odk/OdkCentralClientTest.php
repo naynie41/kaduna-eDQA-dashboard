@@ -8,6 +8,7 @@ use App\Domain\Ingestion\Exceptions\OdkNotConfigured;
 use App\Domain\Ingestion\Exceptions\OdkUnexpectedResponse;
 use App\Domain\Ingestion\Exceptions\OdkUnreachable;
 use App\Domain\Ingestion\Odk\SessionTokenCache;
+use App\Domain\Ingestion\SourceRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Log\Events\MessageLogged;
@@ -42,7 +43,7 @@ function odkSession(string $token, string $expires = '2026-10-18T10:00:00.000Z')
 
 function odkSource(): SubmissionSource
 {
-    return app(SubmissionSource::class);
+    return app(SourceRegistry::class)->adapter('odk');
 }
 
 /** @return list<Request> requests to a path */

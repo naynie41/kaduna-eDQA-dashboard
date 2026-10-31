@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The Data issues listing (ARCHITECTURE.md §6): quarantined records, flat or grouped by rule,
- * filtered by status, rule, round and LGA. Admin-only; Reporting never reads quarantine.
+ * filtered by status, rule, round, LGA and source (its row id). Admin-only; Reporting never reads
+ * quarantine.
  *
  * The LGA filter takes an LGA code and matches the submitted lga_ref by that code or the LGA's
  * name, ignoring case and surrounding spaces (the ref is raw, so it may be either).
@@ -110,13 +111,13 @@ final class QuarantineQuery
      * The Data issues page's records (D-57): newest first, 25 a page, with each record's
      * submission (received at, form) and round, for the filters below plus `state`.
      *
-     * @param  array{state?: ?string, rule?: ?string, round?: int|string|null, lga?: ?string}  $filters
+     * @param  array{state?: ?string, rule?: ?string, round?: int|string|null, lga?: ?string, source_id?: ?int}  $filters
      * @return Paginator<int, QuarantinedRecord>
      */
     public function adminPage(array $filters): Paginator
     {
         return $this->filtered($filters)
-            ->with(['submission:id,instance_id,form_ref,received_at,status', 'round:id,year,quarter'])
+            ->with(['submission:id,source_id,external_id,instance_id,form_ref,received_at,status', 'round:id,year,quarter'])
             ->orderByDesc('id')
             ->paginate(self::ADMIN_PER_PAGE)
             ->withQueryString();
@@ -145,7 +146,57 @@ final class QuarantineQuery
     }
 
     /**
-     * @param  array{status?: ?string, state?: ?string, rule?: ?string, round?: int|string|null, lga?: ?string}  $filters
+     * For each DUPLICATE_ASSESSMENT record on a page, the assessment it repeats: the one in its
+     * round for the facility its reference names (matched as FACILITY_UNKNOWN matches, trimmed,
+     * any case), with the source and IDs of the submission it was built from. Records whose
+     * original is gone (withdrawn, or the reference since corrected) are left out. One query.
+     *
+     * @param  list<QuarantinedRecord>  $records
+     * @return array<int, array{assessment_id: int, facility_id: int, source_id: int, instance_id: string, external_id: ?string}> record ID => original
+     */
+    public function duplicateOriginals(array $records): array
+    {
+        $wanted = [];
+        foreach ($records as $record) {
+            $ref = mb_strtolower(trim((string) $record->facility_ref));
+            if ($record->round_id !== null && $ref !== '' && in_array('DUPLICATE_ASSESSMENT', array_column($record->failures, 'code'), true)) {
+                $wanted[$record->id] = [$record->round_id, $ref];
+            }
+        }
+        if ($wanted === []) {
+            return [];
+        }
+
+        $found = [];
+        $rows = DB::table('assessments as a')
+            ->join('facilities as f', 'f.id', '=', 'a.facility_id')
+            ->join('submissions as s', 's.id', '=', 'a.submission_id')
+            ->whereIn('a.round_id', array_values(array_unique(array_column($wanted, 0))))
+            ->whereIn(DB::raw('lower(f.code)'), array_values(array_unique(array_column($wanted, 1))))
+            ->whereIn('a.status', ['accepted', 'flagged'])
+            ->get(['a.id', 'a.round_id', 'a.facility_id', 'f.code', 's.source_id', 's.instance_id', 's.external_id']);
+        foreach ($rows as $row) {
+            $found[$row->round_id.'|'.mb_strtolower((string) $row->code)] = [
+                'assessment_id' => (int) $row->id,
+                'facility_id' => (int) $row->facility_id,
+                'source_id' => (int) $row->source_id,
+                'instance_id' => (string) $row->instance_id,
+                'external_id' => is_string($row->external_id) ? $row->external_id : null,
+            ];
+        }
+
+        $originals = [];
+        foreach ($wanted as $id => [$round, $ref]) {
+            if (isset($found[$round.'|'.$ref])) {
+                $originals[$id] = $found[$round.'|'.$ref];
+            }
+        }
+
+        return $originals;
+    }
+
+    /**
+     * @param  array{status?: ?string, state?: ?string, rule?: ?string, round?: int|string|null, lga?: ?string, source_id?: ?int}  $filters
      * @return Builder<QuarantinedRecord>
      */
     private function filtered(array $filters): Builder
@@ -169,6 +220,9 @@ final class QuarantineQuery
         }
         if (($filters['round'] ?? null) !== null) {
             $query->where('round_id', (int) $filters['round']);
+        }
+        if (($filters['source_id'] ?? null) !== null) {
+            $query->where('source_id', $filters['source_id']);
         }
         if (($filters['lga'] ?? null) !== null) {
             $lga = Lga::query()->where('code', $filters['lga'])->first(['code', 'name']);

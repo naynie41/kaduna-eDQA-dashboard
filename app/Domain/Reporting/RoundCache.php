@@ -43,6 +43,7 @@ final class RoundCache
         DTOs\LgaScore::class,
         DTOs\MonthSlotPoint::class,
         DTOs\OwnerSplit::class,
+        DTOs\SourceCount::class,
         DTOs\StateSummary::class,
         DTOs\TrendPoint::class,
         DTOs\WardScore::class,

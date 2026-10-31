@@ -9,7 +9,6 @@ use App\Domain\Assessment\Events\AssessmentScored;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\Kobo\KoboConfig;
-use App\Domain\Ingestion\Odk\OdkCentralSource;
 use App\Domain\Ingestion\Odk\OdkConfig;
 use App\Domain\Ingestion\Odk\SessionTokenCache;
 use App\Domain\Reporting\DTOs\ReportFilter;
@@ -24,6 +23,7 @@ use App\Domain\Validation\Events\QuarantineResolved;
 use App\Domain\Validation\Events\SubmissionQuarantined;
 use App\Domain\Validation\Listeners\FlushOpenQuarantineCount;
 use App\Domain\Validation\Listeners\RescoreAfterQuarantineResolved;
+use App\Support\Security\TwoFactorSwitch;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -43,12 +43,11 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // ODK (ARCHITECTURE.md §5.2): settings read from config each time, so nothing stale is
-        // held; the source behind the contract is ODK Central (another adapter if Q-01 says so).
+        // The sources (ARCHITECTURE.md §5.2): settings read from config each time, so nothing stale
+        // is held. There is no default SubmissionSource: SourceRegistry::adapter() names the source.
         $this->app->bind(OdkConfig::class, fn (): OdkConfig => OdkConfig::fromConfig());
         $this->app->bind(KoboConfig::class, fn (): KoboConfig => KoboConfig::fromConfig());
         $this->app->bind(SessionTokenCache::class, fn ($app): SessionTokenCache => new SessionTokenCache($app->make(OdkConfig::class)->refreshMinutes));
-        $this->app->bind(SubmissionSource::class, OdkCentralSource::class);
     }
 
     /**
@@ -56,11 +55,16 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // EDQA_REQUIRE_2FA=false is for local development only: anywhere else the app stops here.
+        TwoFactorSwitch::assertAllowed();
         $this->configureDefaults();
 
         // "Pull now": 6 a minute per administrator (SECURITY.md §8). Named, with its own key, so it
         // is not counted together with the API group's 120 a minute.
-        RateLimiter::for('odk-pull', fn (Request $request): Limit => Limit::perMinute(6)->by('odk-pull:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        // Pull, pull all and reconcile: 6 a minute per administrator, per source and action (the path).
+        RateLimiter::for('source-pull', fn (Request $request): Limit => Limit::perMinute(6)->by('source-pull:'.($request->user()?->getAuthIdentifier() ?? $request->ip()).':'.$request->path()));
+        // The webhooks: 60 a minute per source and sending address.
+        RateLimiter::for('webhook', fn (Request $request): Limit => Limit::perMinute(60)->by('webhook:'.$request->path().':'.$request->ip()));
 
         // Domain listeners live outside app/Listeners, so they are registered here.
         Event::listen(QuarantineResolved::class, RescoreAfterQuarantineResolved::class);

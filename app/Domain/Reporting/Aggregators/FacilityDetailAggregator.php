@@ -108,7 +108,7 @@ final class FacilityDetailAggregator
             flags: $assessment === null ? [] : $this->flags($assessment, $activity['overrides']),
             attachments: $source === null ? [] : $source->attachments,
             activity: $activity['entries'],
-            odk: ['instance_id' => $source?->instanceId, 'url' => $source?->centralUrl],
+            source: ['key' => $source?->sourceKey, 'name' => $source?->sourceName, 'instance_id' => $source?->instanceId, 'url' => $source?->url],
         );
     }
 

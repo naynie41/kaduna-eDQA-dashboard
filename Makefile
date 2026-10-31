@@ -8,7 +8,7 @@ APP_DB_USER     := edqa_app
 APP_DB_PASSWORD := edqa_app_dev
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e e2e-odk e2e-issues size lighthouse odk-mock-up odk-mock-seed
+.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e e2e-sources e2e-issues size lighthouse odk-mock-up odk-mock-seed sources-mock-up sources-mock-seed
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-13s %s\n", $$1, $$2}'
@@ -78,13 +78,16 @@ e2e: ## Playwright against the running dev stack (seeds the local e2e admin firs
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
 	$(COMPOSE) --profile e2e run --rm playwright $(c)
 
-e2e-odk: ## Playwright against the mock ODK Central: Pull now end to end (tests/e2e/odk-pull.spec.ts); the stack is put back after
-	$(COMPOSE) --profile odk up -d odk-mock
-	$(EXEC) php artisan edqa:odk-mock:generate --count=20 --broken=2 --seed=$$(date +%s)
+e2e-sources: ## Playwright against both mocks: Pull all end to end, the duplicate in Data issues (tests/e2e/sources.spec.ts); the stack is put back after
+	$(COMPOSE) --profile sources up -d odk-mock kobo-mock
+	$(EXEC) php artisan edqa:source-mock:generate odk --count=20 --broken=2 --seed=$$(date +%s)
+	@# 4 of Kobo's visits are on ODK too: 2 copied (cross-source duplicates), 2 entered again (DUPLICATE_ASSESSMENT).
+	$(EXEC) php artisan edqa:source-mock:generate kobo --count=20 --broken=2 --overlap=4 --seed=$$(date +%s)
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
-	$(COMPOSE) -f compose.e2e-odk.yml up -d --wait app worker
+	$(COMPOSE) -f compose.e2e-sources.yml up -d --wait app worker
+	$(COMPOSE) -f compose.e2e-sources.yml exec -T app php artisan edqa:sources:sync
 	@# --no-deps: run would otherwise recreate app (a dependency of web) without the override.
-	$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_ODK=1 playwright tests/e2e/odk-pull.spec.ts $(c); status=$$?; \
+	$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_SOURCES=1 playwright tests/e2e/sources.spec.ts $(c); status=$$?; \
 		$(COMPOSE) up -d --wait app worker; exit $$status
 
 e2e-issues: ## Playwright on the Data issues page with known broken records held through the real pipeline (tests/e2e/data-issues.spec.ts)
@@ -98,6 +101,13 @@ odk-mock-up: ## Start the mock ODK Central (odk-mock:8080 in the stack, 127.0.0.
 
 odk-mock-seed: ## Write raw submissions for the mock: make odk-mock-seed n=200
 	$(EXEC) php artisan edqa:odk-mock:generate --count=$(or $(n),200)
+
+sources-mock-up: ## Start both source mocks: odk-mock (127.0.0.1:8090) and kobo-mock (127.0.0.1:8091)
+	$(COMPOSE) --profile sources up -d odk-mock kobo-mock
+
+sources-mock-seed: ## Write n submissions on each mock, 10 of Kobo's also on ODK: make sources-mock-seed n=200
+	$(EXEC) php artisan edqa:source-mock:generate odk --count=$(or $(n),200)
+	$(EXEC) php artisan edqa:source-mock:generate kobo --count=$(or $(n),200) --overlap=10
 
 lighthouse: ##Lighthouse on Slow 3G (Home, Facility view, Visuals) against a production build; Vite restarts after
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction

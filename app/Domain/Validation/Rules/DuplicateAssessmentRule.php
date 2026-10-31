@@ -16,6 +16,9 @@ use App\Domain\Validation\ValidationContext;
  * deprecatedID is the submission behind the existing assessment, or a reprocess of that same
  * instance (ValidationContext::duplicateOf).
  *
+ * The detail names both sources (ARCHITECTURE.md §5.8): the one the accepted assessment came from
+ * and this submission's, whichever tool each was entered with.
+ *
  * Silent when the facility or round did not resolve: FACILITY_UNKNOWN and ROUND_WINDOW report it.
  */
 final class DuplicateAssessmentRule implements ValidationRule
@@ -54,6 +57,19 @@ final class DuplicateAssessmentRule implements ValidationRule
             'round' => $this->roundLabel($round->year, $round->quarter),
             'code' => $facility->code,
             'instance' => $existing,
+            'existing_source' => self::sourceName($context->acceptedSource($existing)),
+            'source' => self::sourceName($submission->source),
         ], 'facility_code')];
+    }
+
+    /** A source as administrators know it ("ODK Central"); its key when config has no name. */
+    private static function sourceName(?string $key): string
+    {
+        if ($key === null || $key === '') {
+            return (string) __('validation_rules.DUPLICATE_ASSESSMENT.unknown_source');
+        }
+        $name = config("edqa.sources.{$key}.name");
+
+        return is_string($name) && $name !== '' ? $name : $key;
     }
 }

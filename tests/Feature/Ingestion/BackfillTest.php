@@ -5,21 +5,20 @@ declare(strict_types=1);
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Ingestion\Actions\BackfillSubmissions;
 use App\Domain\Ingestion\Actions\PullSubmissions;
-use App\Domain\Ingestion\Contracts\SubmissionSource;
+use App\Domain\Ingestion\Aggregators\SourceStatusAggregator;
+use App\Domain\Ingestion\BackfillLock;
 use App\Domain\Ingestion\Enums\AttachmentStatus;
 use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Exceptions\BackfillRefused;
-use App\Domain\Ingestion\Jobs\BackfillOdkSubmissionsJob;
+use App\Domain\Ingestion\Jobs\BackfillSubmissionsJob;
 use App\Domain\Ingestion\Jobs\FetchAttachmentsJob;
 use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Ingestion\Models\SubmissionAttachment;
-use App\Domain\Ingestion\Odk\BackfillLock;
 use App\Domain\Ingestion\Queries\BackfillReportQuery;
-use App\Domain\Reporting\Aggregators\ShellStatusAggregator;
 use App\Domain\Scoring\CurrentRuleVersion;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use Carbon\CarbonImmutable;
@@ -53,7 +52,7 @@ beforeEach(function (): void {
     Storage::fake('attachments');
     Storage::fake('exports');
     $this->source = new FakeSubmissionSource;
-    app()->instance(SubmissionSource::class, $this->source);
+    useSource('odk', $this->source);
 });
 
 /**
@@ -82,7 +81,7 @@ function bfEntry(int $n, string $visit = '2026-04-14', ?string $version = null, 
 
 function bfRun(?int $fromPage = null, ?int $throttle = null): PullRun
 {
-    return app(BackfillSubmissions::class)->execute($fromPage, $throttle)->run->refresh();
+    return app(BackfillSubmissions::class)->execute('odk', $fromPage, $throttle)->run->refresh();
 }
 
 function bfSync(): SourceSync
@@ -162,7 +161,7 @@ it('starts at --from-page instead of the checkpoint', function (): void {
 
 it('stores nothing twice when it overlaps the incremental pull, either way round', function (): void {
     $this->source->add(...array_map(fn (int $n): array => bfEntry($n), range(1, 4)));
-    app(PullSubmissions::class)->execute(PullTrigger::Scheduled);
+    app(PullSubmissions::class)->execute('odk', PullTrigger::Scheduled);
     $this->source->add(...array_map(fn (int $n): array => bfEntry($n), range(5, 7)));
 
     $run = bfRun();
@@ -172,7 +171,7 @@ it('stores nothing twice when it overlaps the incremental pull, either way round
         ->and(Assessment::query()->whereIn('submission_id', bfStored()->select('id'))->count())->toBe(7);
 
     // The pull after it starts from what the backfill reached: only the boundary row again.
-    $pull = app(PullSubmissions::class)->execute(PullTrigger::Scheduled)->refresh();
+    $pull = app(PullSubmissions::class)->execute('odk', PullTrigger::Scheduled)->refresh();
     expect($pull->only(['fetched', 'duplicates', 'accepted']))->toBe(['fetched' => 1, 'duplicates' => 1, 'accepted' => 0])
         ->and(bfSync()->cursor_at?->equalTo(CarbonImmutable::parse('2026-04-20T10:07:00Z')))->toBeTrue();
 });
@@ -227,7 +226,7 @@ it('refuses to start before any historical round exists, and points at the surve
     $this->source->add(bfEntry(1));
 
     expect(fn () => bfRun())->toThrow(BackfillRefused::class);
-    $this->artisan('edqa:backfill')->expectsOutputToContain('edqa:backfill --survey')->assertFailed();
+    $this->artisan('edqa:backfill', ['source' => 'odk'])->expectsOutputToContain('edqa:backfill {source} --survey')->assertFailed();
     expect(PullRun::query()->count())->toBe(0)
         ->and(bfStored()->count())->toBe(0)
         ->and($this->source->calls)->toBe([]);
@@ -237,7 +236,7 @@ it('refuses a second backfill while one runs', function (): void {
     $held = Cache::lock(BackfillLock::NAME, 60);
     expect($held->get())->toBeTrue();
 
-    $this->artisan('edqa:backfill')->expectsOutputToContain(__('backfill.refused.already_running'))->assertFailed();
+    $this->artisan('edqa:backfill', ['source' => 'odk'])->expectsOutputToContain(__('backfill.refused.already_running'))->assertFailed();
     $held->release();
 });
 
@@ -245,7 +244,7 @@ it('surveys submissions per quarter and form version without writing anything', 
     $this->source->add(bfEntry(1, '2025-08-12', '2025.2'), bfEntry(2, '2025-08-20', '2025.2'), bfEntry(3, '2026-02-10'), bfEntry(4, '2026-04-14'), bfEntry(5, '2026-04-15', '2019.9'));
     $before = DB::table('submissions')->count();
 
-    $this->artisan('edqa:backfill', ['--survey' => true])
+    $this->artisan('edqa:backfill', ['source' => 'odk', '--survey' => true])
         ->expectsOutputToContain('Survey: 5 submission(s)')
         ->expectsTable(['Quarter', 'Form version', 'Field map', 'Round', 'Submissions'], [
             ['2025 Q3', '2025.2', 'yes', 'none', 2],
@@ -268,7 +267,7 @@ it('dry-runs the whole history without writing anything', function (): void {
     $this->source->add(bfEntry(6, '2025-08-12'));
     $before = [DB::table('submissions')->count(), DB::table('assessments')->count(), DB::table('quarantined_records')->count()];
 
-    $this->artisan('edqa:backfill', ['--dry-run' => true])
+    $this->artisan('edqa:backfill', ['source' => 'odk', '--dry-run' => true])
         ->expectsOutputToContain('Fetched 6; 0 already stored; of the rest 5 would be accepted, 0 flagged and 1 quarantined.')
         ->assertSuccessful();
 
@@ -277,12 +276,12 @@ it('dry-runs the whole history without writing anything', function (): void {
 });
 
 it('runs on the low queue in chunks, each carrying on the same run from the checkpoint', function (): void {
-    config(['edqa.odk.backfill.job_seconds' => 0]); // one page a job
+    config(['edqa.backfill.job_seconds' => 0]); // one page a job
     $this->source->add(...array_map(fn (int $n): array => bfEntry($n), range(1, 7)));
 
-    $job = new BackfillOdkSubmissionsJob;
+    $job = new BackfillSubmissionsJob('odk');
     expect($job->queue)->toBe('low');
-    BackfillOdkSubmissionsJob::dispatchSync(); // the sync queue runs each next chunk at once
+    BackfillSubmissionsJob::dispatchSync('odk'); // the sync queue runs each next chunk at once
 
     $run = PullRun::query()->sole();
     expect($run->outcome)->toBe(PullOutcome::Succeeded)
@@ -292,25 +291,25 @@ it('runs on the low queue in chunks, each carrying on the same run from the chec
 });
 
 it('queues the next chunk with its run when the time is up', function (): void {
-    config(['edqa.odk.backfill.job_seconds' => 0]);
-    Queue::fake([BackfillOdkSubmissionsJob::class]);
+    config(['edqa.backfill.job_seconds' => 0]);
+    Queue::fake([BackfillSubmissionsJob::class]);
     $this->source->add(...array_map(fn (int $n): array => bfEntry($n), range(1, 7)));
 
-    (new BackfillOdkSubmissionsJob(throttle: 3))->handle(app(BackfillSubmissions::class), app(BackfillLock::class));
+    (new BackfillSubmissionsJob('odk', throttle: 3))->handle(app(BackfillSubmissions::class), app(BackfillLock::class));
 
     $run = PullRun::query()->sole();
     expect($run->outcome)->toBeNull()
         ->and(bfSync()->backfill_checkpoint)->toBe(3);
-    Queue::assertPushed(BackfillOdkSubmissionsJob::class, fn (BackfillOdkSubmissionsJob $next): bool => $next->runId === $run->id && $next->fromPage === null && $next->throttle === 3);
+    Queue::assertPushed(BackfillSubmissionsJob::class, fn (BackfillSubmissionsJob $next): bool => $next->runId === $run->id && $next->fromPage === null && $next->throttle === 3);
 });
 
 it('keeps the status bar on the incremental pull: a backfill run is not "the last pull"', function (): void {
     Rows::pullRun(['trigger_type' => 'scheduled', 'outcome' => 'succeeded', 'started_at' => now()->subMinutes(6), 'finished_at' => now()->subMinutes(5)]);
     Rows::pullRun(['trigger_type' => 'backfill', 'outcome' => 'failed', 'started_at' => now()->subMinutes(2), 'finished_at' => now()->subMinute(), 'error' => 'RuntimeException: boom']);
 
-    $status = app(ShellStatusAggregator::class)->sync();
+    $status = app(SourceStatusAggregator::class)->source('odk');
 
-    expect($status['state'])->toBe('ok')
+    expect($status['state'])->toBe('healthy')
         ->and($status['lastError'])->toBeNull()
         ->and($status['minutesSinceSuccess'])->toBe(5);
 });
@@ -328,7 +327,7 @@ it('writes a backfill report whose numbers reconcile with the tables', function 
     $edit['meta'] = ['instanceID' => 'uuid:bf-8-v2', 'deprecatedID' => 'uuid:bf-8'];
     $edit['__system']['updatedAt'] = '2026-05-01T08:00:00.000Z';
     $this->source->add($edit);
-    app(PullSubmissions::class)->execute(PullTrigger::Scheduled);
+    app(PullSubmissions::class)->execute('odk', PullTrigger::Scheduled);
 
     $report = app(BackfillReportQuery::class)->build();
     $total = collect($report->rounds)->firstWhere('total', true);
@@ -366,8 +365,8 @@ it('writes a backfill report whose numbers reconcile with the tables', function 
     if ($format === 'md') {
         expect($body)->toContain('# Backfill report')->toContain('| Q2 2026 |')->toContain('ROUND_WINDOW')->toContain('UNKNOWN_FORM_VERSION');
     } else {
-        expect(str_getcsv(strtok((string) $body, "\n"), escape: ''))->toBe(['section', 'rule', 'round', 'year', 'version', 'measure', 'value', 'detail'])
-            ->and($body)->toContain('by_round,,total,,,pulled,'.$total['pulled']);
+        expect(str_getcsv(strtok((string) $body, "\n"), escape: ''))->toBe(['section', 'source', 'rule', 'round', 'year', 'version', 'measure', 'value', 'detail'])
+            ->and($body)->toContain('by_round,,,total,,,pulled,'.$total['pulled']);
     }
 })->with(['md', 'csv']);
 

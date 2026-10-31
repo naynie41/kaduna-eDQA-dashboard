@@ -17,7 +17,7 @@ const STYLE: Record<Band, { tone: string; mark: string }> = {
 
 /** The Status column: the band's label, always as text. */
 export default function StatusLabel({ band, label }: StatusLabelProps) {
-    const style = band === null ? { tone: 'bg-wash text-ink-2', mark: '–' } : STYLE[band];
+    const style = band === null ? { tone: 'bg-paper text-ink-2', mark: '–' } : STYLE[band];
 
     return (
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] leading-normal whitespace-nowrap ${style.tone}`}>

@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Domain\Ingestion\Actions\ProcessParsedBatch;
+use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\Kobo\KoboPayloadNormalizer;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Ingestion\Odk\OdkPayloadNormalizer;
+use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Reporting\Jobs\RefreshRoundAggregatesJob;
 use App\Domain\Validation\Contracts\ValidationRule;
@@ -22,6 +24,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\Support\OdkPayload;
+use Tests\Support\Rows;
 use Tests\TestCase;
 
 // Feature tests boot the app and run against the edqa_test Postgres database (never SQLite).
@@ -105,6 +108,32 @@ function submissionRow(ParsedSubmission $parsed): Submission
 function odkParse(array $raw): ParsedSubmission
 {
     return app(SubmissionParser::class)->parse(app(OdkPayloadNormalizer::class)->normalise($raw));
+}
+
+/** Binds an adapter for one source key in place of the real one (SourceRegistry::adapter). */
+function useSource(string $key, SubmissionSource $adapter): void
+{
+    app()->instance(SourceRegistry::adapterBinding($key), $adapter);
+}
+
+/**
+ * Both sources configured with test credentials (never real ones), their rows registered, pages
+ * of $pageSize, no backfill throttle and no heartbeat.
+ */
+function configureSources(int $pageSize = 3): void
+{
+    config(['edqa.sources.odk' => [...config('edqa.sources.odk'),
+        'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'secret-for-tests', 'project_id' => '7', 'form_id' => 'dqa',
+        'page_size' => $pageSize, 'backfill_throttle_seconds' => 0, 'enabled' => true,
+    ]]);
+    config(['edqa.sources.kobo' => [...config('edqa.sources.kobo'),
+        'url' => 'https://kobo.example.org', 'token' => 'token-for-tests', 'asset_uid' => 'aKdDqaForm2026',
+        'page_size' => $pageSize, 'backfill_throttle_seconds' => 0, 'enabled' => true,
+    ]]);
+    config(['edqa.heartbeats.pull' => ['odk' => null, 'kobo' => null]]);
+    Rows::sourceId('odk');
+    Rows::sourceId('kobo');
+    app(SourceRegistry::class)->flush();
 }
 
 /** A raw KoboToolbox data row read as the pipeline reads it: its normaliser, then the parser. */

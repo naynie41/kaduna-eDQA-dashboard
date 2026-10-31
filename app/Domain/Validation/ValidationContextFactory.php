@@ -36,12 +36,14 @@ final class ValidationContextFactory
         $facilityIds = array_values(array_map(fn (FacilitySnapshot $f): int => $f->id, $facilities));
         $rounds = $this->rounds();
         [$ruleVersionId, $ruleConfig] = $this->ruleVersion();
+        [$accepted, $acceptedSources] = $this->acceptedInstances($facilityIds);
 
         return new ValidationContext(
             lgas: $this->lgas(),
             facilities: $facilities,
             rounds: $rounds,
-            acceptedInstances: $this->acceptedInstances($facilityIds),
+            acceptedInstances: $accepted,
+            acceptedSources: $acceptedSources,
             priorScores: $this->priorScores($facilityIds, $rounds),
             assessorDays: $this->assessorDays($submissions),
             knownFormVersions: $this->knownFormVersions(),
@@ -111,22 +113,29 @@ final class ValidationContextFactory
      * Every row in assessments is accepted: assessments are only created from submissions that
      * passed the hard rules (round_aggregates.sql, assumption A1).
      *
+     * Each with the key of the source it came from (§5.8: a duplicate names both sources).
+     *
      * @param  list<int>  $facilityIds
-     * @return array<string, list<string>>
+     * @return array{0: array<string, list<string>>, 1: array<string, string>} "round:facility" => instance IDs; instance ID => source key
      */
     private function acceptedInstances(array $facilityIds): array
     {
         $accepted = [];
+        $sources = [];
         $rows = DB::table('assessments')
             ->join('submissions', 'submissions.id', '=', 'assessments.submission_id')
+            ->leftJoin('submission_sources', 'submission_sources.id', '=', 'submissions.source_id')
             ->whereIn('assessments.facility_id', $facilityIds)
-            ->get(['assessments.round_id', 'assessments.facility_id', 'submissions.instance_id']);
+            ->get(['assessments.round_id', 'assessments.facility_id', 'submissions.instance_id', 'submission_sources.key as source']);
 
         foreach ($rows as $row) {
             $accepted["{$row->round_id}:{$row->facility_id}"][] = (string) $row->instance_id;
+            if (is_string($row->source)) {
+                $sources[(string) $row->instance_id] = $row->source;
+            }
         }
 
-        return $accepted;
+        return [$accepted, $sources];
     }
 
     /**

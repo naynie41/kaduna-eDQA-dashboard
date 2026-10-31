@@ -2,9 +2,10 @@
 the field map.
 
 Answers Q-02 (cascading facility select, select_one scored items) and Q-05 (how far names drift).
-Reads the XForms downloaded by form_versions.py. Local files only; no ODK calls.
+Reads, from the forms directory, XForms (*.xml: ODK Central, form_versions.py) and XLSForms
+(*.xlsx: KoboToolbox, kobo_forms.py, or any XLSForm). Local files only; no network calls.
 
-Writes:
+Writes (with --source kobo, the same files prefixed kobo_, so the ODK ones are kept):
   out/field_diff.md                 per-version contract check, drift and effort
   out/field_map.draft.json          full map per version (input to rule_preview.py; not committed)
   out/edqa_field_maps.draft.php     same map in the config/edqa_field_maps.php shape (§5.5)
@@ -12,7 +13,9 @@ Writes:
 Everything inferred by name is flagged CONFIRM. Only start/end (from their preload) and
 meta/instanceID are taken as certain.
 
-Usage: python field_diff.py [--forms data/forms]
+Usage:
+  python field_diff.py                 # ODK Central: data/forms
+  python field_diff.py --source kobo   # KoboToolbox: data/kobo/forms, versions keyed by deployment uid
 """
 
 from __future__ import annotations
@@ -21,11 +24,13 @@ import argparse
 import json
 import re
 import sys
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 from lxml import etree
+from openpyxl import load_workbook
 from rapidfuzz import fuzz
 from rich.console import Console
 
@@ -204,6 +209,100 @@ def parse_xform(path: Path, published: str = "") -> FormVersion:
     for q in questions.values():
         q.in_repeat = any(q.path.startswith(r + "/") for r in repeats if r)
     return FormVersion(version, published, title, path, questions, repeats)
+
+
+# XLSForm question types as their XForm binds and preloads (what parse_xform reads from the XML).
+XLS_BIND = {"integer": "int", "decimal": "decimal", "range": "int", "text": "string",
+            "date": "date", "time": "time", "datetime": "dateTime", "geopoint": "geopoint",
+            "geotrace": "geotrace", "geoshape": "geoshape", "barcode": "barcode",
+            "image": "binary", "audio": "binary", "video": "binary", "file": "binary"}
+XLS_MEDIA = {"image": "image/*", "audio": "audio/*", "video": "video/*", "file": ""}
+XLS_PRELOAD = {"start": ("timestamp:start", "dateTime"), "end": ("timestamp:end", "dateTime"),
+               "today": ("date:today", "date"), "deviceid": ("property:deviceid", "string"),
+               "username": ("property:username", "string")}
+
+
+def _xls_rows(wb, sheet: str) -> list[dict[str, str]]:
+    if sheet not in wb.sheetnames:
+        return []
+    rows = wb[sheet].iter_rows(values_only=True)
+    header = [str(h or "").strip().lower() for h in next(rows, ())]
+    return [{h: ("" if v is None else str(v).strip()) for h, v in zip(header, row) if h} for row in rows]
+
+
+def _xls_type(raw: str) -> tuple[str, str]:
+    """'select_one yesno' -> ('select_one', 'yesno'); 'begin group' -> ('begin_group', '')."""
+    head, _, arg = re.sub(r"\s+", " ", raw.strip()).partition(" ")
+    head = head.lower()
+    if head in ("begin", "end") and arg:
+        word, _, arg = arg.partition(" ")
+        head = f"{head}_{word.lower()}"
+    return head, arg.strip()
+
+
+def parse_xlsform(path: Path, published: str = "") -> FormVersion:
+    """An XLSForm read into the same shape parse_xform gives, paths as the data carries them
+    (groups joined with /, the root left out). meta/instanceID is added, as every XForm built from
+    an XLSForm has it."""
+    wb = load_workbook(path, read_only=True, data_only=True)
+    choices: dict[str, list[str]] = defaultdict(list)
+    for row in _xls_rows(wb, "choices"):
+        if row.get("list_name") and row.get("name"):
+            choices[row["list_name"]].append(row["name"])
+    settings = (_xls_rows(wb, "settings") or [{}])[0]
+
+    questions: dict[str, Question] = {}
+    repeats: list[str] = []
+    stack: list[str] = []
+    truthy = ("true", "yes", "1", "true()")
+    for row in _xls_rows(wb, "survey"):
+        kind, arg = _xls_type(row.get("type", ""))
+        name = row.get("name", "")
+        if not kind:
+            continue
+        if kind in ("begin_group", "begin_repeat"):
+            stack.append(name)
+            if kind == "begin_repeat":
+                repeats.append("/".join(stack))
+            continue
+        if kind in ("end_group", "end_repeat"):
+            if stack:
+                stack.pop()
+            continue
+        if not name:
+            continue
+        rel = "/".join([*stack, name])
+        q = Question(path=rel, leaf=name, required=row.get("required", "").lower() in truthy,
+                     readonly=row.get("read_only", "").lower() in truthy)
+        if kind in XLS_PRELOAD:
+            q.preload, q.bind_type = XLS_PRELOAD[kind]
+        elif kind == "calculate":
+            q.calculate, q.bind_type = True, "string"
+        elif kind == "hidden":
+            q.bind_type = "string"
+        elif kind == "note":
+            q.control, q.bind_type, q.readonly = "input", "string", True
+        elif kind in ("select_one", "select_multiple"):
+            q.control, q.bind_type = ("select1" if kind == "select_one" else "select"), "string"
+            q.choices, q.choice_source = list(choices.get(arg, [])), "inline"
+            q.choice_filtered = bool(row.get("choice_filter"))
+        elif kind in ("select_one_from_file", "select_multiple_from_file"):
+            q.control = "select1" if kind == "select_one_from_file" else "select"
+            q.bind_type, q.choice_source = "string", f"file:{arg}"
+            q.choice_filtered = bool(row.get("choice_filter"))
+        elif kind in XLS_BIND:
+            q.bind_type = XLS_BIND[kind]
+            q.control = "upload" if q.bind_type == "binary" else "input"
+            q.mediatype = XLS_MEDIA.get(kind, "")
+        else:
+            q.control, q.bind_type = "input", "string"
+        questions.setdefault(rel, q)
+    questions.setdefault("meta/instanceID", Question(path="meta/instanceID", leaf="instanceID",
+                                                     bind_type="string", calculate=True, readonly=True))
+    for q in questions.values():
+        q.in_repeat = any(q.path.startswith(r + "/") for r in repeats if r)
+    return FormVersion(settings.get("version", ""), published, settings.get("form_title", ""), path,
+                       questions, repeats)
 
 
 # ------------------------------------------------------------------------------ analysis
@@ -449,19 +548,25 @@ def effort(entry: dict, checks: list[Check], is_default: bool) -> str:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    p.add_argument("--forms", type=Path, default=HERE / "data" / "forms")
+    p.add_argument("--source", choices=("odk", "kobo"), default="odk",
+                   help="which source's forms: odk (XForms, data/forms) or kobo (XLSForms, data/kobo/forms)")
+    p.add_argument("--forms", type=Path, help="the forms directory (default: the source's)")
     args = p.parse_args()
+    kobo = args.source == "kobo"
+    forms_dir = args.forms or (HERE / "data" / "kobo" / "forms" if kobo else HERE / "data" / "forms")
+    prefix = "kobo_" if kobo else ""
 
     published: dict[str, str] = {}
-    index = OUT_DIR / "form_versions.json"
+    index = OUT_DIR / ("kobo_form_versions.json" if kobo else "form_versions.json")
     if index.exists():
         for v in json.loads(index.read_text(encoding="utf-8"))["versions"]:
             published[v["version"]] = v.get("publishedAt") or ""
-    files = sorted(args.forms.glob("*.xml"))
+    files = sorted([*forms_dir.glob("*.xml"), *forms_dir.glob("*.xlsx")])
     if not files:
-        sys.exit(f"No XForms in {args.forms}; run form_versions.py first")
+        sys.exit(f"No XForms or XLSForms in {forms_dir}; run "
+                 + ("kobo_forms.py" if kobo else "form_versions.py") + " first")
 
-    versions = [parse_xform(f) for f in files]
+    versions = [parse_xlsform(f) if f.suffix == ".xlsx" else parse_xform(f) for f in files]
     for fv in versions:
         fv.published = published.get(fv.version, "")
     versions.sort(key=lambda fv: (fv.published or "", fv.version))
@@ -483,18 +588,20 @@ def main() -> None:
                                for o, n, _ in d["renames"]]
 
     OUT_DIR.mkdir(exist_ok=True)
-    (OUT_DIR / "field_map.draft.json").write_text(json.dumps(
-        {"generated": datetime.now().isoformat(timespec="seconds"), "default": default,
-         "versions": maps}, indent=2), encoding="utf-8")
-    (OUT_DIR / "edqa_field_maps.draft.php").write_text(build_php(maps, default, renames),
-                                                        encoding="utf-8")
+    (OUT_DIR / f"{prefix}field_map.draft.json").write_text(json.dumps(
+        {"generated": datetime.now().isoformat(timespec="seconds"), "source": args.source,
+         "default": default, "versions": maps}, indent=2), encoding="utf-8")
+    (OUT_DIR / f"{prefix}edqa_field_maps.draft.php").write_text(build_php(maps, default, renames),
+                                                                 encoding="utf-8")
 
     all_paths = set().union(*(fv.questions for fv in versions))
     lines = [
-        "# Field diff and form contract",
+        "# Field diff and form contract" + (" (KoboToolbox)" if kobo else ""),
         "",
-        f"Generated {datetime.now():%Y-%m-%d %H:%M} by `discovery/field_diff.py` from "
-        f"{len(versions)} XForm(s).",
+        f"Generated {datetime.now():%Y-%m-%d %H:%M} by `discovery/field_diff.py --source {args.source}` from "
+        f"{len(versions)} form(s)."
+        + (" Versions are Kobo deployment uids: each goes under `sources.kobo` in "
+           "config/edqa_field_maps.php, pointing at the map of the XLSForm it deploys (D-63)." if kobo else ""),
         "",
         "## Versions",
         "",
@@ -543,12 +650,12 @@ def main() -> None:
     lines += [
         "## Draft field map",
         "",
-        "`out/edqa_field_maps.draft.php` (and `field_map.draft.json` for rule_preview.py). "
+        f"`out/{prefix}edqa_field_maps.draft.php` (and `{prefix}field_map.draft.json` for rule_preview.py). "
         "Entries marked CONFIRM were inferred from question names.",
     ]
-    (OUT_DIR / "field_diff.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    console.print(f"{len(versions)} versions, default `{default}`. Wrote out/field_diff.md, "
-                  f"out/edqa_field_maps.draft.php, out/field_map.draft.json")
+    (OUT_DIR / f"{prefix}field_diff.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    console.print(f"{len(versions)} versions, default `{default}`. Wrote out/{prefix}field_diff.md, "
+                  f"out/{prefix}edqa_field_maps.draft.php, out/{prefix}field_map.draft.json")
 
 
 if __name__ == "__main__":

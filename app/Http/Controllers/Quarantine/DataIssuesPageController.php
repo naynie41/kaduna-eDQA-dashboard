@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Quarantine;
 
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Facility\Models\Lga;
+use App\Domain\Ingestion\Exceptions\SourceRefused;
+use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Reporting\Aggregators\SoftFlagAggregator;
 use App\Domain\Reporting\Queries\FlaggedAssessmentsQuery;
 use App\Domain\Round\Models\Round;
@@ -27,12 +29,15 @@ use Inertia\Response;
  * severity, name, why it exists and its open count), the filters in the URL, and one page of
  * rows: quarantined records on the Hard tab, flagged accepted assessments on the Soft tab. The
  * page acts through the 2A.8 API (resolve, bulk resolve, override) and reloads only what changed.
+ * The source filter is a configured key, turned here into its row id for both tabs; every
+ * configured source is offered in config order.
  */
 final class DataIssuesPageController extends Controller
 {
-    public function __invoke(DataIssuesRequest $request, RuleCatalogue $catalogue, QuarantineQuery $quarantine, SoftFlagAggregator $soft, FlaggedAssessmentsQuery $flagged): Response
+    public function __invoke(DataIssuesRequest $request, RuleCatalogue $catalogue, QuarantineQuery $quarantine, SoftFlagAggregator $soft, FlaggedAssessmentsQuery $flagged, SourceRegistry $sources): Response
     {
         $filters = $request->filters();
+        $query = [...$filters, 'source_id' => self::sourceId($sources, $filters['source'])];
         $softCodes = $catalogue->codes(Severity::Soft);
 
         return Inertia::render('admin/data-issues', [
@@ -50,24 +55,39 @@ final class DataIssuesPageController extends Controller
                 ], $catalogue->all());
             },
             'records' => fn () => $filters['tab'] === 'soft'
-                ? $flagged->page($softCodes, $filters)->through(fn (Assessment $a): array => (new FlaggedAssessmentResource($a, $softCodes))->resolve($request))
-                : self::hardPage($quarantine, $filters, $request),
+                ? $flagged->page($softCodes, $query)->through(fn (Assessment $a): array => (new FlaggedAssessmentResource($a, $softCodes))->resolve($request))
+                : self::hardPage($quarantine, $query, $request),
             'lgas' => fn (): array => Lga::query()->orderBy('name')->get(['code', 'name'])->map(fn (Lga $l): array => ['code' => $l->code, 'name' => $l->name])->all(),
             'rounds' => fn (): array => Round::query()->orderByDesc('year')->orderByDesc('quarter')->get(['id', 'year', 'quarter', 'status'])
                 ->map(fn (Round $r): array => ['id' => $r->id, 'year' => $r->year, 'quarter' => $r->quarter, 'status' => $r->status->value])->all(),
+            'sources' => fn (): array => array_map(fn (string $key): array => ['key' => $key, 'name' => $sources->name($key)], $sources->keys()),
             'correctable' => array_keys(CorrectAndReprocess::CORRECTABLE),
         ]);
     }
 
     /**
-     * @param  array{tab: string, state: string, rule: ?string, lga: ?string, round: ?int}  $filters
+     * @param  array{tab: string, state: string, rule: ?string, lga: ?string, round: ?int, source: ?string, source_id: ?int}  $filters
      * @return LengthAwarePaginator<int, array<array-key, mixed>>
      */
     private static function hardPage(QuarantineQuery $quarantine, array $filters, DataIssuesRequest $request): LengthAwarePaginator
     {
         $page = $quarantine->adminPage($filters);
         $names = $quarantine->facilityNames(array_map(fn (QuarantinedRecord $r): ?string => $r->facility_ref, $page->items()));
+        $originals = $quarantine->duplicateOriginals(array_values($page->items()));
 
-        return $page->through(fn (QuarantinedRecord $record): array => (new DataIssueRowResource($record, $names))->resolve($request));
+        return $page->through(fn (QuarantinedRecord $record): array => (new DataIssueRowResource($record, $names, $originals[$record->id] ?? null))->resolve($request));
+    }
+
+    /** The filter's source row id; -1 (matches nothing) for a configured source not registered yet. */
+    private static function sourceId(SourceRegistry $sources, ?string $key): ?int
+    {
+        if ($key === null) {
+            return null;
+        }
+        try {
+            return $sources->id($key);
+        } catch (SourceRefused) {
+            return -1;
+        }
     }
 }

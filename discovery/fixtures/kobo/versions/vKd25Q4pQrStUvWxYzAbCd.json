@@ -1,0 +1,554 @@
+{
+    "uid": "vKd25Q4pQrStUvWxYzAbCd",
+    "date_deployed": "2025-07-05T09:00:00Z",
+    "date_modified": "2025-07-05T09:00:00Z",
+    "content": {
+        "survey": [
+            {
+                "type": "start",
+                "name": "start"
+            },
+            {
+                "type": "end",
+                "name": "end"
+            },
+            {
+                "type": "deviceid",
+                "name": "deviceid"
+            },
+            {
+                "type": "text",
+                "name": "assessor",
+                "label": [
+                    "Assessor"
+                ],
+                "required": true
+            },
+            {
+                "type": "calculate",
+                "name": "round_year",
+                "calculation": "format-date(${start}, '%Y')"
+            },
+            {
+                "type": "calculate",
+                "name": "round_quarter",
+                "calculation": "int((format-date(${start}, '%n') - 1) div 3) + 1"
+            },
+            {
+                "type": "begin_group",
+                "name": "fac",
+                "label": [
+                    "Facility"
+                ]
+            },
+            {
+                "type": "select_one_from_file",
+                "name": "lga_name",
+                "file": "lgas.csv",
+                "label": [
+                    "LGA"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one_from_file",
+                "name": "ward_name",
+                "file": "wards.csv",
+                "choice_filter": "lga=${lga_name}",
+                "label": [
+                    "Ward"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one_from_file",
+                "name": "fac_code",
+                "file": "facilities.csv",
+                "choice_filter": "ward=${ward_name}",
+                "label": [
+                    "Facility"
+                ],
+                "required": true
+            },
+            {
+                "type": "end_group"
+            },
+            {
+                "type": "geopoint",
+                "name": "gps",
+                "label": [
+                    "Location"
+                ]
+            },
+            {
+                "type": "begin_group",
+                "name": "availability",
+                "label": [
+                    "Availability"
+                ]
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m1_nhmis_form",
+                "label": [
+                    "nhmis_summary, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m1_register_present",
+                "label": [
+                    "register_present, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m1_tally_sheet",
+                "label": [
+                    "tally_sheet, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m1_reporting_rate",
+                "label": [
+                    "reporting_rate, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m1_data_elements",
+                "label": [
+                    "data_elements, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m2_nhmis_form",
+                "label": [
+                    "nhmis_summary, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m2_register_present",
+                "label": [
+                    "register_present, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m2_tally_sheet",
+                "label": [
+                    "tally_sheet, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m2_reporting_rate",
+                "label": [
+                    "reporting_rate, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m2_data_elements",
+                "label": [
+                    "data_elements, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m3_nhmis_form",
+                "label": [
+                    "nhmis_summary, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m3_register_present",
+                "label": [
+                    "register_present, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m3_tally_sheet",
+                "label": [
+                    "tally_sheet, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m3_reporting_rate",
+                "label": [
+                    "reporting_rate, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "avail_m3_data_elements",
+                "label": [
+                    "data_elements, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "end_group"
+            },
+            {
+                "type": "begin_group",
+                "name": "consistency",
+                "label": [
+                    "Consistency"
+                ]
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m1_nhmis_summary",
+                "label": [
+                    "nhmis_summary, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m1_register_present",
+                "label": [
+                    "register_present, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m1_tally_sheet",
+                "label": [
+                    "tally_sheet, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m1_reporting_rate",
+                "label": [
+                    "reporting_rate, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m1_data_elements",
+                "label": [
+                    "data_elements, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m2_nhmis_summary",
+                "label": [
+                    "nhmis_summary, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m2_register_present",
+                "label": [
+                    "register_present, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m2_tally_sheet",
+                "label": [
+                    "tally_sheet, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m2_reporting_rate",
+                "label": [
+                    "reporting_rate, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m2_data_elements",
+                "label": [
+                    "data_elements, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m3_nhmis_summary",
+                "label": [
+                    "nhmis_summary, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m3_register_present",
+                "label": [
+                    "register_present, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m3_tally_sheet",
+                "label": [
+                    "tally_sheet, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m3_reporting_rate",
+                "label": [
+                    "reporting_rate, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "consist_m3_data_elements",
+                "label": [
+                    "data_elements, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "end_group"
+            },
+            {
+                "type": "begin_group",
+                "name": "validity",
+                "label": [
+                    "Validity"
+                ]
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m1_nhmis_summary",
+                "label": [
+                    "nhmis_summary, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m1_register_present",
+                "label": [
+                    "register_present, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m1_tally_sheet",
+                "label": [
+                    "tally_sheet, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m1_reporting_rate",
+                "label": [
+                    "reporting_rate, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m1_data_elements",
+                "label": [
+                    "data_elements, month 1"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m2_nhmis_summary",
+                "label": [
+                    "nhmis_summary, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m2_register_present",
+                "label": [
+                    "register_present, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m2_tally_sheet",
+                "label": [
+                    "tally_sheet, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m2_reporting_rate",
+                "label": [
+                    "reporting_rate, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m2_data_elements",
+                "label": [
+                    "data_elements, month 2"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m3_nhmis_summary",
+                "label": [
+                    "nhmis_summary, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m3_register_present",
+                "label": [
+                    "register_present, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m3_tally_sheet",
+                "label": [
+                    "tally_sheet, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m3_reporting_rate",
+                "label": [
+                    "reporting_rate, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "select_one",
+                "select_from_list_name": "yna",
+                "name": "valid_m3_data_elements",
+                "label": [
+                    "data_elements, month 3"
+                ],
+                "required": true
+            },
+            {
+                "type": "end_group"
+            },
+            {
+                "type": "image",
+                "name": "register_photo",
+                "label": [
+                    "Register photo"
+                ]
+            }
+        ],
+        "choices": [
+            {
+                "list_name": "yna",
+                "name": "yes",
+                "label": [
+                    "Yes"
+                ]
+            },
+            {
+                "list_name": "yna",
+                "name": "no",
+                "label": [
+                    "No"
+                ]
+            },
+            {
+                "list_name": "yna",
+                "name": "na",
+                "label": [
+                    "Not applicable"
+                ]
+            }
+        ],
+        "settings": {
+            "form_title": "Data Quality Assessment (fixture)",
+            "id_string": "dqa"
+        }
+    }
+}

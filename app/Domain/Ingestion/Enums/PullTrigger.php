@@ -7,8 +7,8 @@ namespace App\Domain\Ingestion\Enums;
 use App\Support\Enums\HasLabel;
 
 /**
- * What started an ODK pull: the 10-minute schedule, an admin's "Pull now", the webhook, or the
- * historical backfill (edqa:backfill).
+ * What started a pull from a source: the 10-minute schedule, an admin's "Pull now", the webhook,
+ * the historical backfill (edqa:backfill), or the reconcile sweep (edqa:reconcile, nightly).
  */
 enum PullTrigger: string
 {
@@ -18,6 +18,7 @@ enum PullTrigger: string
     case Manual = 'manual';
     case Webhook = 'webhook';
     case Backfill = 'backfill';
+    case Reconcile = 'reconcile';
 
     protected static function labelGroup(): string
     {

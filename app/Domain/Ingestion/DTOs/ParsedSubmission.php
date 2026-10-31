@@ -48,7 +48,7 @@ final readonly class ParsedSubmission
         public ?array $rawNumericScores,
     ) {}
 
-    /** The same submission as the version that replaces $deprecatedId (an edit found by external ID, D-23 in the new numbering). */
+    /** The same submission as the version that replaces $deprecatedId (an edit found by external ID, D-61). */
     public function asEditOf(string $deprecatedId): self
     {
         return new self(...[...get_object_vars($this), 'deprecatedId' => $deprecatedId]);

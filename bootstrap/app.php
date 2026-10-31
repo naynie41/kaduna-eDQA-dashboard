@@ -33,8 +33,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias(['two-factor.confirmed' => EnsureTwoFactorConfirmed::class]);
 
-        // The ODK webhook is protected by its HMAC signature instead (SECURITY.md §6).
-        $middleware->validateCsrfTokens(except: ['webhooks/odk']);
+        // The source webhooks (/webhooks/{source}) are each verified their own way instead, ODK by
+        // its HMAC signature and Kobo by its token header (SECURITY.md §6); nothing else is exempt.
+        $middleware->preventRequestForgery(except: ['webhooks/*']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

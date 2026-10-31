@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $quarantined
  * @property int $duplicates
  * @property int $cross_source_duplicates
+ * @property int $deletions_detected
  * @property string|null $error
  * @property PullTrigger $trigger_type
  * @property PullOutcome|null $outcome
@@ -47,11 +48,11 @@ final class PullRun extends Model
 
     protected $fillable = [
         'source_id', 'triggered_by', 'trigger_type', 'started_at', 'finished_at', 'fetched', 'parsed', 'accepted',
-        'flagged', 'quarantined', 'duplicates', 'cross_source_duplicates', 'error', 'outcome',
+        'flagged', 'quarantined', 'duplicates', 'cross_source_duplicates', 'deletions_detected', 'error', 'outcome',
     ];
 
     /** Mirrors the column defaults, so a new model matches its stored row. */
-    protected $attributes = ['fetched' => 0, 'parsed' => 0, 'accepted' => 0, 'flagged' => 0, 'quarantined' => 0, 'duplicates' => 0, 'cross_source_duplicates' => 0];
+    protected $attributes = ['fetched' => 0, 'parsed' => 0, 'accepted' => 0, 'flagged' => 0, 'quarantined' => 0, 'duplicates' => 0, 'cross_source_duplicates' => 0, 'deletions_detected' => 0];
 
     /** @return array<string, string> */
     protected function casts(): array
@@ -69,6 +70,7 @@ final class PullRun extends Model
             'outcome' => PullOutcome::class,
             'duplicates' => 'integer',
             'cross_source_duplicates' => 'integer',
+            'deletions_detected' => 'integer',
         ];
     }
 

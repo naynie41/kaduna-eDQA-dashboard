@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Domain\Ingestion\Actions\FetchAttachments;
 use App\Domain\Ingestion\Actions\PullSubmissions;
 use App\Domain\Ingestion\Actions\RecordAttachments;
-use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\DTOs\AttachmentRef;
 use App\Domain\Ingestion\Enums\AttachmentStatus;
 use App\Domain\Ingestion\Enums\PullTrigger;
@@ -43,7 +42,7 @@ beforeEach(function (): void {
     ]]);
     Storage::fake('attachments');
     $this->source = new FakeSubmissionSource;
-    app()->instance(SubmissionSource::class, $this->source);
+    useSource('odk', $this->source);
     $this->admin = User::factory()->withTwoFactor()->create();
 });
 
@@ -72,7 +71,7 @@ function attEntry(object $test, int $n, array $files = []): array
 
 function attPull(): void
 {
-    app(PullSubmissions::class)->execute(PullTrigger::Scheduled);
+    app(PullSubmissions::class)->execute('odk', PullTrigger::Scheduled);
 }
 
 function attSubmission(int $n): Submission

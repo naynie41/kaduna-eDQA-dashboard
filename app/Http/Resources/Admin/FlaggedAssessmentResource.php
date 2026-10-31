@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Resources\Admin;
 
 use App\Domain\Assessment\Models\Assessment;
+use App\Domain\Ingestion\SourceRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * One Soft-tab row (D-57): an accepted assessment and the soft flags it still carries, each of
  * which can be overridden with a reason. Informational notes in flags (SLOT_ALL_NA) are left
- * out: they are not flags. Expects facility.lga and round loaded.
+ * out: they are not flags. The source it came from (key and name; null for one no longer
+ * configured). Expects facility.lga and round loaded.
  *
  * @mixin Assessment
  */
@@ -28,6 +30,8 @@ final class FlaggedAssessmentResource extends JsonResource
     {
         /** @var list<string> $flags */
         $flags = $this->flags;
+        $sources = app(SourceRegistry::class);
+        $key = $sources->keyOf($this->source_id);
 
         return [
             'id' => $this->id,
@@ -40,6 +44,7 @@ final class FlaggedAssessmentResource extends JsonResource
                 fn (string $code): array => ['code' => $code, 'name' => (string) __("validation_rules.{$code}.name")],
                 array_filter($flags, fn (string $code): bool => in_array($code, $this->softCodes, true)),
             )),
+            'source' => $key === null ? null : ['key' => $key, 'name' => $sources->name($key)],
         ];
     }
 }

@@ -9,14 +9,15 @@ import ScoreTag from '@/components/ScoreTag';
 import Skeleton from '@/components/Skeleton';
 import { formatCount, formatDate } from '@/lib/format';
 import { useTranslate, useTranslationList } from '@/lib/i18n';
-import type { AssessmentWindow, Coverage, MonitorProps } from '@/types/dashboard';
+import type { AssessmentWindow, Coverage, MonitorProps, SourceCount } from '@/types/dashboard';
 
 /**
  * Monitor (ARCHITECTURE.md §9.2.4): Public vs Private (the Home component), facilities visited per
- * local government against the state mean, coverage by level, and each round's assessment window.
- * All three blocks are deferred; the title, filters and tabs come from AppShell.
+ * local government against the state mean, coverage by level, each round's assessment window, and
+ * the selection's assessments by source (ODK Central, KoboToolbox). Every block is deferred; the
+ * title, filters and tabs come from AppShell.
  */
-export default function Monitor({ owners, coverage, windows }: MonitorProps) {
+export default function Monitor({ owners, coverage, windows, sources }: MonitorProps) {
     const t = useTranslate();
 
     return (
@@ -51,6 +52,15 @@ export default function Monitor({ owners, coverage, windows }: MonitorProps) {
                         <div className="mt-2">
                             <Deferred data="windows" fallback={<Skeleton className="m-5 h-[120px]" />}>
                                 {windows !== undefined && <WindowTable windows={windows} />}
+                            </Deferred>
+                        </div>
+                    </Panel>
+
+                    <Panel labelledBy="monitor-sources" className="overflow-hidden">
+                        <PanelHeader id="monitor-sources" title={t('dashboard.monitor.sources_title')} description={t('dashboard.monitor.sources_description')} />
+                        <div className="mt-2">
+                            <Deferred data="sources" fallback={<Skeleton className="m-5 h-[80px]" />}>
+                                {sources !== undefined && <SourceTable sources={sources} />}
                             </Deferred>
                         </div>
                     </Panel>
@@ -93,6 +103,27 @@ function LevelBars({ coverage }: { coverage: Coverage }) {
                 detail: <ScoreTag score={level.overall} />,
             }))}
         />
+    );
+}
+
+function SourceTable({ sources }: { sources: SourceCount[] }) {
+    const t = useTranslate();
+    const columns: DataTableColumn[] = [
+        { key: 'source', header: t('dashboard.monitor.source') },
+        { key: 'assessments', header: t('dashboard.monitor.assessments'), align: 'end' },
+    ];
+
+    return (
+        <DataTable caption={t('dashboard.monitor.sources_title')} captionHidden columns={columns} empty={<EmptyState title={t('dashboard.monitor.sources_none')} />}>
+            {sources.map((source) => (
+                <tr key={source.key ?? 'unknown'} className="border-b border-paper last:border-b-0">
+                    <th scope="row" className="px-3 py-2 text-left font-medium">
+                        {source.key === null ? t('dashboard.monitor.source_unknown') : source.name}
+                    </th>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatCount(source.assessments)}</td>
+                </tr>
+            ))}
+        </DataTable>
     );
 }
 

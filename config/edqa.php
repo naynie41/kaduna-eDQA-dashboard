@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Support\Config\EnvFlag;
+use App\Support\Config\EnvNumber;
 
 return [
 
@@ -66,9 +67,9 @@ return [
             'project_id' => env('ODK_PROJECT_ID') ?: null,
             'form_id' => env('ODK_FORM_ID') ?: null,
             // Submissions per OData page (§5.3).
-            'page_size' => (int) (env('ODK_PULL_PAGE_SIZE') ?: 500),
+            'page_size' => EnvNumber::positiveInt(env('ODK_PULL_PAGE_SIZE'), 500),
             // The backfill's wait between pages (§5.6, D-53): empty or unset means 5; 0 turns it off.
-            'backfill_throttle_seconds' => is_numeric(env('ODK_BACKFILL_THROTTLE')) ? max(0, (int) env('ODK_BACKFILL_THROTTLE')) : 5,
+            'backfill_throttle_seconds' => EnvNumber::positiveInt(env('ODK_BACKFILL_THROTTLE'), 5),
         ],
         'kobo' => [
             'type' => 'kobo',
@@ -79,8 +80,8 @@ return [
             'url' => env('KOBO_BASE_URL') ?: null,
             'token' => env('KOBO_API_TOKEN') ?: null,
             'asset_uid' => env('KOBO_ASSET_UID') ?: null,
-            'page_size' => (int) (env('KOBO_PULL_PAGE_SIZE') ?: 500),
-            'backfill_throttle_seconds' => is_numeric(env('KOBO_BACKFILL_THROTTLE')) ? max(0, (int) env('KOBO_BACKFILL_THROTTLE')) : 5,
+            'page_size' => EnvNumber::positiveInt(env('KOBO_PULL_PAGE_SIZE'), 500),
+            'backfill_throttle_seconds' => EnvNumber::positiveInt(env('KOBO_BACKFILL_THROTTLE'), 5),
         ],
     ],
 
@@ -99,6 +100,33 @@ return [
         // Local development only: lets KOBO_BASE_URL be plain http, for a mock server. Honoured only
         // when APP_ENV=local; set elsewhere it is refused and Kobo counts as not configured.
         'allow_insecure_local' => filter_var(env('KOBO_ALLOW_INSECURE_LOCAL', false), FILTER_VALIDATE_BOOL),
+
+        // Where edqa:source-mock:generate kobo writes the mock's data (the kobo-mock service reads it).
+        'mock_path' => storage_path('app/kobo-mock'),
+
+        // The webhook (§5.4, SECURITY.md §6): Kobo's REST Services cannot sign, so the service sends
+        // this token in X-EDQA-Webhook-Token (compared with hash_equals). Off (404) while unset or
+        // shorter than 32 characters; it only queues a pull, at most one per debounce_seconds.
+        'webhook' => [
+            'token' => env('KOBO_WEBHOOK_TOKEN') ?: null,
+            'debounce_seconds' => 60,
+        ],
+    ],
+
+    // Pulling from any source (ARCHITECTURE.md §5.3). One pull per source at a time under
+    // Cache::lock("pull:{source}"), held at most lock_seconds, so ODK and Kobo pull in parallel but
+    // never twice each; a second pull of a source waits up to lock_wait_seconds, then goes back on
+    // the queue. The reconcile sweep takes the same lock. reconcile_at: the nightly sweep, per
+    // source, for the open round.
+    'pull' => ['lock_seconds' => 900, 'lock_wait_seconds' => 600, 'reconcile_at' => '02:30'],
+
+    // The historical backfill (§5.6, D-53), one source at a time: how long one
+    // BackfillSubmissionsJob runs before it queues the next from its checkpoint (the wait between
+    // pages is per source, sources.*.backfill_throttle_seconds); and how long an open backfill run
+    // of another source, untouched, still counts as running (a crash leaves one open).
+    'backfill' => [
+        'job_seconds' => 300,
+        'stale_after_seconds' => 3600,
     ],
 
     'odk' => [
@@ -123,10 +151,6 @@ return [
         // Where edqa:odk-mock:generate writes the mock's data (the odk-mock service reads it).
         'mock_path' => storage_path('app/odk-mock'),
 
-        // The pull (§5.3): one at a time under Cache::lock('odk-pull'), held at most lock_seconds;
-        // a second pull waits up to lock_wait_seconds for it, then goes back on the queue.
-        'pull' => ['lock_seconds' => 900, 'lock_wait_seconds' => 600],
-
         // The webhook (§5.4, SECURITY.md §6, D-54): off (404) until ODK_WEBHOOK_SECRET is set. A request
         // is signed HMAC-SHA256 over "{timestamp}.{raw body}" and its timestamp must be within
         // tolerance_seconds; it only queues a pull, at most one per debounce_seconds.
@@ -134,12 +158,6 @@ return [
             'secret' => env('ODK_WEBHOOK_SECRET') ?: null,
             'tolerance_seconds' => 300,
             'debounce_seconds' => 60,
-        ],
-
-        // The historical backfill (§5.6, D-53): how long one BackfillOdkSubmissionsJob runs before it
-        // queues the next from its checkpoint (the wait between pages is sources.odk).
-        'backfill' => [
-            'job_seconds' => 300,
         ],
 
         // Attachments (§5.3, SECURITY.md §7): fetched on the low queue to the private attachments disk. A
@@ -161,8 +179,12 @@ return [
     ],
 
     'heartbeats' => [
-        // Pinged (GET) after each successful pull, for an external dead-man's switch; unset: skipped.
-        'odk_pull' => env('HEARTBEAT_ODK_PULL_URL') ?: null,
+        // Pinged (GET) after each successful pull of that source, for an external dead-man's switch;
+        // unset: skipped. HEARTBEAT_ODK_PULL_URL is the old name, read for one more release.
+        'pull' => [
+            'odk' => env('HEARTBEAT_PULL_ODK_URL') ?: env('HEARTBEAT_ODK_PULL_URL') ?: null,
+            'kobo' => env('HEARTBEAT_PULL_KOBO_URL') ?: null,
+        ],
     ],
 
     'plan' => [

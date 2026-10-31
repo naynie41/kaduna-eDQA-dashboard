@@ -6,6 +6,7 @@ use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Facility\Models\Facility;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Facility\Models\Ward;
+use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Jobs\RequestRescoreJob;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Activitylog\Models\Activity;
 use Tests\Support\ParsedSubmissionBuilder;
+use Tests\Support\Rows;
 
 // The Data issues page (ARCHITECTURE.md §6, §9.3, D-57): the rule summary, the filters in the URL,
 // the hard and soft tables, the record detail, the facility picker, and what the 2A.8 API refuses
@@ -70,7 +72,7 @@ it('lists every rule with severity, name, why and open count, and the open hard 
     $this->actingAs($this->admin)->get('/admin/data-issues')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('admin/data-issues')
         ->missing('filters')
-        ->where('issueFilters', ['tab' => 'hard', 'state' => 'open', 'rule' => null, 'lga' => null, 'round' => null])
+        ->where('issueFilters', ['tab' => 'hard', 'state' => 'open', 'rule' => null, 'lga' => null, 'round' => null, 'source' => null])
         ->has('rules', 15)
         ->where('rules.0.code', 'UNKNOWN_FORM_VERSION')
         ->where('rules.14.code', 'RULE_ERROR')
@@ -144,17 +146,22 @@ it('refuses an unknown filter value', function (string $query, string $field): v
     ['rule=NOT_A_RULE', 'rule'],
     ['lga=XYZ', 'lga'],
     ['round=999999', 'round'],
+    ['source=dhis2', 'source'],
 ]);
 
-it('links each record to ODK Central only when the base URL is configured', function (): void {
+it('names each record\'s source, and links to it there only when its link settings are configured', function (): void {
     $record = issuesNullLga($this->facility, $this->round);
 
     config(['edqa.sources.odk.url' => null]);
-    $this->actingAs($this->admin)->get('/admin/data-issues')->assertInertia(fn (Assert $page) => $page->where('records.data.0.odk_url', null));
-
-    config(['edqa.sources.odk.url' => 'https://central.example.org/', 'edqa.sources.odk.project_id' => '7']);
     $this->actingAs($this->admin)->get('/admin/data-issues')->assertInertia(fn (Assert $page) => $page
-        ->where('records.data.0.odk_url', 'https://central.example.org/#/projects/7/forms/'.rawurlencode((string) $record->submission->form_ref).'/submissions/'.rawurlencode($record->instance_id)));
+        ->where('records.data.0.source', ['key' => 'odk', 'name' => 'ODK Central'])
+        ->where('records.data.0.source_url', null));
+
+    // Central's logical ID, which the link carries; a fixture's made-up ID would get no link.
+    $record->submission->forceFill(['external_id' => 'uuid:6f1c2a9e-3b4d-4e5f-8a7b-9c0d1e2f3a4b'])->save();
+    config(['edqa.sources.odk.url' => 'https://central.example.org/', 'edqa.sources.odk.project_id' => '7', 'edqa.sources.odk.form_id' => 'dqa']);
+    $this->actingAs($this->admin)->get('/admin/data-issues')->assertInertia(fn (Assert $page) => $page
+        ->where('records.data.0.source_url', 'https://central.example.org/#/projects/7/forms/dqa/submissions/'.rawurlencode((string) $record->submission->external_id)));
 });
 
 // ---- GET /api/quarantine/{record}
@@ -270,4 +277,47 @@ it('names no rescore while the record is still failing', function (): void {
         'action' => 'correct', 'corrections' => ['lga_ref' => 'ZAR'], 'reason' => 'Trying the neighbouring LGA',
     ])->assertOk()->assertJsonPath('data.record_status', 'open')->assertJsonPath('data.rescore_round', null)
         ->assertJsonPath('data.failures.0.code', 'FACILITY_LGA_MISMATCH');
+});
+
+// ---- Sources (Phase 2C step 7)
+
+it('filters both tabs by source, offers every configured source, and names the soft row\'s source', function (): void {
+    $odk = issuesNullLga($this->facility, $this->round);
+    $kobo = issuesWrongQuarter($this->facility, $this->round);
+    $kobo->forceFill(['source_id' => Rows::sourceId('kobo')])->save();
+    $flagged = Assessment::factory()->create(['status' => 'flagged', 'flags' => ['VISIT_TOO_SHORT'], 'submission_id' => Submission::factory()->accepted()->create(['source_id' => Rows::sourceId('kobo')])]);
+    Assessment::factory()->create(['status' => 'flagged', 'flags' => ['VISIT_TOO_SHORT']]);
+
+    expect(issuesIds($this, '?source=odk'))->toBe([$odk->id])
+        ->and(issuesIds($this, '?source=kobo'))->toBe([$kobo->id])
+        ->and(issuesIds($this, '?tab=soft&source=kobo'))->toBe([$flagged->id]);
+
+    $this->actingAs($this->admin)->get('/admin/data-issues?tab=soft&source=kobo')->assertInertia(fn (Assert $page) => $page
+        ->where('issueFilters.source', 'kobo')
+        ->where('sources', [['key' => 'odk', 'name' => 'ODK Central'], ['key' => 'kobo', 'name' => 'KoboToolbox']])
+        ->where('records.data.0.source', ['key' => 'kobo', 'name' => 'KoboToolbox']));
+});
+
+it('shows both sides of a DUPLICATE_ASSESSMENT: the accepted one from its source, with its link, and this one', function (): void {
+    config(['edqa.sources.kobo.url' => 'https://kf.example.org', 'edqa.sources.kobo.asset_uid' => 'aKdDqa2026']);
+    $first = Submission::factory()->accepted()->create(['source_id' => Rows::sourceId('kobo'), 'instance_id' => 'uuid:kobo-first', 'external_id' => '1207']);
+    $accepted = Assessment::factory()->create(['round_id' => $this->round->id, 'facility_id' => $this->facility->id, 'submission_id' => $first->id]);
+    $record = quarantineThrough(ParsedSubmissionBuilder::new()->forFacility($this->facility)->inRound($this->round)->build());
+    issuesNullLga(Facility::factory()->inWard(Ward::factory()->create(['lga_id' => $this->zaria->id]))->create(), $this->round);
+
+    $this->actingAs($this->admin)->get('/admin/data-issues?rule=DUPLICATE_ASSESSMENT')->assertInertia(fn (Assert $page) => $page
+        ->count('records.data', 1)
+        ->where('records.data.0.id', $record->id)
+        ->where('records.data.0.source', ['key' => 'odk', 'name' => 'ODK Central'])
+        ->where('records.data.0.failures.0.detail', fn (string $detail): bool => str_contains($detail, 'from KoboToolbox') && str_contains($detail, 'this one from ODK Central'))
+        ->where('records.data.0.duplicate_of', [
+            'assessment_id' => $accepted->id,
+            'facility_id' => $this->facility->id,
+            'source' => ['key' => 'kobo', 'name' => 'KoboToolbox'],
+            'instance_id' => 'uuid:kobo-first',
+            'url' => 'https://kf.example.org/api/v2/assets/aKdDqa2026/data/1207/',
+        ]));
+
+    // Any other record repeats nothing.
+    $this->actingAs($this->admin)->get('/admin/data-issues?rule=LGA_UNKNOWN')->assertInertia(fn (Assert $page) => $page->where('records.data.0.duplicate_of', null));
 });

@@ -26,7 +26,7 @@ return [
 
     'UNKNOWN_FORM_VERSION' => [
         'name' => 'Unknown form version',
-        'why' => 'Each version of the ODK form names its questions differently. A version the portal has no field map for would be read with the wrong map, and its scores would be silently wrong, so it is held back until a map is added.',
+        'why' => 'Each version of the form, on either source, names its questions differently. A version the portal has no field map for would be read with the wrong map, and its scores would be silently wrong, so it is held back until a map is added.',
         'detail' => ':source form version :version has no field map',
         'blank' => '(blank)',
     ],
@@ -100,7 +100,8 @@ return [
     'DUPLICATE_ASSESSMENT' => [
         'name' => 'Duplicate assessment',
         'why' => 'A facility is assessed once per round. A second assessment would count the facility twice.',
-        'detail' => ':round already recorded for facility :code (instance :instance)',
+        'detail' => ':round already recorded for facility :code (instance :instance from :existing_source; this one from :source)',
+        'unknown_source' => 'an unknown source',
     ],
 
     // Soft rules: the why text takes its threshold from config (edqa.validation.soft_rules),

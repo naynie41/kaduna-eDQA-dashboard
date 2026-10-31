@@ -20,16 +20,16 @@ export default function BackfillPanel({ backfill }: BackfillPanelProps) {
     const { run, checkpoint, report } = backfill;
 
     return (
-        <Panel labelledBy="odk-backfill-title">
-            <PanelHeader id="odk-backfill-title" title={t('admin.odk.backfill.title')} description={t('admin.odk.backfill.description')} />
+        <Panel labelledBy="sources-backfill-title">
+            <PanelHeader id="sources-backfill-title" title={t('admin.sources.backfill.title')} description={t('admin.sources.backfill.description')} />
             <dl className="grid gap-x-6 gap-y-2.5 px-5 pb-5 text-[13.5px] rail:grid-cols-[minmax(12rem,auto)_1fr]">
-                <dt className="text-[12.5px] text-ink-2">{t('admin.odk.backfill.last_run')}</dt>
+                <dt className="text-[12.5px] text-ink-2">{t('admin.sources.backfill.last_run')}</dt>
                 <dd>
                     {run === null
-                        ? t('admin.odk.backfill.none')
-                        : t('admin.odk.backfill.run_value', {
+                        ? t('admin.sources.backfill.none')
+                        : t('admin.sources.backfill.run_value', {
                               started: when(run.started_at),
-                              outcome: t(`admin.odk.backfill.outcomes.${run.outcome ?? 'running'}`),
+                              outcome: t(`admin.sources.backfill.outcomes.${run.outcome ?? 'running'}`),
                               fetched: formatCount(run.fetched),
                               accepted: formatCount(run.accepted),
                               flagged: formatCount(run.flagged),
@@ -37,24 +37,24 @@ export default function BackfillPanel({ backfill }: BackfillPanelProps) {
                               duplicates: formatCount(run.duplicates),
                           })}
                 </dd>
-                <dt className="text-[12.5px] text-ink-2">{t('admin.odk.backfill.checkpoint')}</dt>
+                <dt className="text-[12.5px] text-ink-2">{t('admin.sources.backfill.checkpoint')}</dt>
                 <dd>
-                    {t('admin.odk.backfill.checkpoint_value', {
+                    {t('admin.sources.backfill.checkpoint_value', {
                         position: formatCount(checkpoint.position),
                         page: formatCount(checkpoint.page),
                         size: formatCount(checkpoint.page_size),
                     })}
                 </dd>
-                <dt className="text-[12.5px] text-ink-2">{t('admin.odk.backfill.report')}</dt>
+                <dt className="text-[12.5px] text-ink-2">{t('admin.sources.backfill.report')}</dt>
                 <dd>
                     {report === null ? (
-                        t('admin.odk.backfill.report_none')
+                        t('admin.sources.backfill.report_none')
                     ) : (
                         <>
                             <a href={report.url} className="font-medium text-deep underline">
-                                {t('admin.odk.backfill.report_link', { time: when(report.at) })}
+                                {t('admin.sources.backfill.report_link', { time: when(report.at) })}
                             </a>
-                            <span className="block text-[12.5px] text-ink-2">{t('admin.odk.backfill.report_expiry')}</span>
+                            <span className="block text-[12.5px] text-ink-2">{t('admin.sources.backfill.report_expiry')}</span>
                         </>
                     )}
                 </dd>

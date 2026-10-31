@@ -12,9 +12,10 @@ export type CascadePanelProps = {
 };
 
 /**
- * "Regenerate ODK facility file" (ARCHITECTURE.md §5.1, D-54, D-56): POST
- * /api/facility-list/export-cascade, then the counts and a signed download (30 minutes). Uploading
- * the files to ODK Central is manual for now, and the panel says so.
+ * "Regenerate facility media file" (ARCHITECTURE.md §5.1, §9.3, D-54): POST
+ * /api/facility-list/export-cascade, then the counts and a signed download (30 minutes). The same
+ * file is attached to the form on both platforms (ODK Central and KoboToolbox), by hand for now,
+ * and the panel says so. On the Data sources page until the Facility list page is built.
  */
 export default function CascadePanel({ howUrl }: CascadePanelProps) {
     const t = useTranslate();
@@ -29,15 +30,15 @@ export default function CascadePanel({ howUrl }: CascadePanelProps) {
     };
 
     return (
-        <Panel labelledBy="odk-cascade-title">
-            <PanelHeader id="odk-cascade-title" title={t('admin.odk.cascade.title')} description={t('admin.odk.cascade.description')} />
+        <Panel labelledBy="sources-cascade-title">
+            <PanelHeader id="sources-cascade-title" title={t('admin.sources.cascade.title')} description={t('admin.sources.cascade.description')} />
             <div className="flex flex-col gap-3 px-5 pb-5 text-[13.5px]">
                 <p>
                     {howUrl === null ? (
-                        t('admin.odk.cascade.how_file')
+                        t('admin.sources.cascade.how_file')
                     ) : (
                         <a href={howUrl} className="font-medium text-deep underline" target="_blank" rel="noreferrer">
-                            {t('admin.odk.cascade.how')}
+                            {t('admin.sources.cascade.how')}
                         </a>
                     )}
                 </p>
@@ -48,7 +49,7 @@ export default function CascadePanel({ howUrl }: CascadePanelProps) {
                         disabled={action.pending}
                         className="min-h-11 rounded-md border border-deep px-4 text-[13.5px] font-medium text-deep hover:bg-wash disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        {action.pending ? t('common.ui.working') : t('admin.odk.cascade.button')}
+                        {action.pending ? t('common.ui.working') : t('admin.sources.cascade.button')}
                     </button>
                 </div>
                 {action.error !== null && (
@@ -59,12 +60,12 @@ export default function CascadePanel({ howUrl }: CascadePanelProps) {
                 {result !== null && (
                     <div role="status" className="rounded-md border border-ok bg-ok-bg px-3 py-2">
                         <p className="text-ok">
-                            {t('admin.odk.cascade.ready', { lgas: formatCount(result.lgas), wards: formatCount(result.wards), facilities: formatCount(result.facilities) })}
+                            {t('admin.sources.cascade.ready', { lgas: formatCount(result.lgas), wards: formatCount(result.wards), facilities: formatCount(result.facilities) })}
                         </p>
                         <a href={result.url} className="font-medium text-deep underline">
-                            {t('admin.odk.cascade.download', { file: result.filename })}
+                            {t('admin.sources.cascade.download', { file: result.filename })}
                         </a>
-                        <span className="block text-[12.5px] text-ink-2">{t('admin.odk.cascade.expiry')}</span>
+                        <span className="block text-[12.5px] text-ink-2">{t('admin.sources.cascade.expiry')}</span>
                     </div>
                 )}
             </div>

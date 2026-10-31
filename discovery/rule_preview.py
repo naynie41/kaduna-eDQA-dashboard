@@ -12,14 +12,19 @@ is reported as "not evaluated", never guessed:
   rule will use the confirmed map.
 
 Reads data/submissions/ (submission_profile.py) and out/field_map.draft.json (field_diff.py).
-Local files only; no ODK calls.
+With --source kobo it reads KoboToolbox data rows instead: data/kobo/submissions/
+(kobo_inventory.py) and out/kobo_field_map.draft.json (field_diff.py --source kobo). A Kobo row
+is already flat (`group/question` keys); its version is `__version__`, its received time
+`_submission_time` (UTC), and its instance ID `meta/instanceID`, as in ODK. Local files only; no
+network calls.
 
 Writes out/rule_preview.md (counts only) and out/rule_preview.json (per-instance codes; not
-committed).
+committed); with --source kobo, out/kobo_rule_preview.md and .json.
 
 Usage:
   python rule_preview.py --registry data/hfr.xlsx --calendar-rounds
   python rule_preview.py --registry data/hfr.xlsx --rounds data/rounds.csv   # year,quarter,window_start,window_end
+  python rule_preview.py --source kobo --registry data/hfr.xlsx --calendar-rounds
 """
 
 from __future__ import annotations
@@ -227,10 +232,24 @@ def evaluate(sub: Sub, entry: dict | None, registry: dict[str, str] | None,
                      else f"visit {visit} outside every round window")
 
 
+def kobo_flat(row: dict) -> dict[str, str]:
+    """A KoboToolbox data row in the keys the rules read for an ODK one: its answers as they are
+    (already `group/question`), `__system/formVersion` from `__version__`, `__system/submissionDate`
+    from `_submission_time` (UTC, no zone in Kobo's answer)."""
+    flat = flatten(row)
+    received = flat.get("_submission_time", "")
+    flat["__system/formVersion"] = flat.get("__version__", "")
+    flat["__system/submissionDate"] = received + ("Z" if received and not received.endswith("Z") else "")
+    flat.setdefault("__id", flat.get("_id", ""))
+    return flat
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    p.add_argument("--submissions", type=Path, default=HERE / "data" / "submissions")
-    p.add_argument("--field-map", type=Path, default=OUT_DIR / "field_map.draft.json")
+    p.add_argument("--source", choices=("odk", "kobo"), default="odk",
+                   help="whose submissions: odk (OData pages) or kobo (KPI data rows)")
+    p.add_argument("--submissions", type=Path, help="the pages directory (default: the source's)")
+    p.add_argument("--field-map", type=Path, help="the draft map (default: the source's)")
     p.add_argument("--registry", type=Path, help="registry export for the facility rules")
     p.add_argument("--registry-sheet")
     p.add_argument("--map", action="append", default=[], metavar="FIELD=COLUMN")
@@ -241,13 +260,17 @@ def main() -> None:
     rounds_group.add_argument("--calendar-rounds", action="store_true",
                               help="proxy: treat each calendar quarter as a round")
     args = p.parse_args()
+    kobo = args.source == "kobo"
+    prefix = "kobo_" if kobo else ""
+    args.submissions = args.submissions or HERE / "data" / ("kobo/submissions" if kobo else "submissions")
+    args.field_map = args.field_map or OUT_DIR / f"{prefix}field_map.draft.json"
 
     if not args.field_map.exists():
-        sys.exit(f"{args.field_map} not found; run field_diff.py first")
+        sys.exit(f"{args.field_map} not found; run field_diff.py" + (" --source kobo" if kobo else "") + " first")
     maps = json.loads(args.field_map.read_text(encoding="utf-8"))["versions"]
     pages = sorted(args.submissions.glob("page_*.json"))
     if not pages:
-        sys.exit(f"No pages in {args.submissions}; run submission_profile.py first")
+        sys.exit(f"No pages in {args.submissions}; run " + ("kobo_inventory.py" if kobo else "submission_profile.py") + " first")
 
     aliases: dict[str, str] = {}
     for pair in args.lga_alias:
@@ -267,8 +290,9 @@ def main() -> None:
 
     subs: list[Sub] = []
     for page_file in pages:
-        for record in json.loads(page_file.read_text(encoding="utf-8")).get("value", []):
-            flat = flatten(record)
+        page = json.loads(page_file.read_text(encoding="utf-8"))
+        for record in page.get("results" if kobo else "value", []):
+            flat = kobo_flat(record) if kobo else flatten(record)
             subs.append(Sub(
                 instance_id=flat.get("meta/instanceID") or flat.get("__id", ""),
                 year=(flat.get("__system/submissionDate") or "?")[:4],
@@ -437,8 +461,8 @@ def main() -> None:
         "No typed score field outside 0–100 was found.",
     ]
     OUT_DIR.mkdir(exist_ok=True)
-    (OUT_DIR / "rule_preview.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    (OUT_DIR / "rule_preview.json").write_text(json.dumps(
+    (OUT_DIR / f"{prefix}rule_preview.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (OUT_DIR / f"{prefix}rule_preview.json").write_text(json.dumps(
         [{"instance_id": s.instance_id, "year": s.year, "version": s.version,
           "failures": s.failures} for s in live if s.failures], indent=1), encoding="utf-8")
 
@@ -451,7 +475,7 @@ def main() -> None:
         table.add_row(y, f"{total_by_year[y]:,}", pct(quarantined[y], total_by_year[y]),
                       pct(flagged[y], total_by_year[y]))
     console.print(table)
-    console.print("Wrote out/rule_preview.md")
+    console.print(f"Wrote out/{prefix}rule_preview.md")
 
 
 if __name__ == "__main__":

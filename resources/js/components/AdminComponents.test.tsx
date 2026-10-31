@@ -185,7 +185,7 @@ describe('ProgressPanel', () => {
     });
 
     const panel = (onDone?: (run: Run) => void) => (
-        <ProgressPanel<Run> title="Pull" url="/api/odk/pull/7" stage={stageOf} {...(onDone === undefined ? {} : { onDone })}>
+        <ProgressPanel<Run> title="Pull" url="/api/pulls/7" stage={stageOf} {...(onDone === undefined ? {} : { onDone })}>
             {(run) => <span>Fetched {run.fetched}</span>}
         </ProgressPanel>
     );
@@ -280,17 +280,17 @@ const shellTranslations = {
     admin: {
         tabs: { label: 'Administration pages', data_issues_open: ':label, :count open' },
         pages: {
-            odk: { title: 'ODK pull' },
+            sources: { title: 'Data sources' },
             data_issues: { title: 'Data issues' },
             rounds: { title: 'Rounds' },
             facilities: { title: 'Facility list' },
             scoring_rules: { title: 'Scoring rules' },
         },
         stale: {
-            title: 'No successful ODK pull for over :hours hours',
+            title: 'No successful pull for over :hours hours',
             body: 'Round Q:quarter :year is open, and the last successful pull was at :time.',
             body_never: 'Round Q:quarter :year is open, and no pull has succeeded yet.',
-            link: 'Go to the ODK pull page',
+            link: 'Go to the Data sources page',
         },
     },
 };
@@ -301,7 +301,7 @@ describe('AdminTabs', () => {
 
         const nav = screen.getByRole('navigation', { name: 'Administration pages' });
         expect(within(nav).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-            '/admin/odk', '/admin/data-issues', '/admin/rounds', '/admin/facilities', '/admin/scoring-rules',
+            '/admin/sources', '/admin/data-issues', '/admin/rounds', '/admin/facilities', '/admin/scoring-rules',
         ]);
         expect(screen.getByRole('link', { name: 'Data issues, 12 open' })).toBeTruthy();
         expect(screen.getByRole('link', { name: 'Rounds' }).getAttribute('aria-current')).toBe('page');
@@ -310,12 +310,12 @@ describe('AdminTabs', () => {
 });
 
 describe('StaleIngestionBanner', () => {
-    it('says which round is open and that no pull has succeeded, and links to the ODK pull page', () => {
+    it('says which round is open and that no pull has succeeded, and links to the Data sources page', () => {
         renderUi(<StaleIngestionBanner stale={{ stale: true, hours: 24, lastSuccessAt: null, round: { year: 2026, quarter: 4 } }} />, shellTranslations);
 
-        const banner = screen.getByRole('region', { name: 'No successful ODK pull for over 24 hours' });
+        const banner = screen.getByRole('region', { name: 'No successful pull for over 24 hours' });
         expect(banner.textContent).toContain('Round Q4 2026 is open, and no pull has succeeded yet.');
-        expect(within(banner).getByRole('link', { name: 'Go to the ODK pull page' }).getAttribute('href')).toBe('/admin/odk');
+        expect(within(banner).getByRole('link', { name: 'Go to the Data sources page' }).getAttribute('href')).toBe('/admin/sources');
     });
 
     it('renders nothing while ingestion is current', () => {

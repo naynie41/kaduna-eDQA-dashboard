@@ -4,22 +4,29 @@ import type { ScoreValue } from '@/types/score';
  * Shared props for the shell, mirroring HandleInertiaRequests (`shell`) and ShareDashboardContext
  * (`filters`, `filterOptions`, `summary`, dashboard pages only).
  */
-export type SyncState = 'not_configured' | 'not_connected' | 'ok' | 'stale' | 'failed';
+/** A source's sync state (SourceStatusAggregator); worst first: auth_failed, failed, stale, not_connected, healthy, disabled, not_configured. */
+export type SyncState = 'not_configured' | 'disabled' | 'not_connected' | 'healthy' | 'stale' | 'failed' | 'auth_failed';
 
 export type SyncStatus = {
+    /** The source's key (odk, kobo) and its name as administrators see it. */
+    key: string;
+    name: string;
     state: SyncState;
     lastSuccessAt: string | null;
     minutesSinceSuccess: number | null;
+    sinceSuccess: { value: number; unit: 'minutes' | 'hours' | 'days' } | null;
     lastFailedAt: string | null;
     lastError: string | null;
-    /** The failed pull's error class, e.g. OdkUnreachable: what the bar names. */
+    /** The failed pull's error class, e.g. KoboUnreachable: what the bar names. */
     lastErrorClass: string | null;
+    lastErrorHttpStatus: number | null;
     staleAfterMinutes: number;
 };
 
 export type ShellStatus = {
     assessments: number;
-    sync: SyncStatus;
+    /** Every source, worst state first. */
+    sources: SyncStatus[];
     quarantined: number;
 };
 

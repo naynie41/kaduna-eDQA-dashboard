@@ -103,7 +103,7 @@ it('says when the facility has no assessment in the asked round', function (): v
     expect($data['round']['label'])->toBe('Q4 2025')
         ->and($data['assessment'])->toBeNull()
         ->and($data['scores']['overall'])->toMatchArray(['value' => null, 'display' => '—'])
-        ->and($data['odk'])->toBe(['instance_id' => null, 'url' => null]);
+        ->and($data['source'])->toBe(['key' => null, 'name' => null, 'instance_id' => null, 'url' => null]);
 });
 
 it('lists soft flags, open and overridden, with who, when and why', function (): void {
@@ -137,14 +137,17 @@ it('shows the activity log for the facility\'s assessments: who, when, what, why
         ->and(json_encode($activity))->not->toContain('user_agent')->not->toContain('"ip"');
 });
 
-it('gives the ODK instance ID, and a deep link only when ODK Central is configured', function (): void {
-    $instance = (string) DB::table('submissions')->where('id', $this->assessment->submission_id)->value('instance_id');
+it('gives the source, the instance ID, and a deep link only when the source\'s link settings are configured', function (): void {
+    // Central's logical ID, which the link carries; a fixture's made-up ID would get no link.
+    DB::table('submissions')->where('id', $this->assessment->submission_id)->update(['external_id' => 'uuid:6f1c2a9e-3b4d-4e5f-8a7b-9c0d1e2f3a4b']);
+    $submission = DB::table('submissions')->where('id', $this->assessment->submission_id)->first(['instance_id', 'external_id']);
+    $instance = (string) $submission->instance_id;
 
     config(['edqa.sources.odk.url' => null]);
-    expect(detail($this)['odk'])->toBe(['instance_id' => $instance, 'url' => null]);
+    expect(detail($this)['source'])->toBe(['key' => 'odk', 'name' => 'ODK Central', 'instance_id' => $instance, 'url' => null]);
 
-    config(['edqa.sources.odk.url' => 'https://central.example.org/', 'edqa.sources.odk.project_id' => 7]);
-    expect(detail($this)['odk']['url'])->toBe('https://central.example.org/#/projects/7/forms/dqa/submissions/'.rawurlencode($instance));
+    config(['edqa.sources.odk.url' => 'https://central.example.org/', 'edqa.sources.odk.project_id' => 7, 'edqa.sources.odk.form_id' => 'dqa']);
+    expect(detail($this)['source']['url'])->toBe('https://central.example.org/#/projects/7/forms/dqa/submissions/'.rawurlencode((string) $submission->external_id));
 });
 
 it('lists no attachments when the submission has none', function (): void {

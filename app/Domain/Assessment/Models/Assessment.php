@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * status has no enum yet: its values are an open question.
  *
+ * @property int $source_id taken from the submission by the database (never written here)
  * @property CarbonImmutable $started_at
  * @property CarbonImmutable $ended_at
  * @property string $status accepted | flagged (Q-18)
@@ -47,6 +48,7 @@ final class Assessment extends Model
     protected function casts(): array
     {
         return [
+            'source_id' => 'integer',
             'started_at' => 'immutable_datetime',
             'ended_at' => 'immutable_datetime',
             'gps' => 'array',

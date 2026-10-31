@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Domain\Ingestion\Aggregators\SourceStatusAggregator;
 use App\Domain\Reporting\Aggregators\ShellStatusAggregator;
 use App\Domain\Validation\Queries\QuarantineQuery;
 use Illuminate\Http\Request;
@@ -48,10 +49,11 @@ final class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user === null ? null : ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
             ],
-            // The shell's footer count and ODK status bar (ARCHITECTURE.md §9.1); signed-in only.
+            // The shell's footer count and the sources' status bar, worst first (ARCHITECTURE.md §9.1);
+            // signed-in only.
             'shell' => fn (): ?array => $user === null ? null : [
                 'assessments' => app(ShellStatusAggregator::class)->assessments(),
-                'sync' => app(ShellStatusAggregator::class)->sync(),
+                'sources' => app(SourceStatusAggregator::class)->all(),
                 'quarantined' => app(QuarantineQuery::class)->openCountCached(),
             ],
             // The admin pages' tab badge and stale-ingestion banner (ARCHITECTURE.md §9.3, D-55).

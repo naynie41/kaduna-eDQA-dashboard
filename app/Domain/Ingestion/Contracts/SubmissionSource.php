@@ -13,8 +13,9 @@ use App\Domain\Ingestion\Exceptions\SourceException;
 use Carbon\CarbonImmutable;
 
 /**
- * Where submissions come from (ARCHITECTURE.md §5.2): ODK Central today (OdkCentralSource). If the
- * client turns out to run ODK Aggregate (Q-01), a second adapter implements the same contract.
+ * Where submissions come from (ARCHITECTURE.md §5.0, §5.2): ODK Central (OdkCentralSource) and
+ * KoboToolbox (KoboSource), each resolved by its key through SourceRegistry::adapter(). A third
+ * source is a third adapter implementing the same contract, plus a decision record.
  * Read-only: nothing here writes to the source (SECURITY.md §6).
  *
  * Every method throws a SourceException subclass, never a transport exception: the source's
@@ -48,8 +49,8 @@ interface SubmissionSource
     public function submissionsPage(?CarbonImmutable $since, int $top, int $skip, bool $inclusive = false): SubmissionPage;
 
     /**
-     * One page of submissions received or edited at or after $cursor (ARCHITECTURE.md §5.3, D-23
-     * in the new numbering): an edit keeps its submission date, so a pull on that date alone would
+     * One page of submissions received or edited at or after $cursor (ARCHITECTURE.md §5.3, D-61): an edit keeps
+     * its submission date, so a pull on that date alone would
      * miss it. Ordered by the edit time (unedited ones after the edited), then the logical ID, with
      * the total that matches. With no cursor yet, every edited submission.
      *
@@ -58,7 +59,9 @@ interface SubmissionSource
     public function changedSince(?CarbonImmutable $cursor, int $top, int $skip): SubmissionPage;
 
     /**
-     * The attachments one submission expects, and whether each has arrived.
+     * The attachments one submission expects, and whether each has arrived. $instanceId is the
+     * submission's logical ID at its source (ODK's __id, Kobo's _id: the same through edits), so
+     * the current version's files are listed.
      *
      * @return list<AttachmentRef>
      *
@@ -67,7 +70,8 @@ interface SubmissionSource
     public function attachmentList(string $instanceId): array;
 
     /**
-     * Streams one attachment to $sinkPath (the caller chooses and checks the path).
+     * Streams one attachment of the submission (its logical ID, as attachmentList) to $sinkPath
+     * (the caller chooses and checks the path).
      *
      * @throws SourceException
      */

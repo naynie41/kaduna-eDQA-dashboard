@@ -40,7 +40,7 @@ it('fails a second assessment of the same facility in the same round', function 
 
     expect($failures)->toHaveCount(1)
         ->and($failures[0]->severity)->toBe(Severity::Hard)
-        ->and($failures[0]->detail)->toBe("Q2 2026 already recorded for facility KD-0412 (instance {$instance})")
+        ->and($failures[0]->detail)->toBe("Q2 2026 already recorded for facility KD-0412 (instance {$instance} from ODK Central; this one from ODK Central)")
         ->and($failures[0]->field)->toBe('facility_code');
 });
 
@@ -79,7 +79,7 @@ it('catches a duplicate arriving in the same batch', function (): void {
     $context->registerAccepted($first);
 
     expect($rule->check($second, $context)[0]->detail ?? null)
-        ->toBe("Q2 2026 already recorded for facility KD-0412 (instance {$first->instanceId})");
+        ->toBe("Q2 2026 already recorded for facility KD-0412 (instance {$first->instanceId} from ODK Central; this one from ODK Central)");
 });
 
 it('leaves an unresolved facility or round to their own rules', function (): void {

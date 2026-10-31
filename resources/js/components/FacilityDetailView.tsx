@@ -186,23 +186,25 @@ export default function FacilityDetailView({ detail, onCorrected }: FacilityDeta
                 </dl>
             </Section>
 
-            <Section title={t('dashboard.drawer.odk_title')}>
-                {detail.odk.instance_id === null ? (
-                    <p className="text-[13px] text-ink-2">{t('dashboard.drawer.odk_none')}</p>
+            <Section title={t('dashboard.drawer.source_title')}>
+                {detail.source.instance_id === null ? (
+                    <p className="text-[13px] text-ink-2">{t('dashboard.drawer.source_none')}</p>
                 ) : (
                     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[13px]">
+                        {detail.source.name !== null && <Term label={t('dashboard.drawer.source')}>{detail.source.name}</Term>}
                         <Term label={t('dashboard.drawer.instance')}>
-                            <code className="break-all">{detail.odk.instance_id}</code>
+                            <code className="break-all">{detail.source.instance_id}</code>
                         </Term>
                     </dl>
                 )}
-                {detail.odk.instance_id !== null &&
-                    (detail.odk.url !== null ? (
-                        <a href={detail.odk.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[13px] font-medium text-deep underline">
-                            {t('dashboard.drawer.open_in_odk')} <span className="sr-only">{t('dashboard.drawer.new_tab')}</span>
+                {detail.source.instance_id !== null &&
+                    detail.source.name !== null &&
+                    (detail.source.url !== null ? (
+                        <a href={detail.source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[13px] font-medium text-deep underline">
+                            {t('dashboard.drawer.open_in_source', { source: detail.source.name })} <span className="sr-only">{t('dashboard.drawer.new_tab')}</span>
                         </a>
                     ) : (
-                        <p className="mt-2 text-[13px] text-ink-2">{t('dashboard.drawer.odk_not_configured')}</p>
+                        <p className="mt-2 text-[13px] text-ink-2">{t('dashboard.drawer.source_not_configured', { source: detail.source.name })}</p>
                     ))}
             </Section>
         </div>

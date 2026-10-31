@@ -14,7 +14,7 @@ final class ShowQuarantinedRecordController extends Controller
 {
     public function __invoke(QuarantinedRecord $record, QuarantineQuery $quarantine): DataIssueDetailResource
     {
-        $record->load(['submission:id,instance_id,form_ref,received_at,status,payload', 'round:id,year,quarter']);
+        $record->load(['submission:id,source_id,external_id,instance_id,form_ref,received_at,status,payload', 'round:id,year,quarter']);
 
         return new DataIssueDetailResource($record, $quarantine->facilityNames([$record->facility_ref]));
     }

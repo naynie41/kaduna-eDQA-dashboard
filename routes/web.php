@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Admin\AdminOdkController;
+use App\Http\Controllers\Admin\AdminSourcesController;
 use App\Http\Controllers\Assessments\CorrectAssessmentController;
 use App\Http\Controllers\Attachments\ShowAttachmentController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
@@ -13,9 +13,6 @@ use App\Http\Controllers\Facilities\CascadeExportController;
 use App\Http\Controllers\Facilities\FacilityDetailController;
 use App\Http\Controllers\Facilities\FacilityOptionsController;
 use App\Http\Controllers\Odk\BackfillReportDownloadController;
-use App\Http\Controllers\Odk\OdkPullController;
-use App\Http\Controllers\Odk\OdkStatusController;
-use App\Http\Controllers\OdkWebhookController;
 use App\Http\Controllers\Quarantine\BulkResolveQuarantineController;
 use App\Http\Controllers\Quarantine\DataIssuesPageController;
 use App\Http\Controllers\Quarantine\OverrideSoftFlagController;
@@ -25,18 +22,25 @@ use App\Http\Controllers\Quarantine\ShowQuarantinedRecordController;
 use App\Http\Controllers\Rounds\RoundController;
 use App\Http\Controllers\Scoring\RescoreController;
 use App\Http\Controllers\Scoring\ScoringRuleController;
+use App\Http\Controllers\Sources\PullRunController;
+use App\Http\Controllers\Sources\SourceIndexController;
+use App\Http\Controllers\Sources\SourcePullController;
+use App\Http\Controllers\SourceWebhookController;
 use App\Http\Middleware\ShareDashboardContext;
 use Illuminate\Support\Facades\Route;
 
 /*
 | SECURITY.md §3: one protected group is the whole authorisation model. Outside it are only
-| Fortify's login, 2FA challenge and password-reset screens, the ODK webhook (HMAC-signed) and
-| GET /up. tests/Feature/Auth/RouteGuardTest.php enforces this for every registered route.
+| Fortify's login, 2FA challenge and password-reset screens, the source webhooks (each verified its
+| own way, ARCHITECTURE.md §5.4) and GET /up. tests/Feature/Auth/RouteGuardTest.php enforces this for every registered route.
 */
 
-Route::post('webhooks/odk', OdkWebhookController::class)
-    ->middleware('throttle:60,1')
-    ->name('webhooks.odk');
+// One per source (/webhooks/odk, /webhooks/kobo); a key not in config is a 404. 60 a minute per
+// source and address (SECURITY.md §6).
+Route::post('webhooks/{source}', SourceWebhookController::class)
+    ->where('source', '[A-Za-z0-9_-]{1,64}')
+    ->middleware('throttle:webhook')
+    ->name('webhooks.source');
 
 // Signed in but 2FA not yet confirmed: the only page such a user can reach.
 Route::middleware(['auth', 'verified', 'password.confirm'])->group(function (): void {
@@ -63,11 +67,13 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
         Route::get('plan', Dashboard\PlanController::class)->name('plan');
     });
 
-    // Administration (ARCHITECTURE.md §9.3, D-55): /admin opens the ODK pull page. The five pages,
-    // each a placeholder until its Phase 5 step builds it.
-    Route::redirect('admin', '/admin/odk')->name('admin');
+    // Administration (ARCHITECTURE.md §9.3, D-55): /admin opens the Data sources page, which
+    // replaced the ODK pull page (/admin/odk still leads there). Rounds, Facility list and Scoring
+    // rules are placeholders until their Phase 5 steps build them.
+    Route::redirect('admin', '/admin/sources')->name('admin');
     Route::prefix('admin')->name('admin.')->group(function (): void {
-        Route::get('odk', AdminOdkController::class)->name('odk');
+        Route::get('sources', AdminSourcesController::class)->name('sources');
+        Route::permanentRedirect('odk', '/admin/sources')->name('odk');
         Route::get('data-issues', DataIssuesPageController::class)->name('data-issues');
         Route::inertia('rounds', 'admin/rounds')->name('rounds');
         Route::inertia('facilities', 'admin/facilities')->name('facilities');
@@ -90,12 +96,15 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
     Route::prefix('api')->name('api.')->middleware('throttle:120,1')->group(function (): void {
         Route::get('facilities/{facility}', FacilityDetailController::class)->whereNumber('facility')->name('facilities.show');
 
-        // ODK (§5.3, §8): "Pull now" is 6 a minute per administrator on top of the group's 120 (SECURITY.md §8).
-        Route::post('odk/pull', [OdkPullController::class, 'store'])->middleware('throttle:odk-pull')->name('odk.pull.store');
-        Route::get('odk/pull/{run}', [OdkPullController::class, 'show'])->whereNumber('run')->name('odk.pull.show');
-        Route::get('odk/status', OdkStatusController::class)->name('odk.status');
-        Route::get('odk/backfill-report/{file}', BackfillReportDownloadController::class)
-            ->middleware('signed')->where('file', '[A-Za-z0-9.-]+')->name('odk.backfill-report');
+        // The sources (§5.3, §8): pull, pull all and reconcile are 6 a minute per administrator and
+        // per source (and action) on top of the group's 120 (SECURITY.md §8).
+        Route::get('sources', SourceIndexController::class)->name('sources.index');
+        Route::post('sources/pull-all', [SourcePullController::class, 'all'])->middleware('throttle:source-pull')->name('sources.pull-all');
+        Route::post('sources/{key}/pull', [SourcePullController::class, 'store'])->where('key', '[A-Za-z0-9_-]{1,64}')->middleware('throttle:source-pull')->name('sources.pull');
+        Route::post('sources/{key}/reconcile', [SourcePullController::class, 'reconcile'])->where('key', '[A-Za-z0-9_-]{1,64}')->middleware('throttle:source-pull')->name('sources.reconcile');
+        Route::get('pulls/{run}', PullRunController::class)->whereNumber('run')->name('pulls.show');
+        Route::get('backfill-reports/{file}', BackfillReportDownloadController::class)
+            ->middleware('signed')->where('file', '[A-Za-z0-9.-]+')->name('backfill-reports.show');
 
         // The ODK cascading-select media (§5.1): generated on request, fetched through a signed link.
         Route::post('facility-list/export-cascade', [CascadeExportController::class, 'store'])->name('facility-list.cascade.store');

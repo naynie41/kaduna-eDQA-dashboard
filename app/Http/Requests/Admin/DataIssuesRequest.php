@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Admin;
 
+use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Validation\Queries\QuarantineQuery;
 use App\Domain\Validation\RuleCatalogue;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,7 +12,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * The Data issues page's filters, all in the URL (D-57): ?tab=hard|soft, ?state= (hard tab;
- * default open), ?rule=, ?lga= (code), ?round= (id), ?page=.
+ * default open), ?rule=, ?lga= (code), ?round= (id), ?source= (a configured key), ?page=.
  */
 final class DataIssuesRequest extends FormRequest
 {
@@ -31,11 +32,12 @@ final class DataIssuesRequest extends FormRequest
             'rule' => ['nullable', Rule::in($codes)],
             'lga' => ['nullable', 'string', Rule::exists('lgas', 'code')],
             'round' => ['nullable', 'integer', Rule::exists('rounds', 'id')],
+            'source' => ['nullable', 'string', Rule::in(app(SourceRegistry::class)->keys())],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }
 
-    /** @return array{tab: string, state: string, rule: ?string, lga: ?string, round: ?int} */
+    /** @return array{tab: string, state: string, rule: ?string, lga: ?string, round: ?int, source: ?string} */
     public function filters(): array
     {
         return [
@@ -44,6 +46,7 @@ final class DataIssuesRequest extends FormRequest
             'rule' => $this->string('rule')->toString() ?: null,
             'lga' => $this->string('lga')->toString() ?: null,
             'round' => $this->filled('round') ? $this->integer('round') : null,
+            'source' => $this->string('source')->toString() ?: null,
         ];
     }
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domain\Ingestion\Exceptions\KoboAuthFailed;
+use App\Domain\Ingestion\Exceptions\KoboException;
 use App\Domain\Ingestion\Exceptions\KoboNotConfigured;
 use App\Domain\Ingestion\Exceptions\KoboUnexpectedResponse;
 use App\Domain\Ingestion\Exceptions\KoboUnreachable;
@@ -10,6 +11,7 @@ use App\Domain\Ingestion\Exceptions\KoboUnsafeUrl;
 use App\Domain\Ingestion\Kobo\KoboSource;
 use App\Domain\Ingestion\SourceRegistry;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
@@ -215,10 +217,10 @@ it('lists attachments from the submission\'s own _attachments', function (): voi
         koboAttachment('old.jpg', KOBO_URL.'/api/v2/assets/'.KOBO_ASSET.'/data/4/attachments/2/', deleted: true),
     ])]])]);
 
-    $refs = kobo()->attachmentList('uuid:k-4');
+    $refs = kobo()->attachmentList('4');
 
     expect(array_map(fn ($r): array => [$r->name, $r->exists], $refs))->toBe([['register.jpg', true], ['old.jpg', false]])
-        ->and(urldecode(koboSent('/data/')[0]->url()))->toContain('query={"meta/instanceID":"uuid:k-4"}');
+        ->and(urldecode(koboSent('/data/')[0]->url()))->toContain('query={"_id":4}');
 });
 
 it('downloads an attachment from the Kobo host with the token, following a redirect that stays there', function (): void {
@@ -229,7 +231,7 @@ it('downloads an attachment from the Kobo host with the token, following a redir
         KOBO_URL.'/media/original*' => Http::response('jpeg bytes', 200, ['Content-Type' => 'image/jpeg']),
     ]);
 
-    $download = kobo()->downloadAttachment('uuid:k-4', 'register.jpg', $sink);
+    $download = kobo()->downloadAttachment('4', 'register.jpg', $sink);
 
     expect(file_get_contents($sink))->toBe('jpeg bytes')
         ->and($download->mime)->toBe('image/jpeg')
@@ -245,7 +247,7 @@ it('refuses an attachment URL on another host, over http, or redirecting off the
         '*' => Http::response('should never be asked', 200),
     ]);
 
-    expect(fn () => kobo()->downloadAttachment('uuid:k-4', 'register.jpg', $sink))->toThrow(function (KoboUnsafeUrl $e) use ($kind): void {
+    expect(fn () => kobo()->downloadAttachment('4', 'register.jpg', $sink))->toThrow(function (KoboUnsafeUrl $e) use ($kind): void {
         expect($e->status())->toBe('unsafe_url')->and($e->getMessage())->toContain($kind);
     });
 
@@ -266,7 +268,7 @@ it('refuses an attachment URL on another host, over http, or redirecting off the
 it('refuses a file the submission does not list', function (): void {
     Http::fake([KOBO_URL.'/*' => Http::response(['count' => 1, 'results' => [koboRow(4, [koboAttachment('a.jpg', KOBO_URL.'/x')])]])]);
 
-    expect(fn () => kobo()->downloadAttachment('uuid:k-4', 'b.jpg', '/tmp/nope'))->toThrow(KoboUnexpectedResponse::class);
+    expect(fn () => kobo()->downloadAttachment('4', 'b.jpg', '/tmp/nope'))->toThrow(KoboUnexpectedResponse::class);
 });
 
 // ---- Secrets
@@ -288,4 +290,76 @@ it('never logs the token, a query or a body, and names endpoints without IDs', f
     expect(collect($logged)->pluck('message')->unique()->values()->all())->toContain('kobo.request', 'kobo.retry')
         ->and($text)->not->toContain(KOBO_TOKEN)->not->toContain(KOBO_ASSET)->not->toContain('_submission_time')->not->toContain('uuid:k-1')
         ->and($text)->toContain('assets\/{asset}\/data');
+});
+
+/**
+ * Every Kobo call the portal makes, each answered as given: success, refusals, a server that keeps
+ * failing, no connection, an odd answer, unsafe attachment URLs. The exceptions each one threw.
+ *
+ * @return list<Throwable>
+ */
+function koboEveryPath(): array
+{
+    $thrown = [];
+    $attempt = function (Closure $call) use (&$thrown): void {
+        try {
+            $call();
+        } catch (Throwable $e) {
+            $thrown[] = $e;
+        }
+    };
+    $answers = [
+        Http::response(['count' => 1, 'results' => [koboRow(1)]]),
+        Http::response(['detail' => 'Invalid token.'], 401),
+        Http::response(['detail' => 'You do not have permission'], 403),
+        Http::response('<html>oops</html>', 500),
+        Http::response(['unexpected' => true]),
+        fn () => throw new ConnectionException('cURL error 7: Failed to connect to kf.kobotoolbox.org'),
+    ];
+    foreach ($answers as $answer) {
+        Http::fake([KOBO_URL.'/*' => $answer]);
+        $attempt(fn () => kobo()->ping());
+        $attempt(fn () => kobo()->formVersions());
+        $attempt(fn () => kobo()->submissionsPage(CarbonImmutable::parse('2026-04-01'), 10, 0));
+    }
+    foreach (['https://evil.example/steal', 'http://kf.kobotoolbox.org/x'] as $url) {
+        Http::fake([KOBO_URL.'/*' => Http::response(['count' => 1, 'results' => [koboRow(4, [koboAttachment('a.jpg', $url)])]]), '*' => Http::response('no')]);
+        $attempt(fn () => kobo()->downloadAttachment('4', 'a.jpg', (string) tempnam(sys_get_temp_dir(), 'kobo')));
+    }
+
+    return $thrown;
+}
+
+it('logs no Authorization header and no token at debug level, on any request path', function (): void {
+    config(['logging.channels.edqa.level' => 'debug', 'logging.channels.stack.level' => 'debug', 'logging.channels.single.level' => 'debug']);
+    $logged = [];
+    Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged): void {
+        $logged[] = $event;
+    });
+
+    foreach (koboEveryPath() as $e) {
+        report($e); // as a failed job would: the exception and its context, at error level
+    }
+
+    $text = json_encode(array_map(fn (MessageLogged $e): array => [$e->level, $e->message, array_map(
+        fn (mixed $v): mixed => $v instanceof Throwable ? (string) $v : $v, $e->context,
+    )], $logged), JSON_PARTIAL_OUTPUT_ON_ERROR);
+    expect($logged)->not->toBeEmpty()
+        ->and(collect($logged)->pluck('level')->unique()->values()->all())->toContain('info', 'warning', 'error')
+        ->and($text)->not->toContain(KOBO_TOKEN)
+        // A header, in any form a logger would write it: "Authorization: Token …", {"Authorization": …}.
+        ->and($text)->not->toMatch('/Authorization[\\\\"\'\s]*[:=]/i');
+});
+
+it('never puts the token in a KoboClient exception: its message, its string with the trace, or any previous one', function (): void {
+    $thrown = koboEveryPath();
+
+    expect($thrown)->not->toBeEmpty()
+        ->and(collect($thrown)->filter(fn (Throwable $e): bool => $e instanceof KoboException)->count())->toBe(count($thrown));
+    foreach ($thrown as $e) {
+        for ($link = $e; $link !== null; $link = $link->getPrevious()) {
+            expect($link->getMessage())->not->toContain(KOBO_TOKEN)->not->toMatch('/Authorization\s*[:=]/i')
+                ->and((string) $link)->not->toContain(KOBO_TOKEN);
+        }
+    }
 });

@@ -7,6 +7,9 @@ namespace App\Domain\Ingestion;
 use App\Domain\Ingestion\Contracts\PayloadNormalizer;
 use App\Domain\Ingestion\Contracts\SubmissionSource as SourceAdapter;
 use App\Domain\Ingestion\Enums\SourceType;
+use App\Domain\Ingestion\Exceptions\KoboNotConfigured;
+use App\Domain\Ingestion\Exceptions\OdkNotConfigured;
+use App\Domain\Ingestion\Exceptions\SourceException;
 use App\Domain\Ingestion\Exceptions\SourceRefused;
 use App\Domain\Ingestion\Kobo\KoboConfig;
 use App\Domain\Ingestion\Kobo\KoboPayloadNormalizer;
@@ -80,15 +83,40 @@ final class SourceRegistry
         return $this->model($key)->id;
     }
 
+    /** The key of a submission_sources row, or null for a row config no longer knows. */
+    public function keyOf(int $sourceId): ?string
+    {
+        foreach ($this->keys() as $key) {
+            if (($this->rows[$key] ??= SubmissionSource::query()->where('key', $key)->first())?->id === $sourceId) {
+                return $key;
+            }
+        }
+
+        return null;
+    }
+
+    /** The container key a test (or a future override) binds to replace one source's adapter. */
+    public static function adapterBinding(string $key): string
+    {
+        return "edqa.sources.adapter.{$key}";
+    }
+
     public function adapter(string $key): SourceAdapter
     {
+        if ($this->container->bound(self::adapterBinding($key))) {
+            $this->config($key);
+
+            /** @var SourceAdapter */
+            return $this->container->make(self::adapterBinding($key));
+        }
+
         return match ($this->type($key)) {
             SourceType::OdkCentral => $this->container->make(OdkCentralSource::class),
             SourceType::Kobo => $this->container->make(KoboSource::class),
         };
     }
 
-    /** The source's payload normaliser (ARCHITECTURE.md §5.2); KoboToolbox's arrives with Phase 2C step 4. */
+    /** The source's payload normaliser (ARCHITECTURE.md §5.2). */
     public function normaliser(string $key): PayloadNormalizer
     {
         return match ($this->type($key)) {
@@ -109,6 +137,46 @@ final class SourceRegistry
             SourceType::OdkCentral => OdkConfig::fromConfig()->problems(),
             SourceType::Kobo => KoboConfig::fromConfig()->problems(),
         };
+    }
+
+    /** What the source's one form is called, for its source_syncs row: ODK's project/form, Kobo's asset UID. */
+    public function formRef(string $key): string
+    {
+        return match ($this->type($key)) {
+            SourceType::OdkCentral => OdkConfig::fromConfig()->formRef(),
+            SourceType::Kobo => (string) KoboConfig::fromConfig()->assetUid,
+        };
+    }
+
+    /** The source's own NotConfigured, naming the env keys to set. */
+    public function notConfigured(string $key): SourceException
+    {
+        return match ($this->type($key)) {
+            SourceType::OdkCentral => new OdkNotConfigured($this->problems($key)),
+            SourceType::Kobo => new KoboNotConfigured($this->problems($key)),
+        };
+    }
+
+    /** The source's name, as administrators see it ("ODK Central", "KoboToolbox"). */
+    public function name(string $key): string
+    {
+        return $this->config($key)['name'];
+    }
+
+    /** Submissions a page (sources.*.page_size, at least 1). */
+    public function pageSize(string $key): int
+    {
+        $size = $this->config($key)['settings']['page_size'] ?? 500;
+
+        return max(1, is_numeric($size) ? (int) $size : 500);
+    }
+
+    /** Seconds between backfill pages (sources.*.backfill_throttle_seconds). */
+    public function backfillThrottle(string $key): int
+    {
+        $seconds = $this->config($key)['settings']['backfill_throttle_seconds'] ?? 5;
+
+        return max(0, is_numeric($seconds) ? (int) $seconds : 5);
     }
 
     /** @return list<string> keys whose credentials are complete */

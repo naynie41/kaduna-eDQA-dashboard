@@ -18,13 +18,18 @@ const translations = {
     common: {
         ...(testTranslations.common as Record<string, unknown>),
         sync: {
-            not_configured: 'ODK Central is not configured, so no submissions are being pulled.',
-            not_connected: 'ODK Central is configured; no pull has finished yet.',
-            ok: 'Last pull :minutes min ago · :assessments assessments · :quarantined in quarantine',
-            stale: 'Last successful pull :minutes min ago, more than :limit minutes · :assessments assessments · :quarantined in quarantine',
-            failed: 'Last pull failed at :time (:error); last success :success · :assessments assessments · :quarantined in quarantine',
-            failed_no_error: 'Last pull failed at :time; last success :success · :assessments assessments · :quarantined in quarantine',
+            label: 'Data sources',
+            not_configured: ':source is not configured',
+            disabled: ':source is switched off',
+            not_connected: ':source: no pull has finished yet',
+            healthy: ':source: last pull :minutes min ago',
+            stale: ':source: last successful pull :minutes min ago, more than :limit minutes',
+            failed: ':source: last pull failed at :time (:error); last success :success',
+            failed_no_error: ':source: last pull failed at :time; last success :success',
+            auth_failed: ":source refused the portal's credentials at :time; it is not pulling until they are fixed. Last success :success",
             never_succeeded: 'never',
+            counts: ':assessments assessments · :quarantined in quarantine',
+            none: 'No data source is set up.',
         },
     },
     dashboard: {
@@ -37,34 +42,71 @@ const translations = {
     },
 };
 
-const sync = (overrides: Partial<SyncStatus>): ShellStatus => ({
-    assessments: 2184,
-    quarantined: 12,
-    sync: { state: 'ok', lastSuccessAt: null, minutesSinceSuccess: 4, lastFailedAt: null, lastError: null, lastErrorClass: null, staleAfterMinutes: 30, ...overrides },
+const source = (overrides: Partial<SyncStatus> = {}): SyncStatus => ({
+    key: 'odk',
+    name: 'ODK Central',
+    state: 'healthy',
+    lastSuccessAt: null,
+    minutesSinceSuccess: 4,
+    sinceSuccess: null,
+    lastFailedAt: null,
+    lastError: null,
+    lastErrorClass: null,
+    lastErrorHttpStatus: null,
+    staleAfterMinutes: 30,
+    ...overrides,
 });
+
+const shell = (...sources: SyncStatus[]): ShellStatus => ({ assessments: 2184, quarantined: 12, sources });
 
 describe('SyncStatusBar', () => {
     it.each([
-        [{ state: 'not_configured', minutesSinceSuccess: null }, 'ODK Central is not configured, so no submissions are being pulled.'],
-        [{ state: 'not_connected', minutesSinceSuccess: null }, 'ODK Central is configured; no pull has finished yet.'],
-        [{ state: 'ok' }, 'Last pull 4 min ago · 2,184 assessments · 12 in quarantine'],
-        [{ state: 'stale', minutesSinceSuccess: 45 }, 'Last successful pull 45 min ago, more than 30 minutes · 2,184 assessments · 12 in quarantine'],
+        [{ state: 'not_configured', minutesSinceSuccess: null }, 'ODK Central is not configured'],
+        [{ state: 'disabled', minutesSinceSuccess: null }, 'ODK Central is switched off'],
+        [{ state: 'not_connected', minutesSinceSuccess: null }, 'ODK Central: no pull has finished yet'],
+        [{ state: 'healthy' }, 'ODK Central: last pull 4 min ago'],
+        [{ state: 'stale', minutesSinceSuccess: 45 }, 'ODK Central: last successful pull 45 min ago, more than 30 minutes'],
         [
             { state: 'failed', lastFailedAt: '2026-10-15T08:05:00Z', lastSuccessAt: '2026-10-15T07:40:00Z', lastError: 'OdkUnreachable: ODK Central could not be reached', lastErrorClass: 'OdkUnreachable' },
-            'Last pull failed at 15 Oct 2026, 09:05 WAT (OdkUnreachable); last success 15 Oct 2026, 08:40 WAT · 2,184 assessments · 12 in quarantine',
+            'ODK Central: last pull failed at 15 Oct 2026, 09:05 WAT (OdkUnreachable); last success 15 Oct 2026, 08:40 WAT',
         ],
-        [{ state: 'failed', lastFailedAt: '2026-10-15T08:05:00Z', minutesSinceSuccess: null }, 'Last pull failed at 15 Oct 2026, 09:05 WAT; last success never · 2,184 assessments · 12 in quarantine'],
-    ] as const)('says the %o state in words, as a status', async (overrides, text) => {
-        const { container } = renderUi(<SyncStatusBar status={sync(overrides)} />, translations);
+        [{ state: 'failed', lastFailedAt: '2026-10-15T08:05:00Z', minutesSinceSuccess: null }, 'ODK Central: last pull failed at 15 Oct 2026, 09:05 WAT; last success never'],
+        [
+            { state: 'auth_failed', lastFailedAt: '2026-10-15T08:05:00Z', lastErrorClass: 'OdkAuthFailed' },
+            "ODK Central refused the portal's credentials at 15 Oct 2026, 09:05 WAT; it is not pulling until they are fixed. Last success never",
+        ],
+    ] as const)('says the %o state in words, as a status, with the counts', async (overrides, text) => {
+        const { container } = renderUi(<SyncStatusBar status={shell(source(overrides))} />, translations);
 
-        expect(screen.getByRole('status').textContent).toContain(text);
+        const bar = screen.getByRole('status', { name: 'Data sources' });
+        expect(bar.textContent).toContain(text);
+        expect(bar.textContent).toContain('2,184 assessments · 12 in quarantine');
         expect(await axeCheck(container)).toHaveNoViolations();
     });
 
-    it.each(['not_configured', 'not_connected'] as const)('shows %s in the neutral style, not as a failure or a warning', (state) => {
-        renderUi(<SyncStatusBar status={sync({ state, minutesSinceSuccess: null })} />, translations);
+    it("names every source in the order given (worst first), and takes the worst one's tone", () => {
+        renderUi(
+            <SyncStatusBar status={shell(source({ key: 'kobo', name: 'KoboToolbox', state: 'auth_failed', lastFailedAt: '2026-10-15T08:05:00Z' }), source({ state: 'healthy' }))} />,
+            translations,
+        );
+
+        const bar = screen.getByRole('status');
+        const text = bar.textContent ?? '';
+        expect(text.indexOf('KoboToolbox refused')).toBeGreaterThanOrEqual(0);
+        expect(text.indexOf('KoboToolbox refused')).toBeLessThan(text.indexOf('ODK Central: last pull 4 min ago'));
+        expect(bar.className).toMatch(/text-bad/);
+    });
+
+    it.each(['not_configured', 'disabled', 'not_connected'] as const)('shows %s in the neutral style, not as a failure or a warning', (state) => {
+        renderUi(<SyncStatusBar status={shell(source({ state, minutesSinceSuccess: null }), source({ key: 'kobo', name: 'KoboToolbox', state: 'not_configured' }))} />, translations);
 
         expect(screen.getByRole('status').className).not.toMatch(/text-(bad|warn)/);
+    });
+
+    it('says so when there is no source at all', () => {
+        renderUi(<SyncStatusBar status={shell()} />, translations);
+
+        expect(screen.getByRole('status').textContent).toContain('No data source is set up.');
     });
 });
 

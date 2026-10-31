@@ -69,7 +69,9 @@ const row: DataIssueRow = {
     resolved_at: null,
     corrections: {},
     current: { lga_ref: null, ward_ref: 'CHK-KUJ', facility_ref: 'CHK-0001', raw_start: '2026-04-14T09:00:00.000+01:00', raw_end: '2026-04-14T09:45:00.000+01:00', round_year: 2026, round_quarter: 2 },
-    odk_url: null,
+    source: { key: 'odk', name: 'ODK Central' },
+    source_url: null,
+    duplicate_of: null,
 };
 
 const lgas = [

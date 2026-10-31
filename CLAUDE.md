@@ -55,7 +55,7 @@ staging/production. The same images run in dev, CI, staging and production.
 
 **Deliberately absent:** `spatie/laravel-permission`, policies, gates, role columns, any
 import/upload library, any DHIS2 / Google Sheets client. (KoboToolbox *is* supported — as a
-`SubmissionSource` adapter, decision D-21.)
+`SubmissionSource` adapter, decision D-59.)
 
 ---
 

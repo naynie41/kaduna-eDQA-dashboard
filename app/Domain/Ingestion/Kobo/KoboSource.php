@@ -24,8 +24,9 @@ use Throwable;
  * - changedSince: nothing. The KPI API exposes no filterable last-edited field for submissions
  *   (KoboClient), so no query can find edits; ReconcileSourceJob (Phase 2C step 5) is Kobo's edit
  *   path. Returning none (with no request) keeps the pull's second pass a no-op here.
- * - attachmentList / downloadAttachment: from the submission's own _attachments; a download URL
- *   is followed only on the Kobo host, over https (KoboClient::download).
+ * - attachmentList / downloadAttachment: from the submission's own _attachments, found by its
+ *   logical ID (_id, the same through edits: the current version's files, as Central lists them
+ *   under __id); a download URL is followed only on the Kobo host, over https (KoboClient::download).
  *
  * Every method throws a KoboException subclass, never a transport exception.
  */
@@ -149,14 +150,18 @@ final class KoboSource implements SubmissionSource
     }
 
     /**
-     * The submission's _attachments, found by its instance ID.
+     * The submission's _attachments, found by its logical ID (_id; the contract's $instanceId is
+     * the submission's ID at its source).
      *
      * @return list<array<array-key, mixed>>
      */
-    private function attachments(string $instanceId): array
+    private function attachments(string $id): array
     {
+        if (preg_match('/^\d{1,18}$/', $id) !== 1) {
+            return [];
+        }
         $body = $this->object($this->asset().'data/', 'assets/{asset}/data', [
-            'format' => 'json', 'query' => self::encode(['meta/instanceID' => $instanceId]), 'limit' => 1,
+            'format' => 'json', 'query' => self::encode(['_id' => (int) $id]), 'limit' => 1,
         ]);
         $row = is_array($body['results'] ?? null) ? ($body['results'][0] ?? null) : null;
         if (! is_array($row)) {

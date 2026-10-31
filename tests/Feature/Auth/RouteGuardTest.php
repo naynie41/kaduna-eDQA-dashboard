@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 
@@ -16,7 +17,7 @@ const PUBLIC_ROUTES = [
     'POST forgot-password',
     'GET|HEAD reset-password/{token}',
     'POST reset-password',
-    'POST webhooks/odk',
+    'POST webhooks/{source}',
     'GET|HEAD up',
 ];
 
@@ -73,10 +74,11 @@ it('has no registration routes', function (): void {
     $this->post('/register', ['email' => 'x@example.test'])->assertNotFound();
 });
 
-it('keeps the ODK webhook switched off (404) while no secret is configured', function (): void {
-    config(['edqa.odk.webhook.secret' => null]);
+it('keeps the source webhooks switched off (404) while no secret is configured', function (): void {
+    config(['edqa.odk.webhook.secret' => null, 'edqa.kobo.webhook.token' => null]);
 
     $this->postJson('/webhooks/odk', [])->assertNotFound();
+    $this->postJson('/webhooks/kobo', [])->assertNotFound();
 });
 
 // ---- Mandatory 2FA (SECURITY.md §2)
@@ -103,13 +105,14 @@ it('lets a user with confirmed 2FA reach the dashboard', function (): void {
     $this->actingAs(User::factory()->withTwoFactor()->create())->get('/dashboard/home')->assertOk();
 });
 
-// ---- EDQA_REQUIRE_2FA switch (D-26): on unless explicitly false
+// ---- EDQA_REQUIRE_2FA switch (D-26): on unless explicitly false, and off in local only
 
 it('requires 2FA by default', function (): void {
     expect(config('edqa.auth.require_two_factor'))->toBeTrue();
 });
 
 it('lets a user without 2FA reach the dashboard when the requirement is switched off', function (): void {
+    app()->detectEnvironment(fn (): string => 'local'); // the switch works in local only (TwoFactorSwitch)
     config(['edqa.auth.require_two_factor' => false]);
     $user = User::factory()->create(['two_factor_confirmed_at' => null]);
 
@@ -117,10 +120,13 @@ it('lets a user without 2FA reach the dashboard when the requirement is switched
 });
 
 it('still challenges a user who has set up 2FA when the requirement is switched off', function (): void {
+    app()->detectEnvironment(fn (): string => 'local'); // the switch works in local only (TwoFactorSwitch)
     config(['edqa.auth.require_two_factor' => false]);
     $user = User::factory()->withTwoFactor()->create();
 
-    $this->post(route('login'), ['email' => $user->email, 'password' => 'password'])
+    // Outside the testing environment Laravel checks CSRF again; this test is about the challenge.
+    $this->withoutMiddleware(PreventRequestForgery::class)
+        ->post(route('login'), ['email' => $user->email, 'password' => 'password'])
         ->assertRedirect(route('two-factor.login'));
     $this->assertGuest();
 });

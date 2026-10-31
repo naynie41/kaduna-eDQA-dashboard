@@ -32,7 +32,7 @@ export default function StaleIngestionBanner({ stale }: StaleIngestionBannerProp
             </h2>
             <p className="mt-1 text-[13px] text-ink">{body}</p>
             <p className="mt-1.5 text-[13px]">
-                <Link href="/admin/odk" className="font-medium text-deep underline">
+                <Link href="/admin/sources" className="font-medium text-deep underline">
                     {t('admin.stale.link')}
                 </Link>
             </p>

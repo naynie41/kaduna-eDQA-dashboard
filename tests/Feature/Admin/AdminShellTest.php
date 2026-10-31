@@ -21,7 +21,7 @@ beforeEach(function (): void {
 });
 
 const ADMIN_PAGES = [
-    'odk' => 'admin/odk',
+    'sources' => 'admin/sources',
     'data-issues' => 'admin/data-issues',
     'rounds' => 'admin/rounds',
     'facilities' => 'admin/facilities',
@@ -33,8 +33,8 @@ function configureOdk(): void
     config(['edqa.sources.odk' => [...config('edqa.sources.odk'), 'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'x', 'project_id' => '7', 'form_id' => 'dqa']]);
 }
 
-it('redirects /admin to the ODK pull page', function (): void {
-    $this->actingAs($this->admin)->get('/admin')->assertRedirect('/admin/odk');
+it('redirects /admin to the Data sources page', function (): void {
+    $this->actingAs($this->admin)->get('/admin')->assertRedirect('/admin/sources');
 });
 
 it('serves each admin page with the admin props and strings, and no dashboard filters', function (string $path, string $component): void {
@@ -46,7 +46,7 @@ it('serves each admin page with the admin props and strings, and no dashboard fi
             ->where('admin.staleIngestion.stale', false)
             ->has('translations.admin.tabs')
             ->missing('filters')
-            ->has('shell.sync'));
+            ->has('shell.sources'));
 })->with(array_map(fn (string $component, string $path): array => [$path, $component], ADMIN_PAGES, array_keys(ADMIN_PAGES)));
 
 it('keeps every admin page behind the sign-in', function (string $path): void {
@@ -65,21 +65,21 @@ it('shows the open quarantine count, cached, and forgets it when a record is qua
     Rows::quarantined();
     Rows::quarantined(['status' => 'resolved', 'resolution' => 'rejected', 'resolved_at' => now()]);
 
-    $this->actingAs($this->admin)->get('/admin/odk')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 2)->where('shell.quarantined', 2));
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 2)->where('shell.quarantined', 2));
     expect(Cache::get(QuarantineQuery::OPEN_COUNT_KEY))->toBe(2);
 
     // A row written another way is not seen until the cache is forgotten (or lapses after 60 s)…
     $third = Rows::quarantined();
-    $this->actingAs($this->admin)->get('/admin/odk')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 2));
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 2));
 
     // …which a quarantine does,
     SubmissionQuarantined::dispatch($third, 1);
-    $this->actingAs($this->admin)->get('/admin/odk')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 3));
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 3));
 
     // and a resolution.
     DB::table('quarantined_records')->where('id', $third)->update(['status' => 'resolved']);
     QuarantineResolved::dispatch($third, null, QuarantineResolution::Rejected);
-    $this->actingAs($this->admin)->get('/admin/odk')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 2));
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 2));
 });
 
 it('lapses the cached count after a minute anyway', function (): void {
@@ -120,7 +120,7 @@ it('says which round is open and when the last success was', function (): void {
     Rows::round(['year' => 2026, 'quarter' => 4, 'window_start' => '2026-10-01', 'window_end' => '2026-12-31']);
     Rows::pullRun(['outcome' => 'succeeded', 'started_at' => now()->subDays(2), 'finished_at' => now()->subDays(2)]);
 
-    $this->actingAs($this->admin)->get('/admin/odk')->assertInertia(fn (Assert $page) => $page
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page
         ->where('admin.staleIngestion.round', ['year' => 2026, 'quarter' => 4])
         ->where('admin.staleIngestion.hours', 24)
         ->where('admin.staleIngestion.lastSuccessAt', now()->subDays(2)->startOfSecond()->toIso8601String()));
@@ -130,7 +130,8 @@ it('leaves the banner to the status bar while ODK is not configured', function (
     config(['edqa.sources.odk.url' => null]);
     Rows::round(['year' => 2026, 'quarter' => 4, 'window_start' => '2026-10-01', 'window_end' => '2026-12-31']);
 
-    $this->actingAs($this->admin)->get('/admin/odk')->assertInertia(fn (Assert $page) => $page
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page
         ->where('admin.staleIngestion.stale', false)
-        ->where('shell.sync.state', 'not_configured'));
+        ->where('shell.sources.0.key', 'odk')
+        ->where('shell.sources.0.state', 'not_configured'));
 });

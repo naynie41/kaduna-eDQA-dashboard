@@ -15,7 +15,7 @@ export type ProgressStage = {
 export type ProgressPanelProps<T> = {
     /** Names the panel and starts each announcement: "Pull", "Rescore Q2 2026". */
     title: string;
-    /** The progress endpoint, polled with GET (GET /api/odk/pull/{run}, /api/rescores/{batch}). */
+    /** The progress endpoint, polled with GET (GET /api/pulls/{run}, /api/rescores/{batch}). */
     url: string;
     stage: (data: T) => ProgressStage;
     /** The details under the stage (counters); shown on every poll, never announced. */

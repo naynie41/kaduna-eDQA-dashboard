@@ -28,6 +28,7 @@ final class ValidationContext
      * @param  array<string, FacilitySnapshot>  $facilities  keyed by exact code
      * @param  list<RoundSnapshot>  $rounds
      * @param  array<string, list<string>>  $acceptedInstances  "round:facility" => instance IDs
+     * @param  array<string, string>  $acceptedSources  instance ID => the key of its source
      * @param  array<int, list<array{sequence: int, overall: float}>>  $priorScores  per facility, latest first
      * @param  array<string, array<int, true>>  $assessorDays  "assessor|Y-m-d" => facility IDs
      * @param  array<string, true>  $knownFormVersions  "source|version" => true
@@ -42,6 +43,7 @@ final class ValidationContext
         private readonly array $knownFormVersions,
         private readonly ?RuleConfig $ruleConfig,
         private readonly ?int $ruleVersionId,
+        private array $acceptedSources = [],
     ) {}
 
     /** By code first, then by name, ignoring case, spacing and punctuation. */
@@ -175,6 +177,12 @@ final class ValidationContext
         return count($facilities);
     }
 
+    /** The key of the source an accepted instance (in the database or this batch) came from. */
+    public function acceptedSource(string $instanceId): ?string
+    {
+        return $this->acceptedSources[$instanceId] ?? null;
+    }
+
     public function isKnownFormVersion(string $source, string $version): bool
     {
         return isset($this->knownFormVersions["{$source}|{$version}"]);
@@ -191,6 +199,7 @@ final class ValidationContext
         }
 
         $this->acceptedInstances["{$round->id}:{$facility->id}"][] = $submission->instanceId;
+        $this->acceptedSources[$submission->instanceId] = $submission->source;
         $this->assessorDays[self::assessorDayKey($submission->assessorName, $submission->deviceId, $submission->visitDate())][$facility->id] = true;
     }
 

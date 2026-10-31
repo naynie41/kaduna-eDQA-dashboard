@@ -8,41 +8,68 @@ use App\Domain\Ingestion\Actions\DryRunPull;
 use App\Domain\Ingestion\Actions\PullSubmissions;
 use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
-use App\Domain\Ingestion\Exceptions\OdkException;
+use App\Domain\Ingestion\Exceptions\SourceException;
+use App\Domain\Ingestion\Exceptions\SourceRefused;
 use App\Domain\Ingestion\Jobs\PullSubmissionsJob;
 use App\Domain\Ingestion\Models\PullRun;
-use App\Domain\Ingestion\Odk\PullLock;
+use App\Domain\Ingestion\PullLock;
+use App\Domain\Ingestion\SourceRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Throwable;
 
 /**
- * One ODK pull, synchronous (ARCHITECTURE.md §5.3): the same pull the job runs, under the same
- * lock, recorded as a manual pull; a failure is final (no retries) and recorded as the job's is. --dry-run fetches, parses and validates up to --limit
- * submissions in memory, writes nothing, and prints what a real pull would do by rule code: the
- * safe first contact with real credentials.
+ * One pull of a source, or of every enabled source (--all), synchronous (ARCHITECTURE.md §5.3):
+ * the same pull the job runs, under the same per-source lock, recorded as a manual pull; a failure
+ * is final (no retries) and recorded as the job's is. --all pulls the configured and enabled
+ * sources one after another, and fails if any did. --dry-run fetches, parses and validates up to
+ * --limit submissions in memory, writes nothing, and prints what a real pull would do by rule
+ * code: the safe first contact with real credentials.
  */
 final class Pull extends Command
 {
     protected $signature = 'edqa:pull
+        {source? : The source to pull (odk, kobo)}
+        {--all : Every configured and enabled source, one after another}
         {--dry-run : Fetch, parse and validate in memory; write nothing}
         {--limit=200 : With --dry-run, the most submissions to fetch}';
 
-    protected $description = 'Pull submissions from ODK Central now (or --dry-run)';
+    protected $description = 'Pull submissions from a source now (or every source with --all, or --dry-run)';
 
-    public function handle(DryRunPull $dryRun, PullLock $lock, PullSubmissions $pull): int
+    public function handle(SourceRegistry $sources, DryRunPull $dryRun, PullLock $lock, PullSubmissions $pull): int
     {
-        return $this->option('dry-run') ? $this->dryRun($dryRun) : $this->pull($lock, $pull);
-    }
+        $source = $this->argument('source');
+        $all = (bool) $this->option('all');
+        if (($source === null) === ! $all) {
+            $this->error((string) __('sources.pull.name_one', ['sources' => implode(', ', $sources->keys())]));
 
-    private function dryRun(DryRunPull $dryRun): int
-    {
+            return self::FAILURE;
+        }
         try {
-            $report = $dryRun->execute(max(1, (int) $this->option('limit')));
-        } catch (OdkException $e) {
+            $keys = $all ? $sources->enabled() : [$sources->model((string) $source)->key];
+        } catch (SourceRefused $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;
+        }
+
+        $ok = true;
+        foreach ($keys as $key) {
+            $this->line('<options=bold>'.$sources->name($key).'</>');
+            $ok = ($this->option('dry-run') ? $this->dryRun($dryRun, $key) : $this->pull($lock, $pull, $key)) && $ok;
+        }
+
+        return $ok ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function dryRun(DryRunPull $dryRun, string $source): bool
+    {
+        try {
+            $report = $dryRun->execute($source, max(1, (int) $this->option('limit')));
+        } catch (SourceException $e) {
+            $this->error($e->getMessage());
+
+            return false;
         }
 
         $this->info((string) __('odk.pull.dry_run_title'));
@@ -58,28 +85,28 @@ final class Pull extends Command
             );
         }
 
-        return self::SUCCESS;
+        return true;
     }
 
-    private function pull(PullLock $lock, PullSubmissions $pullSubmissions): int
+    private function pull(PullLock $lock, PullSubmissions $pullSubmissions, string $source): bool
     {
         try {
-            $run = $lock->run(fn (): PullRun => $pullSubmissions->execute(PullTrigger::Manual), (int) config('edqa.odk.pull.lock_wait_seconds', 600));
+            $run = $lock->run($source, fn (): PullRun => $pullSubmissions->execute($source, PullTrigger::Manual), PullLock::waitSeconds());
         } catch (LockTimeoutException) {
             $this->error((string) __('odk.pull.busy'));
 
-            return self::FAILURE;
+            return false;
         } catch (Throwable $e) {
-            PullSubmissionsJob::recordFailure($e); // no retries from the console: this is the final failure
+            PullSubmissionsJob::recordFailure($source, $e); // no retries from the console: this is the final failure
             $this->error((string) __('odk.pull.failed', ['error' => PullSubmissions::describe($e)]));
 
-            return self::FAILURE;
+            return false;
         }
 
         if ($run->outcome === PullOutcome::SkippedNotConfigured) {
             $this->warn((string) __('odk.pull.skipped', ['error' => (string) $run->error]));
 
-            return self::FAILURE;
+            return false;
         }
 
         $this->info((string) __('odk.pull.result', [
@@ -87,7 +114,10 @@ final class Pull extends Command
             'fetched' => $run->fetched, 'duplicates' => $run->duplicates,
             'accepted' => $run->accepted, 'flagged' => $run->flagged, 'quarantined' => $run->quarantined,
         ]));
+        if ($run->cross_source_duplicates > 0) {
+            $this->line((string) __('sources.pull.cross_source', ['count' => $run->cross_source_duplicates]));
+        }
 
-        return self::SUCCESS;
+        return true;
     }
 }

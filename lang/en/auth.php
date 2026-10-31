@@ -54,6 +54,8 @@ return [
 
     'two_factor' => [
         'required' => 'Set up two-factor authentication to continue.',
+        // Stops the app at boot (TwoFactorSwitch): read by whoever deploys it, in the container log.
+        'switch_refused' => 'EDQA_REQUIRE_2FA=false is allowed only with APP_ENV=local, and this is APP_ENV=:environment. Two-factor sign-in cannot be switched off on a server: remove EDQA_REQUIRE_2FA from the environment, or set it to true, then restart.',
         'challenge' => [
             'title' => 'Two-factor authentication',
             'intro_code' => 'Enter the 6-digit code from your authenticator app.',

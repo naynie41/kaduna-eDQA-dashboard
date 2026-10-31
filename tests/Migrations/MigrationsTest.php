@@ -49,12 +49,13 @@ it('rolls back every migration one step at a time, then migrates again', functio
 
 const SOURCE_MIGRATION = '2026_10_28_000100_make_ingestion_source_aware';
 
-/** Migrates everything, then rolls back to just before the source-aware migration. */
+/** Migrates everything, then rolls back to just before the source-aware migration (and every later one). */
 function beforeSourceAware(mixed $test): void
 {
     $test->artisan('migrate:fresh', ['--no-interaction' => true])->assertSuccessful();
-    expect(DB::table('migrations')->orderByDesc('id')->value('migration'))->toBe(SOURCE_MIGRATION);
-    $test->artisan('migrate:rollback', ['--step' => 1, '--no-interaction' => true])->assertSuccessful();
+    $later = DB::table('migrations')->where('migration', '>', SOURCE_MIGRATION)->count();
+    $test->artisan('migrate:rollback', ['--step' => $later + 1, '--no-interaction' => true])->assertSuccessful();
+    expect(DB::table('migrations')->where('migration', '>=', SOURCE_MIGRATION)->exists())->toBeFalse();
 }
 
 /** Rows as Phases 2A–2B stored them, in the ODK-only tables. @return array<string, int> */
@@ -161,7 +162,8 @@ it('goes down with the data back in the ODK tables, and up again', function (): 
     $ids = legacyRows();
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
 
-    $this->artisan('migrate:rollback', ['--step' => 1, '--no-interaction' => true])->assertSuccessful();
+    // Back down through the source-aware migration (and every later one).
+    $this->artisan('migrate:rollback', ['--step' => DB::table('migrations')->where('migration', '>=', SOURCE_MIGRATION)->count(), '--no-interaction' => true])->assertSuccessful();
 
     expect(Schema::hasTable('submission_sources'))->toBeFalse()
         ->and(Schema::hasColumn('submissions', 'source_id'))->toBeFalse()

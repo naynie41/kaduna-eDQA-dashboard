@@ -1,7 +1,7 @@
 # discovery/ — Phase 0 investigation tools
 
-Throwaway Python scripts for answering the Phase 0 questions about the client's ODK Central
-data before any Laravel code is written. Nothing here ships: `discovery/` is excluded from the
+Throwaway Python scripts for answering the Phase 0 questions about the client's data on its two
+field-collection sources, ODK Central and KoboToolbox (D-59), before any of it is pulled. Nothing here ships: `discovery/` is excluded from the
 Docker build context (`CONVENTION.md` §12.2). The findings feed `ARCHITECTURE.md` §5.5
 (field maps) and §11.4 (open questions).
 
@@ -9,10 +9,11 @@ Docker build context (`CONVENTION.md` §12.2). The findings feed `ARCHITECTURE.m
 
 These apply to every script in this directory.
 
-1. **Read-only against ODK Central.** The only non-GET call allowed is `POST /v1/sessions` to log in.
-   No other POST, and no PATCH, PUT or DELETE. That includes `DELETE /v1/sessions/current`:
-   let the token expire rather than log out.
-2. **Never print or log the password or the session token.** They must not appear in console
+1. **Read-only against both sources.** Against ODK Central, the only non-GET call allowed is
+   `POST /v1/sessions` to log in. No other POST, and no PATCH, PUT or DELETE. That includes
+   `DELETE /v1/sessions/current`: let the token expire rather than log out. Against KoboToolbox,
+   GET only.
+2. **Never print or log the password, the session token or the Kobo API token.** They must not appear in console
    output, reports, exception messages or saved request dumps.
 3. **Throttle.** Sleep `ODK_THROTTLE_SECONDS` (default 1) between paged requests. The production
    server is live and assessors are submitting to it.
@@ -68,6 +69,53 @@ show Central's message, never the request.
 
 Everything `field_diff.py` infers from question names is marked **CONFIRM** in the draft map.
 Only `start`/`end` (from their preload) and `meta/instanceID` are taken as certain.
+
+### KoboToolbox
+
+The second source has its own read-only client, [`kobo.py`](kobo.py). It allows GET only and
+raises before anything else is sent. The API token travels in a header and never appears in
+output, reports or exception messages. Paged requests are throttled by `KOBO_THROTTLE_SECONDS`.
+The variables go in `.env` beside the ODK ones:
+
+| Variable | Meaning |
+|---|---|
+| `KOBO_BASE_URL` | `https://kf.kobotoolbox.org`, `https://eu.kobotoolbox.org`, or the self-hosted server |
+| `KOBO_API_TOKEN` | The API token of a dedicated account that can view the asset, never the owner's |
+| `KOBO_ASSET_UID` | The DQA project's asset uid (in its URL) |
+| `KOBO_THROTTLE_SECONDS` | Delay between paged requests (default `1`) |
+
+Every Kobo tool takes **`--offline DIR`**, which reads saved API responses instead of calling the
+server. [`fixtures/kobo/`](fixtures/kobo) holds a small synthetic set: two deployed versions and
+eight rows, with no real names. The fixtures include a never-deployed draft, a renamed facility
+group, a row with no LGA, a duplicate visit, an answer outside yes/no/na, an edit, and a row
+carrying an unknown version. Until credentials arrive, run the tools on that.
+
+| Tool | ODK counterpart | What it does | Writes |
+|---|---|---|---|
+| `kobo_inventory.py` | `probe.py`, `form_versions.py`, `submission_profile.py` | Lists the asset, its deployed versions (drafts left out) and the submissions per quarter, by visit start and by `_submission_time`, per version. Also names any row carrying a version that is not deployed. Saves the data rows | `out/kobo_inventory.md`, `out/kobo_form_versions.json`, `data/kobo/submissions/` |
+| `kobo_forms.py` | `form_versions.py` | Rebuilds each deployed version as an XLSForm from the version content Kobo keeps (Kobo exports only the current one). The `version` setting is the deployment uid | `data/kobo/forms/<uid>.xlsx`, `out/kobo_forms.md` |
+| `field_diff.py --source kobo` | `field_diff.py` | Reads those XLSForms (it now reads `.xlsx` as well as XForm `.xml`): contract check, drift and renames between versions, and a draft map per deployment uid | `out/kobo_field_diff.md`, `out/kobo_edqa_field_maps.draft.php`, `out/kobo_field_map.draft.json` |
+| `rule_preview.py --source kobo` | `rule_preview.py` | The defect scan over Kobo's rows. They are read as Kobo sends them: flat `group/question` keys, `__version__`, `_submission_time` in UTC, and `meta/instanceID`/`meta/deprecatedID` as in ODK | `out/kobo_rule_preview.md` |
+
+```bash
+python kobo_inventory.py --offline fixtures/kobo     # or without --offline, against the server
+python kobo_forms.py --offline fixtures/kobo
+python field_diff.py --source kobo
+python rule_preview.py --source kobo --calendar-rounds
+```
+
+On the fixtures, `rule_preview.py --source kobo` finds exactly what they were built to show:
+- one `UNKNOWN_FORM_VERSION`;
+- one `LGA_UNKNOWN`;
+- one `ITEMS_INCOMPLETE` (the answer "maybe");
+- one `DUPLICATE_ASSESSMENT`.
+
+The facility rules are "not evaluated" without `--registry`.
+
+A Kobo deployment uid is not the XLSForm's version, so the draft map is keyed by uid. Each uid
+goes under `sources.kobo` in `config/edqa_field_maps.php`, pointing at the map of the XLSForm it
+deploys. The same XLSForm on both platforms shares one map (D-63;
+`docs/runbooks/source-credentials-day.md`, step B3).
 
 ### `rule_preview.py`
 

@@ -66,6 +66,7 @@ it('refuses a new password that breaks the policy', function (): void {
 });
 
 it('tells the page whether 2FA is on for the user', function (bool $withTwoFactor): void {
+    app()->detectEnvironment(fn (): string => 'local'); // the switch works in local only (TwoFactorSwitch)
     config(['edqa.auth.require_two_factor' => false]);
     $factory = User::factory();
     $user = ($withTwoFactor ? $factory->withTwoFactor() : $factory)->create();

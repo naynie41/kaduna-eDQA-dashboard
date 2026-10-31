@@ -1,19 +1,40 @@
 import type { SyncStatus } from '@/types/shell';
 
-/** GET /api/odk/status, and the ODK pull page's `status` prop (OdkStatusPayload, D-56). */
-export type OdkStatus = {
+/** One open round's counts so far: accepted and flagged assessments, open quarantine records. */
+export type OpenRoundCounts = { id: number; year: number; quarter: number; accepted: number; flagged: number; quarantined: number };
+
+/** One source's entry in GET /api/sources and the Data sources page's `sources` prop (SourcesPayload). */
+export type SourceEntry = {
+    key: string;
+    name: string;
+    type: 'odk_central' | 'kobo';
     configured: boolean;
     /** Env keys to set (never values). */
     problems: string[];
+    enabled: boolean;
     reachable: { ok: boolean; status: string; message: string | null; checked_at: string } | null;
     cursor: { last_pulled_at: string | null; last_edit_at: string | null; last_instance_id: string | null; backfill_skip: number; submission_count: number } | null;
+    last_reconciled_at: string | null;
     running_run_id: number | null;
-    last_run: PullCounters & { id: number; outcome: string | null; finished_at: string | null; parsed: number } | null;
-    sync: SyncStatus & {
-        sinceSuccess: { value: number; unit: 'minutes' | 'hours' | 'days' } | null;
-        lastErrorHttpStatus: number | null;
-    };
-    open_rounds: { id: number; year: number; quarter: number; accepted: number; flagged: number; quarantined: number }[];
+    running_reconcile_run_id: number | null;
+    last_run: (PullCounters & { id: number; outcome: string | null; finished_at: string | null; parsed: number; cross_source_duplicates: number }) | null;
+    status: SyncStatus;
+    /** This source's own counts in each open round. */
+    open_rounds: OpenRoundCounts[];
+};
+
+/** A submission its source no longer returns (DeletionsAtSourceQuery): flagged for review, never applied (D-62). */
+export type DeletionRow = {
+    submission_id: number;
+    source: { key: string; name: string } | null;
+    instance_id: string;
+    deleted_at: string;
+    /** What the portal holds for it: the assessment built from it, or its quarantine record. */
+    facility: { id: number; code: string; name: string } | null;
+    round: RoundRef | null;
+    assessment: { id: number; status: string } | null;
+    quarantined_record_id: number | null;
+    source_url: string | null;
 };
 
 export type PullCounters = {
@@ -26,9 +47,13 @@ export type PullCounters = {
 
 export type PullOutcomeValue = 'succeeded' | 'failed' | 'skipped_not_configured' | 'running';
 
-/** GET /api/odk/pull/{run} (OdkPullRunResource). */
+/** GET /api/pulls/{run} (PullRunResource). */
 export type PullRun = PullCounters & {
     run_id: number;
+    /** The source's key (odk, kobo). */
+    source: string | null;
+    cross_source_duplicates: number;
+    deletions_detected: number;
     trigger: string;
     status: PullOutcomeValue;
     started_at: string;
@@ -37,11 +62,14 @@ export type PullRun = PullCounters & {
     error: string | null;
 };
 
-/** One row of the pull history (PullHistoryQuery). */
+/** One row of the pull history (PullHistoryQuery), every source's. */
 export type PullHistoryRow = PullCounters & {
     id: number;
+    source: { key: string; name: string } | null;
     started_at: string;
-    trigger: 'scheduled' | 'manual' | 'webhook' | 'backfill';
+    trigger: 'scheduled' | 'manual' | 'webhook' | 'backfill' | 'reconcile';
+    cross_source_duplicates: number;
+    deletions_detected: number;
     triggered_by: string | null;
     parsed: number;
     duration: { minutes: number; seconds: number } | null;
@@ -85,6 +113,7 @@ export type DataIssuesFilters = {
     rule: string | null;
     lga: string | null;
     round: number | null;
+    source: string | null;
 };
 
 export type RuleSummary = {
@@ -118,7 +147,17 @@ export type DataIssueRow = {
     resolved_at: string | null;
     corrections: Partial<Record<CorrectableField, string | number | null>>;
     current: Record<CorrectableField, string | number | null>;
-    odk_url: string | null;
+    /** The submission's source, and a link to it there (null while its link settings are not configured). */
+    source: { key: string; name: string } | null;
+    source_url: string | null;
+    /** DUPLICATE_ASSESSMENT: the accepted assessment it repeats, from whichever source (null for any other record, or once that assessment is gone). */
+    duplicate_of: {
+        assessment_id: number;
+        facility_id: number;
+        source: { key: string; name: string } | null;
+        instance_id: string;
+        url: string | null;
+    } | null;
 };
 
 /** DataIssueDetailResource: the row plus what the drawer shows. */
@@ -145,6 +184,7 @@ export type FlaggedRow = {
     assessor: string;
     started_at: string;
     flags: { code: string; name: string }[];
+    source: { key: string; name: string } | null;
 };
 
 /** QuarantineResolutionResource: what a resolve or bulk resolve answers per record. */

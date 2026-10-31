@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Odk;
 
-use App\Domain\Ingestion\Queries\OdkStatusQuery;
+use App\Domain\Ingestion\Queries\BackfillStatusQuery;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\Audit\AuditLog;
@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * GET /api/odk/backfill-report/{file} (D-56): a backfill report from the private exports disk,
+ * GET /api/backfill-reports/{file} (D-56): a backfill report from the private exports disk,
  * through a signed link (30 minutes) inside the auth group; only a backfill report's file name is
  * served. Audited.
  */
@@ -24,7 +24,7 @@ final class BackfillReportDownloadController extends Controller
     {
         /** @var FilesystemAdapter $disk */
         $disk = Storage::disk('exports');
-        if (preg_match(OdkStatusQuery::REPORT_PATTERN, $file) !== 1 || ! $disk->exists($file)) {
+        if (preg_match(BackfillStatusQuery::REPORT_PATTERN, $file) !== 1 || ! $disk->exists($file)) {
             abort(404);
         }
         $user = $request->user();

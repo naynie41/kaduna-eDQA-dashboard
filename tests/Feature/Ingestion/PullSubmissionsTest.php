@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Assessment\Models\AssessmentScore;
 use App\Domain\Ingestion\Actions\PullSubmissions;
-use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
@@ -14,7 +13,7 @@ use App\Domain\Ingestion\Jobs\PullSubmissionsJob;
 use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Models\Submission;
-use App\Domain\Ingestion\Odk\PullLock;
+use App\Domain\Ingestion\PullLock;
 use App\Domain\Scoring\CurrentRuleVersion;
 use App\Domain\Scoring\Enums\Dimension;
 use App\Domain\Validation\Enums\QuarantineResolution;
@@ -53,9 +52,9 @@ beforeEach(function (): void {
     config(['edqa.sources.odk' => [...config('edqa.sources.odk'),
         'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'secret-for-tests', 'project_id' => '7', 'form_id' => 'dqa', 'page_size' => 3,
     ]]);
-    config(['edqa.heartbeats.odk_pull' => null]);
+    config(['edqa.heartbeats.pull.odk' => null]);
     $this->source = new FakeSubmissionSource;
-    app()->instance(SubmissionSource::class, $this->source);
+    useSource('odk', $this->source);
 });
 
 /**
@@ -91,7 +90,7 @@ function pullEdit(array $entry, string $updatedAt = '2026-04-20T08:00:00.000Z'):
 
 function pullNow(PullTrigger $trigger = PullTrigger::Scheduled, ?int $userId = null): PullRun
 {
-    return app(PullSubmissions::class)->execute($trigger, $userId)->refresh();
+    return app(PullSubmissions::class)->execute('odk', $trigger, $userId)->refresh();
 }
 
 function pullSync(): SourceSync
@@ -366,7 +365,7 @@ it('records a pull without credentials as skipped, not failed, and asks the sour
 });
 
 it('pings the heartbeat after a successful pull only', function (): void {
-    config(['edqa.heartbeats.odk_pull' => 'https://hc.example.org/ping/odk']);
+    config(['edqa.heartbeats.pull.odk' => 'https://hc.example.org/ping/odk']);
     Http::fake(['hc.example.org/*' => Http::response('OK')]);
     $this->source->add(pullEntry(1));
 
@@ -385,35 +384,35 @@ it('skips the heartbeat when none is configured, and never fails the pull over i
     pullNow();
     Http::assertNothingSent();
 
-    config(['edqa.heartbeats.odk_pull' => 'https://hc.example.org/ping/odk']);
+    config(['edqa.heartbeats.pull.odk' => 'https://hc.example.org/ping/odk']);
 
     expect(pullNow()->outcome)->toBe(PullOutcome::Succeeded);
 });
 
 it('lets one pull run at a time: a second waits, then goes back on the queue', function (): void {
     $this->source->add(pullEntry(1));
-    config(['edqa.odk.pull.lock_wait_seconds' => 0]);
-    $held = Cache::lock(PullLock::NAME, 900);
+    config(['edqa.pull.lock_wait_seconds' => 0]);
+    $held = Cache::lock(PullLock::name('odk'), 900);
     expect($held->get())->toBeTrue();
 
-    $job = (new PullSubmissionsJob)->withFakeQueueInteractions();
+    $job = (new PullSubmissionsJob('odk'))->withFakeQueueInteractions();
     $job->handle(app(PullLock::class), app(PullSubmissions::class));
 
     $job->assertReleased(60);
     expect(PullRun::query()->count())->toBe(0)
         ->and(pulled()->count())->toBe(0);
-    $this->artisan('edqa:pull')->expectsOutputToContain(__('odk.pull.busy'))->assertFailed();
+    $this->artisan('edqa:pull', ['source' => 'odk'])->expectsOutputToContain(__('odk.pull.busy'))->assertFailed();
 
     $held->release();
-    $next = (new PullSubmissionsJob)->withFakeQueueInteractions();
+    $next = (new PullSubmissionsJob('odk'))->withFakeQueueInteractions();
     $next->handle(app(PullLock::class), app(PullSubmissions::class));
     $next->assertNotReleased();
     expect(pulled()->count())->toBe(1)
-        ->and(Cache::lock(PullLock::NAME, 1)->get())->toBeTrue(); // released after the pull
+        ->and(Cache::lock(PullLock::name('odk'), 1)->get())->toBeTrue(); // released after the pull
 });
 
 it('is queued on default with three tries and the agreed backoff', function (): void {
-    $job = new PullSubmissionsJob(PullTrigger::Manual, 5);
+    $job = new PullSubmissionsJob('odk', PullTrigger::Manual, 5);
 
     expect($job->queue)->toBe('default')
         ->and($job->tries)->toBe(3)
@@ -427,9 +426,9 @@ it('records the final failure on the sync row and raises PullFailed', function (
     Event::fake([PullFailed::class]);
     $this->source->failOn = fn (int $call): ?Throwable => new RuntimeException('Central is down');
 
-    expect(fn () => PullSubmissionsJob::dispatchSync())->toThrow(RuntimeException::class);
+    expect(fn () => PullSubmissionsJob::dispatchSync('odk'))->toThrow(RuntimeException::class);
     $run = PullRun::query()->sole();
-    (new PullSubmissionsJob)->failed(new RuntimeException('Central is down'));
+    (new PullSubmissionsJob('odk'))->failed(new RuntimeException('Central is down'));
 
     expect($run->outcome)->toBe(PullOutcome::Failed)
         ->and($run->error)->toBe('RuntimeException: Central is down')
@@ -470,7 +469,7 @@ it('dry-runs: fetches, parses and validates, prints outcomes by rule code, and w
     $before = pullTableCounts();
     $sync = DB::table('source_syncs')->get()->all();
 
-    $this->artisan('edqa:pull', ['--dry-run' => true, '--limit' => 200])
+    $this->artisan('edqa:pull', ['source' => 'odk', '--dry-run' => true, '--limit' => 200])
         ->expectsOutputToContain(__('odk.pull.dry_run_title'))
         ->expectsOutputToContain('Fetched 5; 1 already stored; of the rest 1 would be accepted, 1 flagged and 2 quarantined.')
         ->expectsTable(['Rule', 'Severity', 'Submissions'], [['FACILITY_UNKNOWN', 'hard', 2], ['VISIT_TOO_SHORT', 'soft', 1]])
@@ -483,7 +482,7 @@ it('dry-runs: fetches, parses and validates, prints outcomes by rule code, and w
 it('dry-runs at most --limit submissions', function (): void {
     $this->source->add(...array_map(fn (int $n): array => pullEntry($n), range(1, 7)));
 
-    $this->artisan('edqa:pull', ['--dry-run' => true, '--limit' => 4])
+    $this->artisan('edqa:pull', ['source' => 'odk', '--dry-run' => true, '--limit' => 4])
         ->expectsOutputToContain('Fetched 4; 0 already stored; of the rest 4 would be accepted')
         ->assertSuccessful();
     expect(pulled()->count())->toBe(0)
@@ -493,7 +492,7 @@ it('dry-runs at most --limit submissions', function (): void {
 it('pulls synchronously from the console, as a manual pull', function (): void {
     $this->source->add(pullEntry(1), pullEntry(2, 'broken'));
 
-    $this->artisan('edqa:pull')
+    $this->artisan('edqa:pull', ['source' => 'odk'])
         ->expectsOutputToContain('Pull succeeded: fetched 2, 0 already stored, 1 accepted, 0 flagged, 1 quarantined.')
         ->assertSuccessful();
     expect(PullRun::query()->sole()->trigger_type)->toBe(PullTrigger::Manual);
@@ -505,7 +504,7 @@ it('schedules the pull every ten minutes only when ODK is configured', function 
         ScheduleFacade::clearResolvedInstance();
         require base_path('routes/console.php');
 
-        return array_values(array_filter(ScheduleFacade::getFacadeRoot()->events(), fn ($event): bool => str_contains((string) $event->description, 'PullSubmissionsJob')));
+        return array_values(array_filter(ScheduleFacade::getFacadeRoot()->events(), fn ($event): bool => $event->description === 'edqa:pull:odk'));
     };
 
     $scheduled = $pulls();

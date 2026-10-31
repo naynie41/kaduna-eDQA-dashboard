@@ -22,6 +22,6 @@ return [
         'not_a_soft_flag' => ':code is not a soft rule flag, so it cannot be overridden.',
     ],
 
-    'superseded_note' => 'Superseded by ODK edit :instance.',
+    'superseded_note' => 'Superseded by an edit at source: :instance.',
 
 ];

@@ -33,7 +33,7 @@ final readonly class FacilityDetail
      * @param  list<Flag>  $flags
      * @param  list<Attachment>  $attachments
      * @param  list<Activity>  $activity
-     * @param  array{instance_id: ?string, url: ?string}  $odk
+     * @param  array{key: ?string, name: ?string, instance_id: ?string, url: ?string}  $source  the submission's source and a link to it there
      */
     public function __construct(
         public array $facility,
@@ -45,7 +45,7 @@ final readonly class FacilityDetail
         public array $flags,
         public array $attachments,
         public array $activity,
-        public array $odk,
+        public array $source,
     ) {}
 
     /** @return array<string, mixed> */
@@ -61,7 +61,7 @@ final readonly class FacilityDetail
             'flags' => $this->flags,
             'attachments' => $this->attachments,
             'activity' => $this->activity,
-            'odk' => $this->odk,
+            'source' => $this->source,
         ];
     }
 }

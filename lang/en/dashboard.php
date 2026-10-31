@@ -173,6 +173,11 @@ return [
         'assessments' => 'Assessments recorded',
         'no_visit' => 'No visits',
         'windows_none' => 'No round in view.',
+        'sources_title' => 'Assessments by source',
+        'sources_description' => 'Where this selection\'s accepted assessments came from: the tool each visit was entered with.',
+        'source' => 'Source',
+        'source_unknown' => 'A source no longer configured',
+        'sources_none' => 'No data source is set up.',
     ],
 
     // Visuals (ARCHITECTURE.md §9.2.5).
@@ -287,8 +292,8 @@ return [
         'attachment_open' => 'Open :filename full size',
         'attachment_download' => 'Download :filename',
         'attachment_status' => [
-            'pending' => 'Not fetched from ODK yet',
-            'failed' => 'Could not be fetched from ODK; it will be tried again',
+            'pending' => 'Not fetched from its source yet',
+            'failed' => 'Could not be fetched from its source; it will be tried again',
             'rejected' => 'Refused, not stored',
         ],
         'attachment_reasons' => [
@@ -334,12 +339,13 @@ return [
         'on_item' => 'Item :code',
         'change' => ':field: :old → :new',
         'empty_value' => '(none)',
-        'odk_title' => 'ODK submission',
-        'odk_none' => 'No ODK submission for this round.',
+        'source_title' => 'Source submission',
+        'source_none' => 'No submission for this round.',
+        'source' => 'Source',
         'instance' => 'Instance ID',
-        'open_in_odk' => 'Open in ODK Central',
+        'open_in_source' => 'Open in :source',
         'new_tab' => '(opens in a new tab)',
-        'odk_not_configured' => 'ODK Central is not connected yet, so there is no link.',
+        'source_not_configured' => ':source is not connected yet, so there is no link.',
     ],
 
     'placeholder' => [

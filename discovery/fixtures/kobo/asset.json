@@ -1,0 +1,9 @@
+{
+    "uid": "aKdDqaMock2026",
+    "name": "Data Quality Assessment (fixture)",
+    "asset_type": "survey",
+    "has_deployment": true,
+    "deployment__active": true,
+    "deployed_version_id": "vKd26Q1aBcDeFgHiJkLmNo",
+    "deployment__submission_count": 8
+}

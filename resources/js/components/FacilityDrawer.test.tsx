@@ -44,7 +44,7 @@ const translations = {
             attachment_alt: 'Photo :filename from :facility, :round',
             attachment_open: 'Open :filename full size',
             attachment_download: 'Download :filename',
-            attachment_status: { pending: 'Not fetched from ODK yet', failed: 'Could not be fetched from ODK; it will be tried again', rejected: 'Refused, not stored' },
+            attachment_status: { pending: 'Not fetched from its source yet', failed: 'Could not be fetched from its source; it will be tried again', rejected: 'Refused, not stored' },
             attachment_reasons: { type_not_allowed: 'its file type is not allowed' },
             activity_title: 'Changes',
             system: 'System',
@@ -59,11 +59,11 @@ const translations = {
             owner: 'Owner',
             status: 'Status',
             active: 'Active',
-            odk_title: 'ODK submission',
+            source_title: 'Source submission',
             instance: 'Instance ID',
-            open_in_odk: 'Open in ODK Central',
+            open_in_source: 'Open in :source',
             new_tab: '(opens in a new tab)',
-            odk_not_configured: 'ODK Central is not connected yet, so there is no link.',
+            source_not_configured: ':source is not connected yet, so there is no link.',
         },
     },
 };
@@ -97,7 +97,7 @@ const detail: FacilityDetail = {
     ],
     attachments: [],
     activity: [{ id: 3, at: '2026-05-01T10:00:00+01:00', actor: null, event: 'updated', subject: 'item', item_code: 'item_2', changes: [{ field: 'value', old: 'no', new: 'yes' }], reason: null }],
-    odk: { instance_id: 'uuid:abc', url: null },
+    source: { key: 'odk', name: 'ODK Central', instance_id: 'uuid:abc', url: null },
 };
 
 function Harness() {
@@ -183,7 +183,7 @@ describe('FacilityDetailView', () => {
     });
 
     it('links to ODK Central when configured, saying it opens a new tab', () => {
-        renderUi(<FacilityDetailView detail={{ ...detail, odk: { instance_id: 'uuid:abc', url: 'https://central.example.org/#/x' } }} />, translations);
+        renderUi(<FacilityDetailView detail={{ ...detail, source: { key: 'odk', name: 'ODK Central', instance_id: 'uuid:abc', url: 'https://central.example.org/#/x' } }} />, translations);
 
         expect(screen.getByRole('link', { name: 'Open in ODK Central (opens in a new tab)' }).getAttribute('href')).toBe('https://central.example.org/#/x');
     });
@@ -226,7 +226,7 @@ describe('FacilityDetailView attachments', () => {
         const download = screen.getByRole('link', { name: 'Download trace.geojson' });
         expect(download.getAttribute('href')).toBe('/attachments/7/trace.geojson');
         expect(download.hasAttribute('download')).toBe(true);
-        expect(screen.getByText(/later\.png/).textContent).toBe('later.png · Not fetched from ODK yet');
+        expect(screen.getByText(/later\.png/).textContent).toBe('later.png · Not fetched from its source yet');
         expect(screen.getByText(/evil\.jpg/).textContent).toBe('evil.jpg · Refused, not stored: its file type is not allowed');
         expect(screen.queryByRole('img', { name: /evil|later/ })).toBeNull();
     });

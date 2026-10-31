@@ -7,8 +7,54 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-31
+
+KoboToolbox support (Phase 2C, D-59): the portal pulls from both of the client's field-collection
+tools, ODK Central and KoboToolbox, through one pipeline.
+- **Ingestion.** Each source has its own adapter and payload normaliser. After that every
+  submission goes through the same parser, the same 14 validation rules and the same scoring,
+  so neither source can bypass the gate.
+- **Per source:** the pull, backfill, cursor, lock, schedule, nightly reconcile, webhook,
+  attachments and deep links.
+- **Duplicates.** A submission copied between the two servers is counted as a cross-source
+  duplicate and stored once (D-60). A visit entered on both tools keeps one assessment, and the
+  other is quarantined, naming both sources.
+- **Edits and deletions.** Edits are found on both platforms, Kobo's by the reconcile sweep
+  (D-61). Deletions at source are listed for review, never applied (D-62).
+- **Admin pages.** Also released here: the administration shell, the Data sources page (which
+  replaced the ODK pull page), Data issues and assessment corrections from the facility drawer
+  (Phase 5 steps 0–3).
+- **Evidence.** Everything is proven against local mocks of both platforms, end to end; the
+  client's servers are not yet available. The first day with credentials follows
+  `docs/runbooks/source-credentials-day.md`.
+
 ### Added
 
+- `discovery/` for KoboToolbox (offline fixtures until credentials arrive):
+  - `kobo.py`: a read-only client, GET only, the token never printed;
+  - `kobo_inventory.py`: the asset, the deployed versions and the submissions per quarter;
+  - `kobo_forms.py`: each deployed version as an XLSForm;
+  - `field_diff.py --source kobo`, which now reads XLSForms;
+  - `rule_preview.py --source kobo`, the defect scan over Kobo rows;
+  - `discovery/fixtures/kobo/`: the saved responses the tools run on with `--offline`.
+- `docs/runbooks/source-credentials-day.md` replaces `odk-credentials-day.md`. It has one part
+  per source (env, check, discovery, field maps, dry run, rounds, backfill one source at a time,
+  schedule) and a final both-sources-live duplicate check.
+- The Data sources page (Phase 2C step 7), replacing the ODK pull page at `/admin/sources`
+  (`/admin/odk` redirects there):
+  - one panel each for ODK Central and KoboToolbox: connection, last success, last error in
+    plain words, open-round counts;
+  - Pull now and Reconcile on each panel, and Pull all above them, each followed live;
+  - the pull history of every source, with a source column and filter;
+  - a "Deletions at source" list for review, linking each to its record.
+- Data issues: a source column and filter on both tabs; a duplicate shows both sides, each with
+  its source and link.
+- Monitor: an "Assessments by source" table for the selection.
+- `assessments.source_id`, set from the submission by the database (migration
+  `2026_10_31_000100_add_source_to_assessments`).
+- `make e2e-sources`: Playwright against both mocks, replacing `make e2e-odk`. It covers Pull
+  all, progress, the history naming both sources, and the duplicate in Data issues. Keyboard
+  only, with axe at 360 and 1280.
 - Source-aware ingestion (Phase 2C step 1): every submission, quarantined record, cursor and pull
   run now names its field-collection source (`submission_sources`: ODK Central now, KoboToolbox
   configured but not yet pulled). Existing data belongs to ODK Central and is kept.
@@ -31,6 +77,37 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Kobo's text GPS points ("lat lng alt accuracy"). Kobo form versions are mapped with
   placeholder IDs until the real deployments are known.
 - New env key: `KOBO_ALLOW_INSECURE_LOCAL` (local mock only).
+- Webhooks, the sources API and status per source (Phase 2C step 6):
+  - **Kobo webhook.** `POST /webhooks/kobo` checks a token in the `X-EDQA-Webhook-Token`
+    header against `KOBO_WEBHOOK_TOKEN` (at least 32 characters), and queues a Kobo pull only.
+  - **ODK webhook.** `POST /webhooks/odk` works as before.
+  - **New endpoints:** `GET /api/sources`, `POST /api/sources/{key}/pull`,
+    `POST /api/sources/pull-all`, `POST /api/sources/{key}/reconcile` and
+    `GET /api/pulls/{runId}`. They replace `/api/odk/*`, and every request is audited with its
+    source.
+  - **Status bar.** It names every source in words, worst first. The states are: not
+    configured, switched off, no pull yet, healthy, stale, failed, and credentials refused.
+  - **Links.** The facility drawer and Data issues link each submission to its own source,
+    Central or Kobo, built only from settings and checked IDs.
+- New env key: `KOBO_WEBHOOK_TOKEN`.
+- Pulling from both sources (Phase 2C step 5):
+  - **In parallel.** ODK Central and KoboToolbox each pull every ten minutes, at the same time
+    as each other, but never twice at once.
+  - **Copies between servers.** A submission copied from one server to the other is counted as
+    a cross-source duplicate and stored once.
+  - **One visit on both tools.** A facility recorded on both tools in one round keeps one
+    assessment. The second is held as a duplicate, and the message names both tools.
+  - **Nightly sweep.** Each source is compared with the open round every night
+    (`edqa:reconcile`). It catches edits made on Kobo, which a normal pull cannot see.
+  - **Deletions at source.** A submission deleted at the source is flagged for an
+    administrator; nothing is removed.
+  - **Backfill.** `edqa:backfill` takes a source and runs one source at a time. Its report is
+    broken down by source, with the duplicates between the two.
+  - **Commands.** `edqa:pull` takes a source or `--all`.
+  - **Local development.** A mock KoboToolbox runs beside the mock ODK Central
+    (`make sources-mock-up`, `make sources-mock-seed n=200`).
+- New env keys: `HEARTBEAT_PULL_ODK_URL`, `HEARTBEAT_PULL_KOBO_URL` (`HEARTBEAT_ODK_PULL_URL`
+  is still read for one release).
 - New env keys: `ODK_ENABLED`, `KOBO_BASE_URL`, `KOBO_API_TOKEN`, `KOBO_ASSET_UID`,
   `KOBO_PULL_PAGE_SIZE`, `KOBO_BACKFILL_THROTTLE`, `KOBO_ENABLED`.
 
@@ -69,6 +146,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `ConfirmWithReasonDialog` for every reasoned action, `ProgressPanel` for queued work (polls with
   backoff, announces stage changes only), the `useApiAction` hook (CSRF, field and domain errors in
   words, disabled while sending) and `AdminTable`.
+
+### Known gaps
+
+- Neither source has been pulled for real: the client's ODK Central and KoboToolbox credentials
+  have not arrived. The field maps, and Kobo's deployment uids, are `CONTRACT-ASSUMED` until the
+  forms are audited (runbook steps A3 and B3).
+- Rounds, Facility list and Scoring rules are still placeholders (Phase 5). Until the Facility
+  list page exists, the facility media file is regenerated on the Data sources page.
+- The open-question numbers in ARCHITECTURE.md §11.4 still collide (see `docs/kobo-impact.md`).
+  The decision numbers are settled: D-01–D-64, the KoboToolbox decisions as D-59–D-64.
+- `ACCESSIBILITY.md` is not in the repository: the UI follows the patterns already built and
+  is checked with axe at 360 and 1280.
 
 ### Changed
 
@@ -433,7 +522,8 @@ or dashboard pages yet.
 - The session cookie is `Secure` unless `SESSION_SECURE_COOKIE=false`, which is meant for local
   HTTP development only.
 
-[Unreleased]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/naynie41/kaduna-eDQA-dashboard/compare/v0.2.0...v0.3.0

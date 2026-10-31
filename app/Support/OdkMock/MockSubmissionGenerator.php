@@ -27,7 +27,10 @@ use RuntimeException;
  *     edits are applied;
  *   - two with a register photo (a small generated JPEG);
  *   - the rest ordinary visits whose answers follow a per-facility quality.
- * Seeded, so the same options give the same data.
+ * Seeded, so the same options give the same data. kinds.json records each entry's kind (by file
+ * number), so another mock can copy plain visits (edqa:source-mock:generate --overlap). Facilities
+ * in $excludeFacilities (those the other mock visits) are never chosen, so two mocks never visit
+ * one facility in a round by accident.
  */
 final class MockSubmissionGenerator
 {
@@ -45,8 +48,10 @@ final class MockSubmissionGenerator
     /** @var array<string, int> */
     public array $written = [];
 
+    /** @param  list<string>  $excludeFacilities  facility codes never to visit */
     public function __construct(
         private readonly string $dataDir,
+        private readonly array $excludeFacilities = [],
     ) {}
 
     /**
@@ -86,6 +91,7 @@ final class MockSubmissionGenerator
         $this->written = ['valid' => 0, 'flagged' => 0, 'broken' => 0, 'edited' => 0, 'attachments' => 0];
         $photos = 2;
         $index = 0;
+        $kindsWritten = [];
         $broken = min($broken, $count);
         foreach ($periods as $p => [$round, $version]) {
             $map = FieldMap::for('odk', $version) ?? FieldMap::for('odk', (string) config('edqa_field_maps.current.odk'));
@@ -109,6 +115,7 @@ final class MockSubmissionGenerator
                     $entry = $this->withPhoto($entry);
                 }
                 $this->write('submissions', $index, $entry);
+                $kindsWritten[sprintf('%04d', $index + 1)] = $kind === 'valid' && isset($entry['register_photo']) ? 'photo' : $kind;
                 $this->written[match (true) {
                     in_array($kind, self::BROKEN, true) => 'broken',
                     $kind === 'valid', $kind === 'edited' => 'valid',
@@ -121,6 +128,7 @@ final class MockSubmissionGenerator
                 $index++;
             }
         }
+        file_put_contents("{$this->dataDir}/kinds.json", json_encode($kindsWritten, JSON_PRETTY_PRINT));
 
         return $this->written;
     }
@@ -174,6 +182,7 @@ final class MockSubmissionGenerator
             ->join('wards as w', 'w.id', '=', 'f.ward_id')
             ->where('f.is_active', true)
             ->whereNotExists(fn ($q) => $q->from('assessments as a')->whereColumn('a.facility_id', 'f.id')->where('a.round_id', $round->id))
+            ->when($this->excludeFacilities !== [], fn ($q) => $q->whereNotIn('f.code', $this->excludeFacilities))
             ->orderBy('f.code')
             ->get(['f.code', 'l.code as lga', 'w.code as ward', 'f.ownership']);
 

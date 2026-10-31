@@ -8,14 +8,16 @@ import { formatCount, formatDateTime } from '@/lib/format';
 import { useTranslate, useTranslationList } from '@/lib/i18n';
 import type { Paginated, PullHistoryRow, PullOutcomeValue } from '@/types/admin';
 
-export type PullHistoryFilters = { trigger: string | null; outcome: string | null };
+export type PullHistoryFilters = { source: string | null; trigger: string | null; outcome: string | null };
 
 export type PullHistoryPanelProps = {
     history: Paginated<PullHistoryRow>;
     filters: PullHistoryFilters;
+    /** Every configured source, in config order: the source filter. */
+    sources: { key: string; name: string }[];
 };
 
-const TRIGGERS = ['scheduled', 'manual', 'webhook', 'backfill'] as const;
+const TRIGGERS = ['scheduled', 'manual', 'webhook', 'reconcile', 'backfill'] as const;
 const OUTCOMES: PullOutcomeValue[] = ['succeeded', 'failed', 'skipped_not_configured', 'running'];
 
 // An outcome in words, with a shape as well as a colour (CLAUDE.md hard rule 11).
@@ -27,20 +29,20 @@ const OUTCOME_STYLE: Record<PullOutcomeValue, { tone: string; mark: string }> = 
 };
 
 /**
- * The pull history (ARCHITECTURE.md §9.3, D-56): newest first, 25 a page from the server,
- * filtered by trigger and outcome. A filter or page change reloads only the history and says
- * how many pulls are shown.
+ * The combined pull history (ARCHITECTURE.md §9.3): every source's pulls, newest first, 25 a
+ * page from the server, filtered by source, trigger and outcome. A filter or page change reloads
+ * only the history and says how many pulls are shown.
  */
-export default function PullHistoryPanel({ history, filters }: PullHistoryPanelProps) {
+export default function PullHistoryPanel({ history, filters, sources }: PullHistoryPanelProps) {
     const t = useTranslate();
     const announce = useAnnounce();
     const months = useTranslationList('common.months_short');
-    const ids = { trigger: useId(), outcome: useId() };
+    const ids = { source: useId(), trigger: useId(), outcome: useId() };
 
     const visit = (next: Partial<PullHistoryFilters> & { page?: number }) => {
         const query = { ...filters, ...next };
         router.get(
-            '/admin/odk',
+            '/admin/sources',
             Object.fromEntries(Object.entries(query).filter(([, value]) => value !== null && value !== undefined && value !== '')),
             {
                 only: ['history', 'historyFilters'],
@@ -49,36 +51,52 @@ export default function PullHistoryPanel({ history, filters }: PullHistoryPanelP
                 replace: true,
                 onSuccess: (page) => {
                     const total = (page.props.history as Paginated<PullHistoryRow> | undefined)?.total ?? 0;
-                    announce(t('admin.odk.history.filtered', { total: formatCount(total) }));
+                    announce(t('admin.sources.history.filtered', { total: formatCount(total) }));
                 },
             },
         );
     };
 
     const columns = [
-        { key: 'started', header: t('admin.odk.history.started') },
-        { key: 'trigger', header: t('admin.odk.history.trigger') },
-        { key: 'by', header: t('admin.odk.history.by') },
-        { key: 'retrieved', header: t('admin.odk.history.retrieved'), align: 'end' as const },
-        { key: 'accepted', header: t('admin.odk.history.accepted'), align: 'end' as const },
-        { key: 'flagged', header: t('admin.odk.history.flagged'), align: 'end' as const },
-        { key: 'quarantined', header: t('admin.odk.history.quarantined'), align: 'end' as const },
-        { key: 'duration', header: t('admin.odk.history.duration'), align: 'end' as const },
-        { key: 'outcome', header: t('admin.odk.history.outcome') },
+        { key: 'started', header: t('admin.sources.history.started') },
+        { key: 'source', header: t('admin.sources.history.source') },
+        { key: 'trigger', header: t('admin.sources.history.trigger') },
+        { key: 'by', header: t('admin.sources.history.by') },
+        { key: 'retrieved', header: t('admin.sources.history.retrieved'), align: 'end' as const },
+        { key: 'accepted', header: t('admin.sources.history.accepted'), align: 'end' as const },
+        { key: 'flagged', header: t('admin.sources.history.flagged'), align: 'end' as const },
+        { key: 'quarantined', header: t('admin.sources.history.quarantined'), align: 'end' as const },
+        { key: 'duplicates', header: t('admin.sources.history.duplicates'), align: 'end' as const },
+        { key: 'cross', header: t('admin.sources.history.cross_source_duplicates'), align: 'end' as const },
+        { key: 'duration', header: t('admin.sources.history.duration'), align: 'end' as const },
+        { key: 'outcome', header: t('admin.sources.history.outcome') },
     ];
 
     const select = 'min-h-11 rounded-md border border-rule bg-panel px-2.5 text-[13.5px]';
 
     return (
-        <Panel labelledBy="odk-history-title">
-            <PanelHeader id="odk-history-title" title={t('admin.odk.history.title')} />
+        <Panel labelledBy="sources-history-title">
+            <PanelHeader id="sources-history-title" title={t('admin.sources.history.title')} />
             <div className="flex flex-wrap gap-3 px-5 pb-3">
                 <div className="flex flex-col gap-1">
+                    <label htmlFor={ids.source} className="text-[12.5px] text-ink-2">
+                        {t('admin.sources.history.filter_source')}
+                    </label>
+                    <select id={ids.source} className={select} value={filters.source ?? ''} onChange={(event) => visit({ source: event.target.value || null, page: 1 })}>
+                        <option value="">{t('admin.sources.history.all_sources')}</option>
+                        {sources.map((source) => (
+                            <option key={source.key} value={source.key}>
+                                {source.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex flex-col gap-1">
                     <label htmlFor={ids.trigger} className="text-[12.5px] text-ink-2">
-                        {t('admin.odk.history.filter_trigger')}
+                        {t('admin.sources.history.filter_trigger')}
                     </label>
                     <select id={ids.trigger} className={select} value={filters.trigger ?? ''} onChange={(event) => visit({ trigger: event.target.value || null, page: 1 })}>
-                        <option value="">{t('admin.odk.history.all_triggers')}</option>
+                        <option value="">{t('admin.sources.history.all_triggers')}</option>
                         {TRIGGERS.map((trigger) => (
                             <option key={trigger} value={trigger}>
                                 {t(`enums.pull_trigger.${trigger}`)}
@@ -88,29 +106,29 @@ export default function PullHistoryPanel({ history, filters }: PullHistoryPanelP
                 </div>
                 <div className="flex flex-col gap-1">
                     <label htmlFor={ids.outcome} className="text-[12.5px] text-ink-2">
-                        {t('admin.odk.history.filter_outcome')}
+                        {t('admin.sources.history.filter_outcome')}
                     </label>
                     <select id={ids.outcome} className={select} value={filters.outcome ?? ''} onChange={(event) => visit({ outcome: event.target.value || null, page: 1 })}>
-                        <option value="">{t('admin.odk.history.all_outcomes')}</option>
+                        <option value="">{t('admin.sources.history.all_outcomes')}</option>
                         {OUTCOMES.map((outcome) => (
                             <option key={outcome} value={outcome}>
-                                {t(`admin.odk.history.outcomes.${outcome}`)}
+                                {t(`admin.sources.history.outcomes.${outcome}`)}
                             </option>
                         ))}
                     </select>
                 </div>
             </div>
             <AdminTable
-                caption={t('admin.odk.history.caption')}
+                caption={t('admin.sources.history.caption')}
                 captionHidden
                 columns={columns}
-                empty={<p className="px-3 py-6 text-center text-[13px] text-ink-2">{t('admin.odk.history.none')}</p>}
+                empty={<p className="px-3 py-6 text-center text-[13px] text-ink-2">{t('admin.sources.history.none')}</p>}
                 meta={{ page: history.current_page, lastPage: history.last_page, from: history.from ?? 0, to: history.to ?? 0, total: history.total }}
                 onPage={(page) => visit({ page })}
                 labels={{
-                    showing: (figures) => t('admin.odk.history.showing', figures),
-                    none: t('admin.odk.history.showing_none'),
-                    nav: t('admin.odk.history.pages'),
+                    showing: (figures) => t('admin.sources.history.showing', figures),
+                    none: t('admin.sources.history.showing_none'),
+                    nav: t('admin.sources.history.pages'),
                 }}
             >
                 {history.data.map((row) => (
@@ -118,21 +136,24 @@ export default function PullHistoryPanel({ history, filters }: PullHistoryPanelP
                         <th scope="row" className="px-3 py-2 text-left font-normal whitespace-nowrap">
                             {months.length === 12 ? formatDateTime(row.started_at, months) : row.started_at}
                         </th>
+                        <td className="px-3 py-2 whitespace-nowrap">{row.source?.name ?? t('admin.sources.history.unknown_source')}</td>
                         <td className="px-3 py-2 whitespace-nowrap">{t(`enums.pull_trigger.${row.trigger}`)}</td>
-                        <td className="px-3 py-2">{row.triggered_by ?? t('admin.odk.history.system')}</td>
+                        <td className="px-3 py-2">{row.triggered_by ?? t('admin.sources.history.system')}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatCount(row.fetched)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatCount(row.accepted)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatCount(row.flagged)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatCount(row.quarantined)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatCount(row.duplicates)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatCount(row.cross_source_duplicates)}</td>
                         <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
                             {row.duration === null
                                 ? '–'
                                 : row.duration.minutes === 0
-                                  ? t('admin.odk.history.duration_seconds', { seconds: row.duration.seconds })
-                                  : t('admin.odk.history.duration_value', row.duration)}
+                                  ? t('admin.sources.history.duration_seconds', { seconds: row.duration.seconds })
+                                  : t('admin.sources.history.duration_value', row.duration)}
                         </td>
                         <td className="px-3 py-2">
-                            <Outcome outcome={row.outcome} label={t(`admin.odk.history.outcomes.${row.outcome}`)} error={row.error} />
+                            <Outcome outcome={row.outcome} label={t(`admin.sources.history.outcomes.${row.outcome}`)} error={row.error} />
                         </td>
                     </tr>
                 ))}

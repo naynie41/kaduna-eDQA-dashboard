@@ -22,7 +22,7 @@ const DASHBOARD_PAGES = [
     'home' => ['owners', 'trend', 'weakest'],
     'facility' => ['facilities'],
     'lga' => ['lgas'],
-    'monitor' => ['owners', 'coverage', 'windows'],
+    'monitor' => ['owners', 'coverage', 'windows', 'sources'],
     'visuals' => ['monthSlots', 'lgas'],
     'plan' => ['plan'],
 ];
@@ -91,11 +91,11 @@ it('lists only years and quarters that have rounds, the LGAs by name, and the en
             ->where('filterOptions.owners', [['value' => 'public', 'label' => 'Public'], ['value' => 'private', 'label' => 'Private']]));
 });
 
-it('shares the shell status with every signed-in page: assessments and ODK sync', function (): void {
+it('shares the shell status with every signed-in page: assessments and each source\'s sync state', function (): void {
     $this->actingAs($this->admin)->get('/dashboard/home')
         ->assertInertia(fn (Assert $page) => $page
             ->where('shell.assessments', 8) // seven Q2 visits and one Q1
-            ->where('shell.sync.state', 'not_configured')
+            ->where('shell.sources', fn ($sources): bool => collect($sources)->pluck('state', 'key')->all() === ['odk' => 'not_configured', 'kobo' => 'not_configured'])
             ->where('shell.quarantined', 0));
 });
 
@@ -107,17 +107,26 @@ it('reads the sync state from the latest pull runs', function (array $runs, stri
     }
     Rows::quarantined();
 
-    $this->actingAs($this->admin)->get('/admin/odk')
+    $this->actingAs($this->admin)->get('/admin/sources')
         ->assertInertia(fn (Assert $page) => $page
-            ->where('shell.sync.state', $state)
+            ->where('shell.sources.0.key', 'odk')
+            ->where('shell.sources.0.state', $state)
             ->where('shell.quarantined', 1));
 })->with([
-    'recent success' => [[[4, 'succeeded']], 'ok'],
+    'recent success' => [[[4, 'succeeded']], 'healthy'],
     'stale success' => [[[45, 'succeeded']], 'stale'],
     'last pull failed' => [[[90, 'succeeded'], [3, 'failed']], 'failed'],
-    'running after a success' => [[[10, 'succeeded'], [0, null]], 'ok'],
+    'running after a success' => [[[10, 'succeeded'], [0, null]], 'healthy'],
 ]);
 
-it('opens Administration on the ODK pull page', function (): void {
-    $this->actingAs($this->admin)->get('/admin')->assertRedirect('/admin/odk');
+it('opens Administration on the Data sources page', function (): void {
+    $this->actingAs($this->admin)->get('/admin')->assertRedirect('/admin/sources');
+});
+
+it('names the sources in Monitor\'s assessments by source, every configured one listed', function (): void {
+    $this->actingAs($this->admin)->get('/dashboard/monitor?year=2026&quarter=2')
+        ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reloaded) => $reloaded->where('sources', [
+            ['key' => 'odk', 'name' => 'ODK Central', 'assessments' => 7],
+            ['key' => 'kobo', 'name' => 'KoboToolbox', 'assessments' => 0],
+        ])));
 });

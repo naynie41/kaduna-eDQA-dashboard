@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\Security\TwoFactorSwitch;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,7 +13,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * 2FA requirement (SECURITY.md §2): a signed-in administrator without confirmed TOTP reaches only
  * the 2FA setup page (and Fortify's 2FA and logout routes, which sit outside this middleware).
- * Skipped when EDQA_REQUIRE_2FA=false (D-26).
+ * Skipped only in local development with EDQA_REQUIRE_2FA=false (TwoFactorSwitch): never on a
+ * server, whatever the config says.
  */
 final class EnsureTwoFactorConfirmed
 {
@@ -20,7 +22,7 @@ final class EnsureTwoFactorConfirmed
     {
         $user = $request->user();
 
-        if (config('edqa.auth.require_two_factor') === true
+        if (TwoFactorSwitch::required()
             && $user instanceof User && $user->two_factor_confirmed_at === null) {
             return $request->expectsJson()
                 ? response()->json(['message' => __('auth.two_factor.required')], 403)

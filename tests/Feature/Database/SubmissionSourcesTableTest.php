@@ -32,6 +32,10 @@ it('never counts a negative cross-source duplicate (pull_runs_cross_source_dupli
     expectCheckViolation(fn () => Rows::pullRun(['cross_source_duplicates' => -1]), 'pull_runs_cross_source_duplicates_nonnegative');
 });
 
+it('never counts a negative deletion at source (pull_runs_deletions_detected_nonnegative)', function (): void {
+    expectCheckViolation(fn () => Rows::pullRun(['deletions_detected' => -1]), 'pull_runs_deletions_detected_nonnegative');
+});
+
 it('refuses a submission, pull run or quarantined record with no source', function (string $table, Closure $row): void {
     expectSqlState(fn () => DB::table($table)->insert([...$row(), 'source_id' => null]), '23502', 'source_id');
 })->with([

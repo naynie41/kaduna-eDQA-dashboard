@@ -56,6 +56,7 @@ return [
         'manual' => 'Pull now',
         'webhook' => 'Webhook',
         'backfill' => 'Backfill',
+        'reconcile' => 'Reconcile',
     ],
     'plan_action_status' => [
         'not_started' => 'Not started',

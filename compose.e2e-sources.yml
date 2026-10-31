@@ -1,0 +1,20 @@
+# For `make e2e-sources` only: the app and the worker talk to both mocks, ODK Central
+# (docker/odk-mock) and KoboToolbox (docker/kobo-mock), so the Data sources page's Pull all can be
+# driven end to end. Plain http is accepted only with the *_ALLOW_INSECURE_LOCAL flags and
+# APP_ENV=local (D-50). The mocks' credentials are their own, written by edqa:source-mock:generate;
+# nothing here is a real secret. The target puts the stack back without this file.
+services:
+  app:
+    environment: &source-mocks
+      ODK_CENTRAL_URL: http://odk-mock:8080
+      ODK_CENTRAL_EMAIL: mock@odk.local
+      ODK_CENTRAL_PASSWORD: mock-password
+      ODK_PROJECT_ID: "1"
+      ODK_FORM_ID: dqa
+      ODK_ALLOW_INSECURE_LOCAL: "true"
+      KOBO_BASE_URL: http://kobo-mock:8080
+      KOBO_API_TOKEN: mock-kobo-token
+      KOBO_ASSET_UID: aKdDqaMock2026
+      KOBO_ALLOW_INSECURE_LOCAL: "true"
+  worker:
+    environment: *source-mocks

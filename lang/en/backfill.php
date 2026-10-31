@@ -7,12 +7,13 @@ declare(strict_types=1);
 return [
 
     'refused' => [
-        'no_historical_rounds' => 'No historical round exists yet. Create the rounds the submissions span first (run edqa:backfill --survey to see them): a visit outside every round is quarantined, never guessed into one.',
+        'no_historical_rounds' => 'No historical round exists yet. Create the rounds the submissions span first (run edqa:backfill {source} --survey to see them): a visit outside every round is quarantined, never guessed into one.',
         'already_running' => 'A backfill is already running.',
+        'other_source_running' => 'A backfill of :source is still running. Backfill one source at a time: let it finish first.',
     ],
 
     'survey' => [
-        'title' => 'Survey: :total submission(s) in ODK, read without writing anything.',
+        'title' => 'Survey: :total submission(s) in :source, read without writing anything.',
         'quarter' => 'Quarter',
         'version' => 'Form version',
         'mapped' => 'Field map',
@@ -39,8 +40,14 @@ return [
         'written' => 'Backfill report written to :path.',
         'bad_format' => 'Give --format as one of: :formats.',
         'title' => 'Backfill report',
-        'generated' => 'Generated :at. Every stored ODK submission, as it stands now.',
-        'totals' => ':submissions submission(s) stored, of which :superseded replaced by an ODK edit (counted once, apart, below).',
+        'generated' => 'Generated :at. Every stored submission, from every source, as it stands now.',
+        'totals' => ':submissions submission(s) stored, of which :superseded replaced by an edit (counted once, apart, below).',
+        'all_sources' => 'All sources',
+        'source' => 'Source',
+        'duplicates' => 'Duplicates between the sources',
+        'duplicates_note' => 'When both sources hold the same quarters, decide which copy is authoritative (Q-15). DUPLICATE_ASSESSMENT: open records of a second visit to a facility in a round; of which the first came from the other source. Cross-source duplicates: the same submission (instance ID) sent by the other source too, counted by every run and never stored twice.',
+        'against_other_source' => 'Of which against the other source',
+        'cross_source_duplicates' => 'Cross-source duplicates',
         'by_round' => 'Submissions per round',
         'round' => 'Round',
         'no_round' => 'No round (outside every window, or not processed)',

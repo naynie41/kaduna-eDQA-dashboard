@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domain\Reporting\Aggregators\AssessmentsBySourceAggregator;
 use App\Domain\Reporting\Aggregators\AssessmentWindowAggregator;
 use App\Domain\Reporting\Aggregators\CoverageAggregator;
 use App\Domain\Reporting\Aggregators\DimensionAggregator;
@@ -51,6 +52,7 @@ it('returns the same answer from a serializing cache as when computed', function
     'month slots' => fn () => app(MonthSlotAggregator::class)->series(new ReportFilter),
     'coverage' => fn () => app(CoverageAggregator::class)->coverage(new ReportFilter),
     'assessment window' => fn () => app(AssessmentWindowAggregator::class)->windows(new ReportFilter),
+    'assessments by source' => fn () => app(AssessmentsBySourceAggregator::class)->counts(new ReportFilter),
     'weakest wards' => fn () => app(WeakestWardsAggregator::class)->weakest(new ReportFilter(lga: 'AAA')),
     'facility page' => fn () => app(FacilityScoresQuery::class)->paginate(new ReportFilter(year: 2026), FacilitySort::default()),
 ]);

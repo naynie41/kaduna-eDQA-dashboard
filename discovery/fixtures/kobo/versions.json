@@ -1,0 +1,22 @@
+{
+    "count": 3,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "uid": "vKd26Q1aBcDeFgHiJkLmNo",
+            "date_deployed": "2026-01-05T09:00:00Z",
+            "date_modified": "2026-01-05T09:00:00Z"
+        },
+        {
+            "uid": "vKdDraftNeverDeployed1",
+            "date_deployed": null,
+            "date_modified": "2025-12-20T12:00:00Z"
+        },
+        {
+            "uid": "vKd25Q4pQrStUvWxYzAbCd",
+            "date_deployed": "2025-07-05T09:00:00Z",
+            "date_modified": "2025-07-05T09:00:00Z"
+        }
+    ]
+}

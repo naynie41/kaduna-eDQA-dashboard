@@ -8,11 +8,12 @@ use App\Domain\Ingestion\DTOs\AssessmentSource;
 use App\Domain\Ingestion\Enums\AttachmentStatus;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Ingestion\Models\SubmissionAttachment;
-use App\Domain\Ingestion\Odk\CentralLink;
+use App\Domain\Ingestion\SourceLinks;
+use App\Domain\Ingestion\SourceRegistry;
 
 /**
- * Where an accepted assessment came from: its ODK instance ID, a link to the submission in ODK
- * Central, and its attachments (the facility drawer, ARCHITECTURE.md §9.2.7), each fetched one
+ * Where an accepted assessment came from: its source, its instance ID, a link to the submission on
+ * that source (SourceLinks), and its attachments (the facility drawer, ARCHITECTURE.md §9.2.7), each fetched one
  * with the authenticated route that serves it (SECURITY.md §7).
  *
  * Lives in Ingestion because it reads submissions, which Reporting may not (CLAUDE.md hard rule 6).
@@ -21,9 +22,14 @@ use App\Domain\Ingestion\Odk\CentralLink;
  */
 final class AssessmentSourceQuery
 {
+    public function __construct(
+        private readonly SourceRegistry $sources,
+        private readonly SourceLinks $links,
+    ) {}
+
     public function forSubmission(int $submissionId): ?AssessmentSource
     {
-        $submission = Submission::query()->whereKey($submissionId)->first(['id', 'instance_id', 'form_ref']);
+        $submission = Submission::query()->whereKey($submissionId)->first(['id', 'source_id', 'external_id', 'instance_id']);
         if ($submission === null) {
             return null;
         }
@@ -46,16 +52,14 @@ final class AssessmentSourceQuery
             ->values()
             ->all();
 
+        $key = $this->sources->keyOf((int) $submission->source_id);
+
         return new AssessmentSource(
+            $key,
+            $key === null ? null : $this->sources->name($key),
             (string) $submission->instance_id,
-            $this->centralUrl((string) $submission->form_ref, (string) $submission->instance_id),
+            $key === null ? null : $this->links->submission($key, is_string($submission->external_id) ? $submission->external_id : null),
             $attachments,
         );
-    }
-
-    /** Central's submission page; null until ODK Central's URL and project are configured. */
-    private function centralUrl(string $formId, string $instanceId): ?string
-    {
-        return CentralLink::submission($formId, $instanceId);
     }
 }

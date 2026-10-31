@@ -10,8 +10,7 @@ use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Events\PullFailed;
 use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Ingestion\Models\SourceSync;
-use App\Domain\Ingestion\Odk\OdkConfig;
-use App\Domain\Ingestion\Odk\PullLock;
+use App\Domain\Ingestion\PullLock;
 use App\Domain\Ingestion\SourceRegistry;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -21,13 +20,15 @@ use Illuminate\Queue\InteractsWithQueue;
 use Throwable;
 
 /**
- * Pulls new and edited submissions from ODK Central (ARCHITECTURE.md §5.3): every ten minutes
- * from the schedule, on "Pull now" and from the webhook. One pull at a time under PullLock: a
- * second dispatch waits for the running one and then pulls (finding little or nothing new), never
- * the same pages twice at once. Waiting too long puts it back on the queue.
+ * Pulls new and edited submissions from one source (ARCHITECTURE.md §5.3): every ten minutes per
+ * configured and enabled source from the schedule, on "Pull now" and from the webhook. One pull
+ * per source at a time under that source's PullLock ("pull:{source}"): a second dispatch for the
+ * same source waits for the running one and then pulls (finding little or nothing new), never the
+ * same pages twice at once; another source's pull runs alongside. Waiting too long puts it back on
+ * the queue.
  *
- * Every attempt is its own odk_pull_runs row; the last failure also lands on the form's sync row
- * and raises PullFailed (the daily digest and the ODK pull page read both).
+ * Every attempt is its own pull_runs row for its source; the last failure also lands on that
+ * source's sync row and raises PullFailed (the daily digest and the admin pages read both).
  */
 final class PullSubmissionsJob implements ShouldQueue
 {
@@ -44,6 +45,7 @@ final class PullSubmissionsJob implements ShouldQueue
     public int $timeout = 900;
 
     public function __construct(
+        public readonly string $source,
         public readonly PullTrigger $trigger = PullTrigger::Scheduled,
         public readonly ?int $userId = null,
         public readonly ?int $runId = null,
@@ -54,7 +56,7 @@ final class PullSubmissionsJob implements ShouldQueue
     public function handle(PullLock $lock, PullSubmissions $pull): void
     {
         try {
-            $lock->run(fn (): PullRun => $pull->execute($this->trigger, $this->userId, $this->runId), (int) config('edqa.odk.pull.lock_wait_seconds', 600));
+            $lock->run($this->source, fn (): PullRun => $pull->execute($this->source, $this->trigger, $this->userId, $this->runId), PullLock::waitSeconds());
         } catch (LockTimeoutException) {
             $this->release(60);
         }
@@ -69,23 +71,24 @@ final class PullSubmissionsJob implements ShouldQueue
                 'error' => $e === null ? 'Unknown failure' : PullSubmissions::describe($e),
             ]);
         }
-        self::recordFailure($e);
+        self::recordFailure($this->source, $e);
     }
 
-    /** The final failure of a pull: on the form's sync row, and PullFailed. Also used by edqa:pull. */
-    public static function recordFailure(?Throwable $e): void
+    /** The final failure of a pull: on the source's sync row, and PullFailed. Also used by edqa:pull. */
+    public static function recordFailure(string $source, ?Throwable $e): void
     {
         $message = $e === null ? 'Unknown failure' : PullSubmissions::describe($e);
-        $run = PullRun::query()->where('outcome', PullOutcome::Failed)->latest('id')->first();
+        $sources = app(SourceRegistry::class);
+        $sourceId = $sources->id($source);
+        $run = PullRun::query()->where('source_id', $sourceId)->where('outcome', PullOutcome::Failed)->latest('id')->first();
 
-        $config = OdkConfig::fromConfig();
-        if ($config->isConfigured()) {
+        if ($sources->problems($source) === []) {
             SourceSync::query()
-                ->where('source_id', app(SourceRegistry::class)->id('odk'))
-                ->where('form_ref', $config->formRef())
+                ->where('source_id', $sourceId)
+                ->where('form_ref', $sources->formRef($source))
                 ->update(['last_error' => $message, 'updated_at' => now()]);
         }
 
-        PullFailed::dispatch($run?->id, $message);
+        PullFailed::dispatch($run?->id, $message, $source);
     }
 }

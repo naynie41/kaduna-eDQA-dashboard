@@ -46,8 +46,8 @@ const translations = {
             owner: 'Owner',
             status: 'Status',
             active: 'Active',
-            odk_title: 'ODK submission',
-            odk_none: 'None.',
+            source_title: 'Source submission',
+            source_none: 'None.',
             correct: {
                 start: 'Correct this assessment',
                 title: 'Correcting this assessment',
@@ -96,7 +96,7 @@ const detail = (open = true): FacilityDetail => ({
     flags: [],
     attachments: [],
     activity: [],
-    odk: { instance_id: null, url: null },
+    source: { key: null, name: null, instance_id: null, url: null },
 });
 
 afterEach(() => {

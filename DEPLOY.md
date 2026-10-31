@@ -784,32 +784,67 @@ the app is broken:
 
 ### 15.2 `app.env` keys (Laravel)
 
+The key names are exactly those in the application's `.env.example`, which lists every key a
+server sets, with local-development values. Below are the server values. A key left out of
+`app.env` takes the default named here.
+
 ```
 APP_NAME="Kaduna eDQA"  APP_ENV=production  APP_DEBUG=false  APP_URL=https://edqa.<domain>
 APP_KEY=base64:...      APP_PREVIOUS_KEYS=  APP_TIMEZONE=Africa/Lagos
+APP_LOCALE=en  APP_FALLBACK_LOCALE=en  APP_FAKER_LOCALE=en_US  APP_MAINTENANCE_DRIVER=file
+BCRYPT_ROUNDS=12
 LOG_CHANNEL=stderr      LOG_LEVEL=warning   LOG_STDERR_FORMATTER=Monolog\Formatter\JsonFormatter
+LOG_DEPRECATIONS_CHANNEL=null
 
 DB_CONNECTION=pgsql  DB_HOST=postgres  DB_PORT=5432  DB_DATABASE=edqa
 DB_USERNAME=edqa_app DB_PASSWORD=...
 
-REDIS_HOST=redis  REDIS_PASSWORD=...  REDIS_DB=0  REDIS_CACHE_DB=1
+REDIS_CLIENT=phpredis  REDIS_HOST=redis  REDIS_PASSWORD=...  REDIS_PORT=6379  REDIS_DB=0  REDIS_CACHE_DB=1
 QUEUE_CONNECTION=redis  CACHE_STORE=redis
 SESSION_DRIVER=database  SESSION_LIFETIME=480  SESSION_ENCRYPT=true  SESSION_SECURE_COOKIE=true
+SESSION_PATH=/  SESSION_DOMAIN=null
+BROADCAST_CONNECTION=log  FILESYSTEM_DISK=local
 
+# ODK Central (Project Viewer account, read-only). Page size and throttle: a positive whole
+# number, else the default (500 a page, 5 s between backfill pages).
 ODK_CENTRAL_URL=https://odk.<client>  ODK_CENTRAL_EMAIL=...  ODK_CENTRAL_PASSWORD=...
 ODK_PROJECT_ID=  ODK_FORM_ID=  ODK_WEBHOOK_SECRET=  ODK_PULL_PAGE_SIZE=500  ODK_BACKFILL_THROTTLE=5
+ODK_ENABLED=                      # empty or true: pulled; false: switched off
+
+# KoboToolbox (API token of a dedicated account that can only view the asset). Page size and
+# throttle as for ODK. The webhook token is optional: at least 32 random characters, else the
+# webhook is off (404).
+KOBO_BASE_URL=https://kf.kobotoolbox.org  KOBO_API_TOKEN=...  KOBO_ASSET_UID=...
+KOBO_PULL_PAGE_SIZE=500  KOBO_BACKFILL_THROTTLE=5  KOBO_WEBHOOK_TOKEN=
+KOBO_ENABLED=                     # empty or true: pulled; false: switched off
 
 MAIL_MAILER=smtp  MAIL_HOST=  MAIL_PORT=587  MAIL_USERNAME=  MAIL_PASSWORD=  MAIL_FROM_ADDRESS=
+MAIL_FROM_NAME="${APP_NAME}"
 EDQA_DIGEST_RECIPIENTS=
 
 BROWSERSHOT_CHROME_PATH=/usr/bin/chromium  BROWSERSHOT_NODE_BINARY=/usr/bin/node
-HEARTBEAT_ODK_PULL_URL=  HEARTBEAT_SCHEDULER_URL=
+HEARTBEAT_PULL_ODK_URL=  HEARTBEAT_PULL_KOBO_URL=  HEARTBEAT_SCHEDULER_URL=
+
+VITE_APP_NAME="${APP_NAME}"       # build-time only: read when the assets are built
 ```
+
+**Local only: never set on a server.** Each is refused outside `APP_ENV=local`:
+
+| Key | Local use | On a server |
+|---|---|---|
+| `ODK_ALLOW_INSECURE_LOCAL` | Allows an `http` `ODK_CENTRAL_URL`, for the mock ODK Central | Leave it out. If it is set, ODK Central counts as not configured and is not pulled |
+| `KOBO_ALLOW_INSECURE_LOCAL` | Allows an `http` `KOBO_BASE_URL`, for the mock KoboToolbox | Leave it out. If it is set, KoboToolbox counts as not configured and is not pulled |
+| `EDQA_REQUIRE_2FA` | `false` switches the two-factor sign-in requirement off for local development | Leave it out (or `true`). If it is `false`, **the app refuses to start**, with an error naming the key, and two-factor sign-in is never skipped there, whatever the config says (SECURITY.md §2) |
 
 `migrator.env` contains only `DB_USERNAME=edqa_migrator` and `DB_PASSWORD=...`, layered over
 `app.env` for the `migrate` service.
 
-The ODK service account must be a **Project Viewer** (read-only) on the one project.
+The ODK service account must be a **Project Viewer** (read-only) on the one project. The
+KoboToolbox token must belong to a dedicated account that can view the one asset and nothing
+more, never the owner's token (SECURITY.md §6).
+
+The old heartbeat key `HEARTBEAT_ODK_PULL_URL` is still read for one release, as an alias of
+`HEARTBEAT_PULL_ODK_URL`. Rename it in `app.env`.
 
 ### 15.3 Rotation
 

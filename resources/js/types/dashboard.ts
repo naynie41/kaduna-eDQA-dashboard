@@ -245,7 +245,8 @@ export type FacilityDetail = {
         changes: { field: string; old: string | null; new: string | null }[];
         reason: string | null;
     }[];
-    odk: { instance_id: string | null; url: string | null };
+    /** The submission's source and a link to it there (null while its link settings are not configured). */
+    source: { key: string | null; name: string | null; instance_id: string | null; url: string | null };
 };
 
 /** Monitor (§9.2.4): CoverageAggregator and AssessmentWindowAggregator, as they serialise. */
@@ -281,10 +282,19 @@ export type AssessmentWindow = {
     assessments: number;
 };
 
+/** One source's accepted assessments in the selection (AssessmentsBySourceAggregator); every configured source, none left out at 0. */
+export type SourceCount = {
+    /** null for an assessment whose source is no longer configured. */
+    key: string | null;
+    name: string;
+    assessments: number;
+};
+
 export type MonitorProps = {
     owners?: OwnerSplit;
     coverage?: Coverage;
     windows?: AssessmentWindow[];
+    sources?: SourceCount[];
 };
 
 /** Visuals (§9.2.5): MonthSlotAggregator's points and takeaways, the owner view. */

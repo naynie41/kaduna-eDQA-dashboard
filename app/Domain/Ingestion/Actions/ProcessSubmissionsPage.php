@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Ingestion\Actions;
 
-use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\DTOs\AttachmentRef;
+use App\Domain\Ingestion\DTOs\EnvelopeAttachment;
 use App\Domain\Ingestion\DTOs\SubmissionEnvelope;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Ingestion\FieldMap;
@@ -13,21 +13,25 @@ use App\Domain\Ingestion\Jobs\FetchAttachmentsJob;
 use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\Models\Submission;
-use App\Domain\Ingestion\Odk\OdkRow;
 use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Ingestion\SubmissionParser;
 use App\Domain\Validation\Actions\MarkSuperseded;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 /**
- * One page of raw ODK rows, committed in ONE transaction (ARCHITECTURE.md §5.3, §5.6): the one
- * path both the pull and the backfill take.
+ * One page of raw rows from one source, committed in ONE transaction (ARCHITECTURE.md §5.3, §5.6):
+ * the one path the pull, the backfill and the reconcile sweep of every source take. The source is
+ * the sync row's; its normaliser reads each row.
  *
- * Before the transaction: Central's attachment list for each new row expecting files (no HTTP
- * while the transaction holds locks). Inside it, in order: the raw rows inserted verbatim
- * ON CONFLICT (instance_id) DO NOTHING (rows not returned are duplicates); the new ones parsed from
+ * Before the transaction: the attachments each new row expects (no HTTP while the transaction
+ * holds locks): a row that lists its own (Kobo's _attachments) gives them; one that only counts
+ * them (ODK's __system.attachmentsExpected) asks the source for the list. Inside it, in order: the
+ * raw rows inserted verbatim ON CONFLICT (instance_id) DO NOTHING (rows not returned are
+ * duplicates; one whose instance another source already holds is a cross-source duplicate, D-60,
+ * counted apart and logged with both sources, never stored twice); the new ones parsed from
  * the stored payload; edits of quarantined submissions superseded (MarkSuperseded); the batch run
  * through ProcessParsedBatch with one ValidationContext; their attachments recorded pending; the
  * run's counters; and last the form's sync row. A crash anywhere rolls all of it back, so the
@@ -44,7 +48,6 @@ final class ProcessSubmissionsPage
     private const CURSORS = ['cursor_at', 'edit_cursor_at'];
 
     public function __construct(
-        private readonly SubmissionSource $source,
         private readonly SubmissionParser $parser,
         private readonly SourceRegistry $sources,
         private readonly ProcessParsedBatch $batch,
@@ -59,12 +62,14 @@ final class ProcessSubmissionsPage
      */
     public function execute(PullRun $run, SourceSync $sync, array $rows, array $changes = [], bool $fetchAttachments = true): void
     {
-        $expected = $this->expectedAttachments($rows);
+        $key = (string) $sync->source()->value('key');
+        $normaliser = $this->sources->normaliser($key);
+        $envelopes = array_map($normaliser->normalise(...), $rows);
+        $expected = $this->expectedAttachments($key, $rows, $envelopes);
 
-        $withFiles = DB::transaction(function () use ($run, $sync, $rows, $changes, $expected): array {
-            $normaliser = $this->sources->normaliser((string) $sync->source()->value('key'));
-            $envelopes = array_map($normaliser->normalise(...), $rows);
+        $withFiles = DB::transaction(function () use ($run, $sync, $rows, $changes, $expected, $key, $normaliser, $envelopes): array {
             $inserted = $this->insert($envelopes, $rows, $sync->source_id, $sync->formId());
+            $crossSource = self::crossSource($envelopes, $inserted, $sync->source_id, $key);
             $edits = self::editsByExternalId(array_values($inserted));
             $submissions = $inserted === [] ? [] : Submission::query()->whereIn('id', array_values($inserted))->get()->keyBy('instance_id')->all();
 
@@ -103,13 +108,14 @@ final class ProcessSubmissionsPage
             $run->update([
                 'fetched' => $run->fetched + count($rows),
                 'parsed' => $run->parsed + count($batch),
-                'duplicates' => $run->duplicates + count($rows) - count($inserted),
+                'duplicates' => $run->duplicates + count($rows) - count($inserted) - $crossSource,
+                'cross_source_duplicates' => $run->cross_source_duplicates + $crossSource,
                 'accepted' => $run->accepted + $counts[SubmissionStatus::Accepted->value],
                 'flagged' => $run->flagged + $counts[SubmissionStatus::Flagged->value],
                 'quarantined' => $run->quarantined + $counts[SubmissionStatus::Quarantined->value],
             ]);
 
-            $this->moveSync($sync, $changes, $rows, count($inserted));
+            $this->moveSync($sync, $changes, $envelopes, count($inserted));
 
             return $withFiles;
         });
@@ -124,15 +130,18 @@ final class ProcessSubmissionsPage
     /**
      * The sync row's last statement in the page.
      *
+     * The last row's instance is noted beside a moved cursor (the reconcile sweep moves none).
+     *
      * @param  array<string, CarbonImmutable|int|null>  $changes
-     * @param  list<array<array-key, mixed>>  $rows
+     * @param  list<SubmissionEnvelope>  $envelopes
      */
-    private function moveSync(SourceSync $sync, array $changes, array $rows, int $inserted): void
+    private function moveSync(SourceSync $sync, array $changes, array $envelopes, int $inserted): void
     {
         $pdo = DB::connection()->getPdo();
         $update = ['submission_count' => DB::raw('submission_count + '.$inserted), 'updated_at' => now()];
-        if ($rows !== []) {
-            $update['cursor_instance_id'] = OdkRow::instanceId($rows[array_key_last($rows)]);
+        $cursorMoved = array_filter(array_intersect_key($changes, array_flip(self::CURSORS)), fn ($v): bool => $v !== null) !== [];
+        if ($envelopes !== [] && $cursorMoved) {
+            $update['cursor_instance_id'] = $envelopes[array_key_last($envelopes)]->meta->instanceId;
         }
         foreach ($changes as $column => $value) {
             if ($value === null) {
@@ -153,34 +162,80 @@ final class ProcessSubmissionsPage
     }
 
     /**
-     * What ODK lists for each row that expects files (__system.attachmentsExpected) and is not
-     * stored yet; Central lists them under the submission's root ID (__id).
+     * The files each row not stored yet expects: those its envelope lists (Kobo's _attachments),
+     * or, for a row that only counts them (ODK's __system.attachmentsExpected), the source's list
+     * under the submission's logical ID (Central's __id).
      *
      * @param  list<array<array-key, mixed>>  $rows
+     * @param  list<SubmissionEnvelope>  $envelopes  one per row
      * @return array<string, list<AttachmentRef>> instance ID => the files
      */
-    private function expectedAttachments(array $rows): array
+    private function expectedAttachments(string $key, array $rows, array $envelopes): array
     {
-        $candidates = [];
-        foreach ($rows as $row) {
-            $expected = FieldMap::get($row, '__system.attachmentsExpected');
-            if (is_numeric($expected) && (int) $expected > 0) {
-                $candidates[OdkRow::instanceId($row)] = OdkRow::rootId($row);
+        $listed = [];
+        $ask = [];
+        foreach ($envelopes as $i => $envelope) {
+            $meta = $envelope->meta;
+            if ($meta->attachments !== []) {
+                $listed[$meta->instanceId] = array_map(fn (EnvelopeAttachment $a): AttachmentRef => new AttachmentRef($a->name, $a->url !== null), $meta->attachments);
+            } else {
+                $expected = FieldMap::get($rows[$i], '__system.attachmentsExpected');
+                if (is_numeric($expected) && (int) $expected > 0) {
+                    $ask[$meta->instanceId] = $meta->externalId ?? $meta->instanceId;
+                }
             }
         }
-        if ($candidates === []) {
+        if ($listed === [] && $ask === []) {
             return [];
         }
 
-        $stored = DB::table('submissions')->whereIn('instance_id', array_keys($candidates))->pluck('instance_id')->flip()->all();
-        $listed = [];
-        foreach ($candidates as $instanceId => $rootId) {
+        $ids = array_map(strval(...), [...array_keys($listed), ...array_keys($ask)]);
+        $stored = DB::table('submissions')->whereIn('instance_id', $ids)->pluck('instance_id')->flip()->all();
+        $files = [];
+        foreach ($listed as $instanceId => $refs) {
             if (! isset($stored[$instanceId])) {
-                $listed[$instanceId] = $this->source->attachmentList($rootId);
+                $files[(string) $instanceId] = $refs;
+            }
+        }
+        foreach ($ask as $instanceId => $logicalId) {
+            if (! isset($stored[$instanceId])) {
+                $files[(string) $instanceId] = $this->sources->adapter($key)->attachmentList($logicalId);
             }
         }
 
-        return $listed;
+        return $files;
+    }
+
+    /**
+     * The rows not inserted whose instance another source already holds (D-60): counted apart from
+     * this source's own repeats, and logged naming both sources (IDs only, never payload values).
+     *
+     * @param  list<SubmissionEnvelope>  $envelopes
+     * @param  array<string, int>  $inserted
+     */
+    private static function crossSource(array $envelopes, array $inserted, int $sourceId, string $key): int
+    {
+        $skipped = [];
+        foreach ($envelopes as $envelope) {
+            if (! isset($inserted[$envelope->meta->instanceId])) {
+                $skipped[] = $envelope->meta->instanceId;
+            }
+        }
+        if ($skipped === []) {
+            return 0;
+        }
+
+        $elsewhere = DB::table('submissions as s')
+            ->join('submission_sources as src', 'src.id', '=', 's.source_id')
+            ->whereIn('s.instance_id', array_values(array_unique($skipped)))
+            ->where('s.source_id', '<>', $sourceId)
+            ->pluck('src.key', 's.instance_id')->all();
+        foreach ($elsewhere as $instanceId => $storedFrom) {
+            Log::warning('Cross-source duplicate submission', ['instance_id' => (string) $instanceId, 'source' => $key, 'stored_from' => (string) $storedFrom]);
+        }
+
+        // A row repeated within the page counts once per row, as a duplicate does.
+        return count(array_filter($skipped, fn (string $id): bool => isset($elsewhere[$id])));
     }
 
     /**
@@ -235,7 +290,7 @@ final class ProcessSubmissionsPage
     }
 
     /**
-     * Edits a source sent without deprecatedID (D-23 in the new numbering): a new row whose
+     * Edits a source sent without deprecatedID (D-61): a new row whose
      * external_id the source already sent, under another instance ID, replaces the latest version
      * not yet replaced. Its deprecated_id is set to that version (the payload is untouched), so
      * the edit takes the path every edit takes (MarkSuperseded, the assessment updated in place).
