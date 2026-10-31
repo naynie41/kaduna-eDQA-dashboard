@@ -42,5 +42,25 @@
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="PULSE_ENABLED" value="false" force="true"/>
         <env name="EDQA_REQUIRE_2FA" value="true" force="true"/>
+        <!-- The developer's .env may hold real source credentials (Kobo credentials day): tests never
+             see them, so no test can reach a real server. A test that needs a source sets config(). -->
+        <env name="ODK_CENTRAL_URL" value="" force="true"/>
+        <env name="ODK_CENTRAL_EMAIL" value="" force="true"/>
+        <env name="ODK_CENTRAL_PASSWORD" value="" force="true"/>
+        <env name="ODK_PROJECT_ID" value="" force="true"/>
+        <env name="ODK_FORM_ID" value="" force="true"/>
+        <env name="ODK_WEBHOOK_SECRET" value="" force="true"/>
+        <env name="ODK_ALLOW_INSECURE_LOCAL" value="" force="true"/>
+        <env name="ODK_ENABLED" value="" force="true"/>
+        <env name="KOBO_BASE_URL" value="" force="true"/>
+        <env name="KOBO_API_TOKEN" value="" force="true"/>
+        <env name="KOBO_ASSET_UID" value="" force="true"/>
+        <env name="KOBO_WEBHOOK_TOKEN" value="" force="true"/>
+        <env name="KOBO_ALLOW_INSECURE_LOCAL" value="" force="true"/>
+        <env name="KOBO_ENABLED" value="" force="true"/>
+        <env name="HEARTBEAT_PULL_ODK_URL" value="" force="true"/>
+        <env name="HEARTBEAT_PULL_KOBO_URL" value="" force="true"/>
+        <env name="HEARTBEAT_ODK_PULL_URL" value="" force="true"/>
+        <env name="HEARTBEAT_SCHEDULER_URL" value="" force="true"/>
     </php>
 </phpunit>

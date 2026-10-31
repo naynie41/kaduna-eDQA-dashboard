@@ -25,12 +25,19 @@ beforeEach(function (): void {
     CurrentRuleVersion::forget();
 });
 
-/** @return array<string, array{0: string, 1: string}> "kind/name" => [kind, name] for the raw rows of one source */
+/**
+ * The contract fixtures (valid/, broken/) of one source. kobo/real/ holds the real form's rows, which
+ * have no ODK twin and are tested on their own (KoboRealFormTest).
+ *
+ * @return array<string, array{0: string, 1: string}> "kind/name" => [kind, name]
+ */
 function sourceFixtures(string $source): array
 {
     $cases = [];
-    foreach (glob(dirname(__DIR__, 2)."/Fixtures/sources/{$source}/*/*.json") ?: [] as $file) {
-        $cases[basename(dirname($file)).'/'.basename($file, '.json')] = [basename(dirname($file)), basename($file, '.json')];
+    foreach (['valid', 'broken'] as $kind) {
+        foreach (glob(dirname(__DIR__, 2)."/Fixtures/sources/{$source}/{$kind}/*.json") ?: [] as $file) {
+            $cases[$kind.'/'.basename($file, '.json')] = [$kind, basename($file, '.json')];
+        }
     }
 
     return $cases;

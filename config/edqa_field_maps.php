@@ -70,12 +70,20 @@ return [
         // follow the contract, so its scored items come from item rules (config/edqa_item_rules.php,
         // generated from the form's own score formulas: D-66–D-68). Read from the form's content on
         // 2026-10-31 (discovery/out/kobo_form_diff.md).
+        // CONFIRMED against the asset's 6 real submissions (2026-10-31): the K.3 defect scan and the
+        // K.4 dry run read every field below in all 6, the item rules leave no answer invalid, and the
+        // portal's scores equal the form's own (tests/Feature/Ingestion/KoboRealFormTest.php).
         'kobo-2024010101' => [
-            // The form's own slugs, matched to master-list codes through facility_source_refs (D-72).
+            // The path is confirmed; its values are the form's slugs, not master-list codes. They
+            // resolve only through facility_source_refs (D-72): TO CONFIRM, the client-signed mapping.
             'facility_code' => 'description_facility.healthfacility',
+            // Confirmed: all 5 values seen read as LGAs (lowercase slugs of the names).
             'lga_code' => 'description_facility.lga',
+            // The path is confirmed; its values are the form's ward slugs, which no rule compares
+            // with the master list (the facility carries its ward).
             'ward_code' => 'description_facility.ward',
-            // The reviewed period (D-71): the year, and the quarter (q1–q4) or the month (january…).
+            // The reviewed period (D-71, client answer Q8): the year, and the month (5 monthly visits)
+            // or the quarter, q1–q4. The quarter is confirmed by the one quarterly visit only.
             'round_year' => 'description_facility.review_year',
             'round_quarter' => 'review_quarter',
             'round_quarter_format' => 'q',
@@ -86,7 +94,8 @@ return [
             'gps' => 'details_ass.location',
             'item_rules' => 'kobo-2024010101',
             'visit_mode' => ['path' => 'period_visit', 'monthly' => 'monthly_dqa', 'quarterly' => 'quarterly_dqa'],
-            // Not facility assessments (D-74): stored, never scored.
+            // Not facility assessments (D-74): stored, never scored. From the form's choice lists: TO
+            // CONFIRM, as no community visit or DDU has been submitted yet.
             'out_of_scope' => [
                 'community_visit' => ['path' => 'field_visit_type', 'value' => 'community_visit'],
                 'ddu' => ['path' => 'ddu_dqa', 'value' => 'ddu'],
