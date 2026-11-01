@@ -68,6 +68,18 @@ export default function CascadePanel({ howUrl }: CascadePanelProps) {
                         <span className="block text-xs text-ink-2">{t('admin.sources.cascade.expiry')}</span>
                     </div>
                 )}
+                {result !== null && (
+                    <div>
+                        <h3 id="sources-cascade-steps" className="mb-1.5 text-base font-semibold">
+                            {t('admin.sources.cascade.steps_label')}
+                        </h3>
+                        <ol aria-labelledby="sources-cascade-steps" className="flex list-decimal flex-col gap-1 pl-5">
+                            <li>{t('admin.sources.cascade.steps.download')}</li>
+                            <li>{t('admin.sources.cascade.steps.odk')}</li>
+                            <li>{t('admin.sources.cascade.steps.kobo')}</li>
+                        </ol>
+                    </div>
+                )}
             </div>
         </Panel>
     );

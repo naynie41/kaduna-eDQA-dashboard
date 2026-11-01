@@ -40,6 +40,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `add_deletion_review_to_submissions`, `POST /api/submissions/{submission}/deletion-review`.
 - `SourceTag` names a record's source in words in the pull history, Data issues and deletions
   tables.
+- Data sources page (Phase 5 step 1): each source's state in words (Healthy, Behind, Failing,
+  Credentials rejected, Waiting for the first pull); the last error says what the HTTP status means
+  and what happens to the next pulls; the backfill panel shows every configured source's last run
+  and checkpoint; the facility media file panel lists the steps on both platforms.
 
 ### Fixed
 

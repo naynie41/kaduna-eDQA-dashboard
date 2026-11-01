@@ -1,6 +1,9 @@
 # Everyday commands (CLAUDE.md §8, CONVENTION.md §12.4). Everything runs inside the containers.
 COMPOSE := docker compose -f compose.dev.yml
 EXEC    := $(COMPOSE) exec -T app
+# The Kobo mock always serves its own asset (SourceMockGenerator::KOBO_ASSET, as compose.e2e-sources.yml
+# configures it), never the asset a developer's .env names for the real server.
+KOBO_MOCK_EXEC := $(COMPOSE) exec -T -e KOBO_ASSET_UID=aKdDqaMock2026 app
 RUNPHP  := $(COMPOSE) run --rm --no-deps -T --entrypoint
 
 # Dev-only credentials from docker/postgres/init-dev.sql.
@@ -82,13 +85,19 @@ e2e-sources: ## Playwright against both mocks: Pull all end to end, the duplicat
 	$(COMPOSE) --profile sources up -d odk-mock kobo-mock
 	$(EXEC) php artisan edqa:source-mock:generate odk --count=20 --broken=2 --seed=$$(date +%s)
 	@# 4 of Kobo's visits are on ODK too: 2 copied (cross-source duplicates), 2 entered again (DUPLICATE_ASSESSMENT).
-	$(EXEC) php artisan edqa:source-mock:generate kobo --count=20 --broken=2 --overlap=4 --seed=$$(date +%s)
+	$(KOBO_MOCK_EXEC) php artisan edqa:source-mock:generate kobo --count=20 --broken=2 --overlap=4 --seed=$$(date +%s)
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
 	$(COMPOSE) -f compose.e2e-sources.yml up -d --wait app worker
 	$(COMPOSE) -f compose.e2e-sources.yml exec -T app php artisan edqa:sources:sync
 	@# --no-deps: run would otherwise recreate app (a dependency of web) without the override.
+	@# Second pass: the Kobo mock refuses the token (HTTP 401), one Kobo pull fails on it, the page is
+	@# read for the plain-language error, then the token is put back whatever the outcome.
 	$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_SOURCES=1 playwright tests/e2e/sources.spec.ts $(c); status=$$?; \
-		$(COMPOSE) up -d --wait app worker; exit $$status
+		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php tests/e2e/support/kobo-mock-token.php refuse; \
+		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php artisan edqa:pull kobo > /dev/null 2>&1; \
+		$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_KOBO_AUTH_FAILED=1 playwright tests/e2e/sources.spec.ts -g "refusing the token" $(c); auth=$$?; \
+		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php tests/e2e/support/kobo-mock-token.php restore; \
+		$(COMPOSE) up -d --wait app worker; [ $$status -ne 0 ] && exit $$status; exit $$auth
 
 e2e-issues: ## Playwright on the Data issues page with known broken records held through the real pipeline (tests/e2e/data-issues.spec.ts)
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
@@ -107,7 +116,7 @@ sources-mock-up: ## Start both source mocks: odk-mock (127.0.0.1:8090) and kobo-
 
 sources-mock-seed: ## Write n submissions on each mock, 10 of Kobo's also on ODK: make sources-mock-seed n=200
 	$(EXEC) php artisan edqa:source-mock:generate odk --count=$(or $(n),200)
-	$(EXEC) php artisan edqa:source-mock:generate kobo --count=$(or $(n),200) --overlap=10
+	$(KOBO_MOCK_EXEC) php artisan edqa:source-mock:generate kobo --count=$(or $(n),200) --overlap=10
 
 lighthouse: ##Lighthouse on Slow 3G (Home, Facility view, Visuals) against a production build; Vite restarts after
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction

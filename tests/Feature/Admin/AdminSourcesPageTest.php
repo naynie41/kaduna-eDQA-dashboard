@@ -143,27 +143,78 @@ it('refuses a filter it does not know', function (string $query): void {
     $this->actingAs($this->admin)->get("/admin/sources?{$query}")->assertSessionHasErrors();
 })->with(['trigger=cron', 'outcome=partial', 'page=0', 'source=dhis2', 'source[]=odk']);
 
-it('shows the last backfill, its checkpoint page, and a signed link to the newest report', function (): void {
+it('shows each source\'s last backfill and checkpoint page, and a signed link to the newest report', function (): void {
     odkPageConfigure();
     config(['edqa.sources.odk.page_size' => 500]);
+    config(['edqa.sources.kobo' => [...config('edqa.sources.kobo'), 'url' => 'https://kf.example.org', 'token' => 'kobo-token-for-tests', 'asset_uid' => 'aKdDqa2026', 'page_size' => 1000]]);
+    useSource('kobo', new FakeSubmissionSource);
     DB::table('source_syncs')->insert(['source_id' => Rows::sourceId(), 'form_ref' => '7/dqa', 'backfill_checkpoint' => 1500, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('source_syncs')->insert(['source_id' => Rows::sourceId('kobo'), 'form_ref' => 'aKdDqa2026', 'backfill_checkpoint' => 2000, 'created_at' => now(), 'updated_at' => now()]);
     Rows::pullRun(['trigger_type' => 'backfill', 'outcome' => 'succeeded', 'started_at' => now()->subDay(), 'finished_at' => now()->subDay()->addHour(), 'fetched' => 1500, 'accepted' => 1400]);
+    Rows::pullRun(['source_id' => Rows::sourceId('kobo'), 'trigger_type' => 'backfill', 'outcome' => 'failed', 'started_at' => now()->subHours(2), 'finished_at' => now()->subHour(), 'fetched' => 2000]);
     Storage::disk('exports')->put('backfill-report-20261019-090000.md', '# old');
     Storage::disk('exports')->put('backfill-report-20261020-090000.md', '# Backfill report');
     Storage::disk('exports')->put('cascade/odk-cascade-20261020-090000.zip', 'zip');
 
     $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page
-        ->where('backfill.run.fetched', 1500)
-        ->where('backfill.checkpoint', ['position' => 1500, 'page' => 3, 'page_size' => 500])
+        ->where('backfill.sources.0.key', 'odk')
+        ->where('backfill.sources.0.name', 'ODK Central')
+        ->where('backfill.sources.0.run.fetched', 1500)
+        ->where('backfill.sources.0.checkpoint', ['position' => 1500, 'page' => 3, 'page_size' => 500])
+        ->where('backfill.sources.1.key', 'kobo')
+        ->where('backfill.sources.1.run.outcome', 'failed')
+        ->where('backfill.sources.1.checkpoint', ['position' => 2000, 'page' => 2, 'page_size' => 1000])
         ->where('backfill.report.file', 'backfill-report-20261020-090000.md')
         ->where('backfill.report.url', fn (string $url): bool => str_contains($url, '/api/backfill-reports/backfill-report-20261020-090000.md') && str_contains($url, 'signature=')));
 });
 
-it('says no backfill has run and no report exists', function (): void {
+it('says no backfill has run and no report exists; a source not configured has no backfill line', function (): void {
+    odkPageConfigure();
+
     $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page
-        ->where('backfill.run', null)
-        ->where('backfill.report', null)
-        ->where('backfill.checkpoint.position', 0));
+        ->count('backfill.sources', 1)
+        ->where('backfill.sources.0.key', 'odk')
+        ->where('backfill.sources.0.run', null)
+        ->where('backfill.sources.0.checkpoint.position', 0)
+        ->where('backfill.report', null));
+});
+
+it('gives each source the state the page says in words', function (Closure $setup, string $state, ?string $errorClass, ?int $httpStatus): void {
+    odkPageConfigure();
+    config(['edqa.sources.kobo' => [...config('edqa.sources.kobo'), 'url' => 'https://kf.example.org', 'token' => 'kobo-token-for-tests', 'asset_uid' => 'aKdDqa2026']]);
+    useSource('kobo', new FakeSubmissionSource);
+    Rows::sourceId('kobo');
+    $setup();
+
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page
+        ->where('sources.1.key', 'kobo')
+        ->where('sources.1.status.state', $state)
+        ->where('sources.1.status.lastErrorClass', $errorClass)
+        ->where('sources.1.status.lastErrorHttpStatus', $httpStatus));
+})->with([
+    'never pulled' => [fn () => null, 'not_connected', null, null],
+    'healthy' => [fn () => Rows::pullRun(['source_id' => Rows::sourceId('kobo'), 'outcome' => 'succeeded', 'started_at' => now()->subMinutes(6), 'finished_at' => now()->subMinutes(5)]), 'healthy', null, null],
+    'stale' => [fn () => Rows::pullRun(['source_id' => Rows::sourceId('kobo'), 'outcome' => 'succeeded', 'started_at' => now()->subHours(2), 'finished_at' => now()->subHours(2)]), 'stale', null, null],
+    'failed' => [function (): void {
+        Rows::pullRun(['source_id' => Rows::sourceId('kobo'), 'outcome' => 'succeeded', 'started_at' => now()->subHours(2), 'finished_at' => now()->subHours(2)]);
+        Rows::pullRun(['source_id' => Rows::sourceId('kobo'), 'outcome' => 'failed', 'started_at' => now()->subMinutes(3), 'finished_at' => now()->subMinutes(2), 'error' => 'KoboUnreachable: KoboToolbox could not be reached']);
+    }, 'failed', 'KoboUnreachable', null],
+    'auth failed' => [fn () => Rows::pullRun(['source_id' => Rows::sourceId('kobo'), 'outcome' => 'failed', 'started_at' => now()->subMinutes(3), 'finished_at' => now()->subMinutes(2), 'error' => 'KoboAuthFailed: KoboToolbox refused the API token (HTTP 401). Pulls from KoboToolbox stop until the token is fixed.']), 'auth_failed', 'KoboAuthFailed', 401],
+    'disabled' => [fn () => config(['edqa.sources.kobo.enabled' => false]), 'disabled', null, null],
+]);
+
+it('says which settings a source is missing, by name, and never its values', function (): void {
+    odkPageConfigure();
+    config(['edqa.sources.kobo' => [...config('edqa.sources.kobo'), 'url' => null, 'token' => 'kobo-token-for-tests', 'asset_uid' => null]]);
+
+    $response = $this->actingAs($this->admin)->get('/admin/sources');
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('sources.1.key', 'kobo')
+        ->where('sources.1.configured', false)
+        ->where('sources.1.status.state', 'not_configured')
+        ->where('sources.1.problems', fn ($problems): bool => in_array('KOBO_BASE_URL', $problems->all(), true) && in_array('KOBO_ASSET_UID', $problems->all(), true) && ! in_array('KOBO_API_TOKEN', $problems->all(), true))
+        ->where('docs.runbook', fn (?string $url): bool => $url === null || str_contains($url, 'source-credentials-day')));
+    expect($response->getContent())->not->toContain('kobo-token-for-tests');
 });
 
 it('downloads the backfill report through its signed link only, audited', function (): void {

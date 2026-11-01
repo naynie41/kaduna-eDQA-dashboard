@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import BackfillPanel from '@/components/BackfillPanel';
+import CascadePanel from '@/components/CascadePanel';
 import DeletionsPanel from '@/components/DeletionsPanel';
 import DuplicateSides from '@/components/DuplicateSides';
 import PullAllPanel from '@/components/PullAllPanel';
@@ -61,7 +63,35 @@ const translations = {
                 reconciled_never: 'Not yet.',
                 not_yet: 'none yet',
                 last_error: 'Last error',
-                error_status: ':source returned HTTP :status at :time; last success :success.',
+                error_status: ':source returned HTTP :status at :time — :meaning',
+                meaning: {
+                    unauthorized_kobo: 'the API token was rejected.',
+                    unauthorized_odk: "the service account's email or password was rejected.",
+                    forbidden: 'the account has no access to the form.',
+                    not_found: 'the form or project named in the settings was not found.',
+                    too_many: 'it asked the portal to slow down.',
+                    server: 'its server had a problem.',
+                    other: 'the answer was not what the portal expected.',
+                },
+                consequence: {
+                    settings: 'Every scheduled pull from :source will fail the same way until the setting is fixed on the server.',
+                    retry: 'The next scheduled pull tries again.',
+                },
+                last_success_sentence: 'Last success: :success.',
+                state: {
+                    healthy: 'Healthy',
+                    stale: 'Behind',
+                    failed: 'Failing',
+                    auth_failed: 'Credentials rejected',
+                    not_connected: 'Waiting for the first pull',
+                },
+                state_body: {
+                    healthy: 'The last pull succeeded :ago.',
+                    stale: 'No successful pull for over :minutes minutes.',
+                    failed: 'The last pull failed: see the last error below.',
+                    auth_failed: ':source refused the portal\'s credentials: see the last error below.',
+                    not_connected: 'No pull has finished yet.',
+                },
                 error_class: ':what at :time; last success :success.',
                 errors: { auth: ":source refused the portal's credentials", unreachable: ':source could not be reached', unexpected: ':source sent an odd answer', QueryException: 'The database refused a write', other: 'The pull stopped' },
                 error_detail: 'Detail: :error',
@@ -145,6 +175,36 @@ const translations = {
                 dialog_confirm: 'Mark reviewed',
                 saved: 'Deletion marked reviewed.',
             },
+            backfill: {
+                title: 'Historical backfill',
+                description: 'Read-only here.',
+                last_run: 'Last backfill',
+                none: 'No backfill has run.',
+                run_value: 'Started :started; :outcome. :fetched read: :accepted accepted, :flagged flagged, :quarantined quarantined, :duplicates already stored.',
+                outcomes: { running: 'still running', succeeded: 'finished', failed: 'stopped with an error', skipped_not_configured: 'skipped' },
+                checkpoint: 'Checkpoint',
+                checkpoint_value: ':position submissions read, page :page at :size a page (edqa:backfill resumes here).',
+                report: 'Latest backfill report',
+                report_none: 'No backfill report yet.',
+                report_link: 'Download the backfill report of :time',
+                report_expiry: 'The link works for 30 minutes.',
+            },
+            cascade: {
+                title: 'Facility media file',
+                description: 'The same file is attached to the form on both platforms.',
+                button: 'Regenerate facility media file',
+                ready: 'Ready: :lgas LGAs, :wards wards, :facilities facilities.',
+                download: 'Download :file',
+                expiry: 'The link works for 30 minutes.',
+                how: 'How to attach it',
+                how_file: 'How to attach it: docs/odk-cascade-media.md in the project.',
+                steps_label: 'Attach it to the form on both platforms',
+                steps: {
+                    download: 'Download the file above.',
+                    odk: 'ODK Central: open the form, go to Media, upload the file (it replaces the old one), then publish the form.',
+                    kobo: "KoboToolbox: open the form's Settings, go to Media, upload the same file, then redeploy the form.",
+                },
+            },
         },
         issues: {
             table: { source_unknown: 'Unknown source' },
@@ -226,6 +286,34 @@ describe('SourcePanel', () => {
     });
 
     it.each([
+        ['healthy', 'Healthy', 'The last pull succeeded 10 minutes ago.'],
+        ['stale', 'Behind', 'No successful pull for over 30 minutes.'],
+        ['failed', 'Failing', 'The last pull failed: see the last error below.'],
+        ['auth_failed', 'Credentials rejected', "KoboToolbox refused the portal's credentials: see the last error below."],
+        ['not_connected', 'Waiting for the first pull', 'No pull has finished yet.'],
+    ] as const)('says the source\'s state in words: %s', (state, label, body) => {
+        renderUi(panel(source({ status: { ...source().status, state } })), translations);
+
+        const region = screen.getByRole('region', { name: 'KoboToolbox' });
+        expect(region.textContent).toContain(label);
+        expect(region.textContent).toContain(body);
+    });
+
+    it('says what a refused token means, and that every pull will fail until it is fixed', () => {
+        renderUi(panel(source({ status: { key: 'kobo', name: 'KoboToolbox', state: 'auth_failed', ...sync, lastFailedAt: '2026-10-15T13:02:00Z', lastErrorClass: 'KoboAuthFailed', lastErrorHttpStatus: 401 } })), translations);
+
+        expect(screen.getByText('Last error').parentElement?.textContent).toContain(
+            'KoboToolbox returned HTTP 401 at 14:02 WAT — the API token was rejected. Every scheduled pull from KoboToolbox will fail the same way until the setting is fixed on the server. Last success: never.',
+        );
+    });
+
+    it('says a server error is temporary, and the next pull tries again', () => {
+        renderUi(panel(source({ status: { key: 'kobo', name: 'KoboToolbox', state: 'failed', ...sync, lastFailedAt: '2026-10-15T13:02:00Z', lastErrorClass: 'KoboUnexpectedResponse', lastErrorHttpStatus: 503 } })), translations);
+
+        expect(screen.getByText('Last error').parentElement?.textContent).toContain('KoboToolbox returned HTTP 503 at 14:02 WAT — its server had a problem. The next scheduled pull tries again.');
+    });
+
+    it.each([
         [{ lastErrorHttpStatus: 503, lastErrorClass: 'KoboUnexpectedResponse' }, 'KoboToolbox returned HTTP 503 at'],
         [{ lastErrorHttpStatus: null, lastErrorClass: 'KoboAuthFailed' }, "KoboToolbox refused the portal's credentials at"],
         [{ lastErrorHttpStatus: null, lastErrorClass: 'OdkUnreachable' }, 'KoboToolbox could not be reached at'],
@@ -234,7 +322,7 @@ describe('SourcePanel', () => {
         renderUi(panel(source({ status: { key: 'kobo', name: 'KoboToolbox', state: 'failed', ...sync, lastFailedAt: '2026-10-15T08:05:00Z', ...error } })), translations);
 
         expect(screen.getByText('Last error').parentElement?.textContent).toContain(text);
-        expect(screen.getByText('Last error').parentElement?.textContent).toContain('last success never');
+        expect(screen.getByText('Last error').parentElement?.textContent).toMatch(/last success:? never/i);
     });
 
     it('starts a pull on its own source and hands the run to the page', async () => {
@@ -389,6 +477,50 @@ describe('DeletionsPanel', () => {
         renderUi(<DeletionsPanel deletions={{ rows: [], total: 0 }} />, translations);
 
         expect(screen.getByText('No submission has been deleted at its source.')).not.toBeNull();
+    });
+});
+
+describe('BackfillPanel', () => {
+    it('shows each source\'s last backfill and checkpoint, and the newest report', async () => {
+        const run = { id: 4, outcome: 'succeeded', started_at: '2026-10-14T21:00:00Z', finished_at: '2026-10-14T23:00:00Z', fetched: 1500, accepted: 1400, flagged: 50, quarantined: 50, duplicates: 0 };
+        const { container } = renderUi(
+            <BackfillPanel
+                backfill={{
+                    sources: [
+                        { key: 'odk', name: 'ODK Central', run, checkpoint: { position: 1500, page: 3, page_size: 500 } },
+                        { key: 'kobo', name: 'KoboToolbox', run: null, checkpoint: { position: 0, page: 0, page_size: 1000 } },
+                    ],
+                    report: { file: 'backfill-report-20261015-090000.md', at: '2026-10-15T08:00:00Z', url: '/api/backfill-reports/backfill-report-20261015-090000.md?signature=x' },
+                }}
+            />,
+            translations,
+        );
+
+        const odk = screen.getByRole('group', { name: 'ODK Central' });
+        expect(odk.textContent).toContain('1,500 read');
+        expect(odk.textContent).toContain('page 3 at 500 a page');
+        expect(screen.getByRole('group', { name: 'KoboToolbox' }).textContent).toContain('No backfill has run.');
+        expect(screen.getByRole('link', { name: /Download the backfill report/ }).getAttribute('href')).toContain('signature=');
+        expect(await axeCheck(container)).toHaveNoViolations();
+    });
+});
+
+describe('CascadePanel', () => {
+    it('regenerates the file, then says how to attach the same file on both platforms and redeploy', async () => {
+        stubFetch(() => ({ body: { data: { filename: 'kaduna-facilities.zip', lgas: 23, wards: 255, facilities: 2176, url: '/api/facility-list/cascade/kaduna-facilities.zip?signature=x', expires_at: '2026-10-15T09:00:00Z' } } }));
+        const { container } = renderUi(<CascadePanel howUrl={null} />, translations);
+        const user = userEvent.setup();
+
+        await user.click(screen.getByRole('button', { name: 'Regenerate facility media file' }));
+
+        expect(await screen.findByRole('link', { name: 'Download kaduna-facilities.zip' })).not.toBeNull();
+        const steps = screen.getByRole('list', { name: 'Attach it to the form on both platforms' });
+        expect(within(steps).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+            'Download the file above.',
+            'ODK Central: open the form, go to Media, upload the file (it replaces the old one), then publish the form.',
+            "KoboToolbox: open the form's Settings, go to Media, upload the same file, then redeploy the form.",
+        ]);
+        expect(await axeCheck(container)).toHaveNoViolations();
     });
 });
 

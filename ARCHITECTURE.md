@@ -1173,6 +1173,23 @@ The admin tab shows a red badge with the open quarantine count.
   no dashboard filters on admin pages, the sync bar, ConfirmWithReasonDialog, ProgressPanel (2 s →
   10 s, stage changes announced only), `useApiAction` (CSRF, 422, 409) and AdminTable.
 
+**Built (Phase 5 step 1): the Data sources page completed.**
+- **State in words** heads each configured, switched-on source's panel: Healthy / Behind / Failing /
+  Credentials rejected / Waiting for the first pull (with not configured and switched off as
+  before). Reachability stays as its own line.
+- **The last error says what it means and what happens next.** With an HTTP status: 401 is "the API
+  token was rejected" (Kobo) or "the service account's email or password was rejected" (ODK), 403
+  no access to the form, 404 the form or project not found, 429 slow down, 5xx a server problem.
+  The schedule keeps trying every ten minutes, so a settings problem (401/403/404) says every
+  scheduled pull will fail until the setting is fixed; anything else says the next pull tries
+  again. (Pulls are not paused: the page says what actually happens.)
+- **Backfill per source** (`BackfillStatusQuery`): each configured source's last backfill run and
+  checkpoint (its own page size); one link to the newest report, which covers every source.
+- **Facility media file**: after a regeneration, the steps for both platforms (Media on the ODK
+  Central form, then publish; Media in the KoboToolbox form's settings, then redeploy).
+- **e2e**: `make e2e-sources` runs a second pass with the Kobo mock refusing the token
+  (`tests/e2e/support/kobo-mock-token.php`), checking the plain-language 401, keyboard reach and axe.
+
 - **Facility list** is still a placeholder (Phase 5). Until it is built, the facility media file
   panel ("Regenerate facility media file") is on the Data sources page. It says the one file is
   attached to the form on both platforms.

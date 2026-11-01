@@ -81,6 +81,12 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
         <Panel labelledBy={titleId}>
             <PanelHeader id={titleId} title={t('admin.sources.panel.title', name)} />
             <div className="flex flex-col gap-3 px-5 pb-5 text-sm">
+                {source.enabled && sync.state in STATES && (
+                    <div>
+                        <State mark={STATES[sync.state as RunState].mark} tone={STATES[sync.state as RunState].tone} label={t(`admin.sources.panel.state.${sync.state}`)} />
+                        <p className="mt-0.5">{stateBody(t, source.name, sync)}</p>
+                    </div>
+                )}
                 {!source.enabled ? (
                     <div>
                         <State mark="○" tone="text-ink-2" label={t('admin.sources.panel.disabled')} />
@@ -102,9 +108,9 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
                     <div className="notice notice-bad text-bad">
                         <p className="font-medium">{t('admin.sources.panel.last_error')}</p>
                         <p className="text-ink">
-                            {errorSentence(t, source.name, sync, formatTime(sync.lastFailedAt), sync.lastSuccessAt === null ? t('admin.sources.panel.never_inline') : formatTime(sync.lastSuccessAt))}
+                            {errorSentence(t, source, sync, formatTime(sync.lastFailedAt), sync.lastSuccessAt === null ? t('admin.sources.panel.never_inline') : formatTime(sync.lastSuccessAt))}
                         </p>
-                        {sync.lastError !== null && <p className="mt-0.5 text-xs break-words text-ink-2">{t('admin.sources.panel.error_detail', { error: sync.lastError })}</p>}
+                        {sync.lastError !== null && <p className="mt-0.5 text-xs break-words text-ink">{t('admin.sources.panel.error_detail', { error: sync.lastError })}</p>}
                     </div>
                 )}
 
@@ -190,17 +196,66 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
     );
 }
 
+type RunState = 'healthy' | 'stale' | 'failed' | 'auth_failed' | 'not_connected';
+
+// The headline state of a configured, switched-on source: a shape and a tone, always with words.
+const STATES: Record<RunState, { mark: string; tone: string }> = {
+    healthy: { mark: '●', tone: 'text-ok' },
+    stale: { mark: '▲', tone: 'text-warn' },
+    failed: { mark: '■', tone: 'text-bad' },
+    auth_failed: { mark: '■', tone: 'text-bad' },
+    not_connected: { mark: '○', tone: 'text-ink-2' },
+};
+
+function stateBody(t: Translate, source: string, sync: SyncStatus): string {
+    switch (sync.state) {
+        case 'healthy':
+            return sync.sinceSuccess === null
+                ? t('admin.sources.panel.state_body.not_connected')
+                : t('admin.sources.panel.state_body.healthy', { ago: t(`admin.sources.panel.ago.${sync.sinceSuccess.unit}`, { count: formatCount(sync.sinceSuccess.value) }) });
+        case 'stale':
+            return t('admin.sources.panel.state_body.stale', { minutes: formatCount(sync.staleAfterMinutes) });
+        default:
+            return t(`admin.sources.panel.state_body.${sync.state}`, { source });
+    }
+}
+
 /**
- * "KoboToolbox returned HTTP 503 at 14:02 WAT; last success 13:40 WAT", or the error class in
- * words: OdkAuthFailed and KoboAuthFailed are both "refused the portal's credentials".
+ * "KoboToolbox returned HTTP 401 at 14:02 WAT — the API token was rejected. Every scheduled pull
+ * from KoboToolbox will fail the same way until the setting is fixed on the server. Last success:
+ * never." What the status means for this kind of source, and what happens next: the schedule keeps
+ * trying, so a settings problem (401, 403, 404) fails every time, and anything else may pass next
+ * time. Without a status, the error class in words: OdkAuthFailed and KoboAuthFailed are both
+ * "refused the portal's credentials".
  */
-function errorSentence(t: Translate, source: string, sync: SyncStatus, time: string, success: string): string {
-    if (sync.lastErrorHttpStatus !== null) {
-        return t('admin.sources.panel.error_status', { source, status: sync.lastErrorHttpStatus, time, success });
+function errorSentence(t: Translate, source: SourceEntry, sync: SyncStatus, time: string, success: string): string {
+    const status = sync.lastErrorHttpStatus;
+    if (status !== null) {
+        const meaning =
+            status === 401
+                ? source.type === 'kobo'
+                    ? 'unauthorized_kobo'
+                    : 'unauthorized_odk'
+                : status === 403
+                  ? 'forbidden'
+                  : status === 404
+                    ? 'not_found'
+                    : status === 429
+                      ? 'too_many'
+                      : status >= 500
+                        ? 'server'
+                        : 'other';
+        const settings = status === 401 || status === 403 || status === 404;
+
+        return [
+            t('admin.sources.panel.error_status', { source: source.name, status, time, meaning: t(`admin.sources.panel.meaning.${meaning}`) }),
+            t(`admin.sources.panel.consequence.${settings ? 'settings' : 'retry'}`, { source: source.name }),
+            t('admin.sources.panel.last_success_sentence', { success }),
+        ].join(' ');
     }
     const kind = errorKind(sync.lastErrorClass);
 
-    return t('admin.sources.panel.error_class', { what: t(`admin.sources.panel.errors.${kind}`, { source }), time, success });
+    return t('admin.sources.panel.error_class', { what: t(`admin.sources.panel.errors.${kind}`, { source: source.name }), time, success });
 }
 
 function errorKind(errorClass: string | null): 'auth' | 'unreachable' | 'unexpected' | 'QueryException' | 'other' {

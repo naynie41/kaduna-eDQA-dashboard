@@ -111,38 +111,48 @@ test.describe('Data sources page, against both mocks', () => {
     });
 
     test('the visit recorded on both tools is in Data issues, showing both sources', async ({ page }) => {
-        await page.goto('/admin/data-issues?rule=DUPLICATE_ASSESSMENT');
-        await expect(page.getByRole('heading', { level: 1, name: 'Data issues' })).toBeVisible({ timeout: 60_000 });
-
+        test.setTimeout(360_000);
         const sides = page.locator('dl[aria-label="Both sides of the duplicate"]');
         const both = sides.filter({ hasText: 'ODK Central' }).filter({ hasText: 'KoboToolbox' }).first();
-        await expect(both).toBeVisible();
+        // The phone project runs beside the desktop one, whose Pull all brings the duplicate in:
+        // look again (a fresh page each time) until it has, rather than fail on the first look.
+        await expect(async () => {
+            await page.goto('/admin/data-issues?rule=DUPLICATE_ASSESSMENT');
+            await expect(page.getByRole('heading', { level: 1, name: 'Data issues' })).toBeVisible({ timeout: 60_000 });
+            await expect(both).toBeVisible({ timeout: 5_000 });
+        }).toPass({ timeout: 300_000, intervals: [5_000, 10_000] });
         await expect(both).toContainText('Already accepted');
         await expect(both).toContainText('This submission');
     });
 
     test('the dashboard shows assessments from both sources (Monitor, by source)', async ({ page }) => {
         // The visits are in the round the mocks were seeded for: E2E_ROUND (year and quarter, "2026Q3"), else the latest.
+        test.setTimeout(360_000);
         const [year, quarter] = (process.env.E2E_ROUND ?? '').split('Q');
-        await page.goto(year && quarter ? `/dashboard/monitor?year=${year}&quarter=${quarter}` : '/dashboard/monitor');
         const panel = page.getByRole('region', { name: 'Assessments by source' });
-        await expect(panel).toBeVisible({ timeout: 60_000 });
-
-        for (const name of ['ODK Central', 'KoboToolbox']) {
-            const row = panel.getByRole('row').filter({ has: page.getByRole('rowheader', { name, exact: true }) });
-            await expect(row).toHaveCount(1);
-            await expect(row.getByRole('cell')).not.toHaveText('0');
-        }
+        // As above: the desktop project's Pull all may still be bringing the assessments in.
+        await expect(async () => {
+            await page.goto(year && quarter ? `/dashboard/monitor?year=${year}&quarter=${quarter}` : '/dashboard/monitor');
+            await expect(panel).toBeVisible({ timeout: 60_000 });
+            for (const name of ['ODK Central', 'KoboToolbox']) {
+                const row = panel.getByRole('row').filter({ has: page.getByRole('rowheader', { name, exact: true }) });
+                await expect(row).toHaveCount(1, { timeout: 5_000 });
+                await expect(row.getByRole('cell')).not.toHaveText('0', { timeout: 5_000 });
+            }
+        }).toPass({ timeout: 300_000, intervals: [5_000, 10_000] });
     });
 
     test('GET /api/quarantine holds the visit recorded on both tools, its detail naming both sources', async ({ page }) => {
+        test.setTimeout(360_000);
         await page.goto('/admin/sources'); // the signed-in session, for the API request
-        const response = await page.request.get('/api/quarantine?rule=DUPLICATE_ASSESSMENT&status=open', { headers: { Accept: 'application/json' } });
-        expect(response.status()).toBe(200);
-
-        const body = (await response.json()) as { data: { failures: { code: string; detail: string }[] }[] };
-        const details = body.data.flatMap((record) => record.failures.filter((failure) => failure.code === 'DUPLICATE_ASSESSMENT').map((failure) => failure.detail));
-        expect(details.some((detail) => detail.includes('ODK Central') && detail.includes('KoboToolbox'))).toBe(true);
+        // As above: wait for the desktop project's Pull all rather than fail on the first look.
+        await expect(async () => {
+            const response = await page.request.get('/api/quarantine?rule=DUPLICATE_ASSESSMENT&status=open', { headers: { Accept: 'application/json' } });
+            expect(response.status()).toBe(200);
+            const body = (await response.json()) as { data: { failures: { code: string; detail: string }[] }[] };
+            const details = body.data.flatMap((record) => record.failures.filter((failure) => failure.code === 'DUPLICATE_ASSESSMENT').map((failure) => failure.detail));
+            expect(details.some((detail) => detail.includes('ODK Central') && detail.includes('KoboToolbox'))).toBe(true);
+        }).toPass({ timeout: 300_000, intervals: [5_000, 10_000] });
     });
 
     test('no serious or critical axe violations, with both sources pulled', async ({ page }) => {
@@ -154,6 +164,39 @@ test.describe('Data sources page, against both mocks', () => {
     test('no serious or critical axe violations on Data issues, the duplicate shown', async ({ page }) => {
         await page.goto('/admin/data-issues?rule=DUPLICATE_ASSESSMENT');
         await expect(page.getByRole('heading', { level: 1, name: 'Data issues' })).toBeVisible({ timeout: 60_000 });
+        await checkA11y(page);
+    });
+});
+
+// `make e2e-sources`, second pass: the Kobo mock's token is changed so the portal's is refused
+// (HTTP 401), one Kobo pull fails on it, and the page is read with E2E_KOBO_AUTH_FAILED=1. The
+// target puts the token back afterwards.
+test.describe('Data sources page, KoboToolbox refusing the token', () => {
+    test.skip(process.env.E2E_KOBO_AUTH_FAILED !== '1', 'Run with make e2e-sources');
+
+    test('says the token was rejected, in words, and what that means for the next pulls', async ({ page }) => {
+        await page.goto('/admin/sources');
+        await ready(page);
+
+        const kobo = page.getByRole('region', { name: 'KoboToolbox', exact: true });
+        await expect(kobo).toContainText('Credentials rejected');
+        await expect(kobo).toContainText(/KoboToolbox returned HTTP 401 at \d{2}:\d{2} WAT — the API token was rejected\./);
+        await expect(kobo).toContainText('Every scheduled pull from KoboToolbox will fail the same way until the setting is fixed on the server.');
+        // ODK Central is unaffected: one source's failure never hides the other's state.
+        await expect(page.getByRole('region', { name: 'ODK Central', exact: true })).not.toContainText('Credentials rejected');
+        // The token's value is never on the page.
+        expect(await page.content()).not.toContain('mock-kobo-token');
+    });
+
+    test('reaches Kobo\'s Pull now by keyboard alone', async ({ page }) => {
+        await page.goto('/admin/sources');
+        await ready(page);
+        await tabTo(page, page.getByRole('button', { name: 'Pull now KoboToolbox' }));
+    });
+
+    test('no serious or critical axe violations, with the error shown', async ({ page }) => {
+        await page.goto('/admin/sources');
+        await ready(page);
         await checkA11y(page);
     });
 });

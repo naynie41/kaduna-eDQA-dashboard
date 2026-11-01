@@ -80,7 +80,39 @@ return [
             'reconciled_never' => 'Not yet.',
             'not_yet' => 'none yet',
             'last_error' => 'Last error',
-            'error_status' => ':source returned HTTP :status at :time; last success :success.',
+            // "KoboToolbox returned HTTP 401 at 14:02 WAT — the API token was rejected. Every scheduled
+            // pull … will fail … Last success: never." What the status means, and what happens next.
+            'error_status' => ':source returned HTTP :status at :time — :meaning',
+            'meaning' => [
+                'unauthorized_kobo' => 'the API token was rejected.',
+                'unauthorized_odk' => 'the service account\'s email or password was rejected.',
+                'forbidden' => 'the account has no access to the form.',
+                'not_found' => 'the form or project named in the settings was not found.',
+                'too_many' => 'it asked the portal to slow down.',
+                'server' => 'its server had a problem.',
+                'other' => 'the answer was not what the portal expected.',
+            ],
+            // The schedule keeps trying every ten minutes: a settings problem fails every time.
+            'consequence' => [
+                'settings' => 'Every scheduled pull from :source will fail the same way until the setting is fixed on the server.',
+                'retry' => 'The next scheduled pull tries again.',
+            ],
+            'last_success_sentence' => 'Last success: :success.',
+            // The source's state, the panel's headline (the status bar's words).
+            'state' => [
+                'healthy' => 'Healthy',
+                'stale' => 'Behind',
+                'failed' => 'Failing',
+                'auth_failed' => 'Credentials rejected',
+                'not_connected' => 'Waiting for the first pull',
+            ],
+            'state_body' => [
+                'healthy' => 'The last pull succeeded :ago.',
+                'stale' => 'No successful pull for over :minutes minutes.',
+                'failed' => 'The last pull failed: see the last error below.',
+                'auth_failed' => ':source refused the portal\'s credentials: see the last error below.',
+                'not_connected' => 'No pull has finished yet.',
+            ],
             'error_class' => ':what at :time; last success :success.',
             'errors' => [
                 'auth' => ':source refused the portal\'s credentials',
@@ -208,7 +240,7 @@ return [
                 'failed' => 'stopped with an error',
                 'skipped_not_configured' => 'skipped, as the source was not configured',
             ],
-            'checkpoint' => 'ODK Central checkpoint',
+            'checkpoint' => 'Checkpoint',
             'checkpoint_value' => ':position submissions read, page :page at :size a page (edqa:backfill resumes here).',
             'report' => 'Latest backfill report',
             'report_link' => 'Download the backfill report of :time',
@@ -224,6 +256,13 @@ return [
             'expiry' => 'The link works for 30 minutes.',
             'how' => 'How to attach it to the form on ODK Central and KoboToolbox',
             'how_file' => 'How to attach it: docs/odk-cascade-media.md in the project.',
+            // After a regeneration: the same file on both platforms, then the form redeployed.
+            'steps_label' => 'Attach it to the form on both platforms',
+            'steps' => [
+                'download' => 'Download the file above.',
+                'odk' => 'ODK Central: open the form, go to Media, upload the file (it replaces the old one), then publish the form.',
+                'kobo' => 'KoboToolbox: open the form\'s Settings, go to Media, upload the same file, then redeploy the form.',
+            ],
         ],
     ],
     // The Data issues page (D-57).

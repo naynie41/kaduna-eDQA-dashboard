@@ -90,8 +90,14 @@ export type Paginated<T> = {
 };
 
 export type BackfillStatus = {
-    run: (PullCounters & { id: number; outcome: string | null; started_at: string; finished_at: string | null }) | null;
-    checkpoint: { position: number; page: number; page_size: number };
+    /** Each configured source's last backfill and checkpoint, in config order. */
+    sources: {
+        key: string;
+        name: string;
+        run: { id: number; outcome: string | null; started_at: string; finished_at: string | null; fetched: number; accepted: number; flagged: number; quarantined: number; duplicates: number } | null;
+        checkpoint: { position: number; page: number; page_size: number };
+    }[];
+    /** The newest backfill report: one file covers every source. */
     report: { file: string; at: string; url: string } | null;
 };
 
