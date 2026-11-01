@@ -8,6 +8,7 @@ use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Ingestion\SourceLinks;
 use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Validation\Models\QuarantinedRecord;
+use App\Models\User;
 
 /**
  * The Data sources page's "Deletions at source" (ARCHITECTURE.md §5.3, §9.3, D-62): submissions a
@@ -26,7 +27,7 @@ final class DeletionsAtSourceQuery
     ) {}
 
     /**
-     * @return array{rows: list<array{submission_id: int, source: ?array{key: string, name: string}, instance_id: string, deleted_at: string, facility: ?array{id: int, code: string, name: string}, round: ?array{id: int, year: int, quarter: int}, assessment: ?array{id: int, status: string}, quarantined_record_id: ?int, source_url: ?string}>, total: int}
+     * @return array{rows: list<array{submission_id: int, source: ?array{key: string, name: string}, instance_id: string, deleted_at: string, facility: ?array{id: int, code: string, name: string}, round: ?array{id: int, year: int, quarter: int}, assessment: ?array{id: int, status: string}, quarantined_record_id: ?int, source_url: ?string, reviewed: ?array{at: string, by: ?string}}>, total: int}
      */
     public function list(): array
     {
@@ -42,9 +43,11 @@ final class DeletionsAtSourceQuery
             ])
             ->orderByDesc('deleted_at_source')->orderByDesc('id')
             ->limit(self::LIMIT)
-            ->get(['id', 'source_id', 'external_id', 'instance_id', 'deleted_at_source']);
+            ->get(['id', 'source_id', 'external_id', 'instance_id', 'deleted_at_source', 'deletion_reviewed_at', 'deletion_reviewed_by']);
+        // Who reviewed each one, in one query for the whole list.
+        $reviewers = User::query()->whereIn('id', $submissions->pluck('deletion_reviewed_by')->filter()->unique()->all())->pluck('name', 'id');
 
-        $rows = $submissions->map(function (Submission $submission): array {
+        $rows = $submissions->map(function (Submission $submission) use ($reviewers): array {
             $key = $this->sources->keyOf($submission->source_id);
             $assessment = $submission->assessment;
             /** @var QuarantinedRecord|null $record */
@@ -61,6 +64,10 @@ final class DeletionsAtSourceQuery
                 'assessment' => $assessment === null ? null : ['id' => $assessment->id, 'status' => $assessment->status],
                 'quarantined_record_id' => $record?->id,
                 'source_url' => $key === null ? null : $this->links->submission($key, is_string($submission->external_id) ? $submission->external_id : null),
+                'reviewed' => $submission->deletion_reviewed_at === null ? null : [
+                    'at' => $submission->deletion_reviewed_at->toIso8601String(),
+                    'by' => $submission->deletion_reviewed_by === null ? null : (string) ($reviewers[$submission->deletion_reviewed_by] ?? ''),
+                ],
             ];
         });
 

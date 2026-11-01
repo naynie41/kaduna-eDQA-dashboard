@@ -23,6 +23,9 @@ const translations = {
         ...(testTranslations.common as Record<string, unknown>),
         api: { error: 'Something went wrong.', conflict: 'Refused.', invalid: 'Check the fields.', forbidden: 'Not allowed.', too_many: 'Too many requests.' },
         progress: { stage: ':label: :stage', failed: 'Could not get the progress.' },
+        reason: { label: 'Reason', hint: 'At least :min characters.', remaining: ':count more characters needed.' },
+        ui: { ...((testTranslations.common as Record<string, Record<string, string>>).ui ?? {}), cancel: 'Cancel', working: 'Working…' },
+        sources: { unknown: 'Unknown source' },
     },
     enums: { pull_trigger: { scheduled: 'Scheduled', manual: 'Pull now', webhook: 'Webhook', backfill: 'Backfill', reconcile: 'Reconcile' }, submission_status: { accepted: 'Accepted', flagged: 'Flagged' } },
     admin: {
@@ -133,6 +136,14 @@ const translations = {
                 open_in_source: 'Check in :source',
                 new_tab: '(opens in a new tab)',
                 more: 'Showing the newest :shown of :total.',
+                review: 'Review',
+                reviewed: 'Reviewed by :name, :time',
+                mark: 'Mark reviewed',
+                mark_named: 'Mark :instance reviewed',
+                dialog_title: 'Mark this deletion reviewed?',
+                dialog_consequence: ':instance is no longer at :source. Marking it reviewed records that you have looked into it. Nothing is removed from the portal, and it stops counting as an open issue.',
+                dialog_confirm: 'Mark reviewed',
+                saved: 'Deletion marked reviewed.',
             },
         },
         issues: {
@@ -334,6 +345,7 @@ describe('DeletionsPanel', () => {
         assessment: { id: 77, status: 'accepted' },
         quarantined_record_id: null,
         source_url: 'https://kf.example.org/api/v2/assets/aX/data/12/',
+        reviewed: null,
         ...overrides,
     });
 
@@ -347,6 +359,30 @@ describe('DeletionsPanel', () => {
         expect(screen.getAllByRole('link', { name: /^Check in/ })).toHaveLength(1);
         expect(screen.getByText('Showing the newest 2 of 3.')).not.toBeNull();
         expect(await axeCheck(container)).toHaveNoViolations();
+    });
+
+    it('marks a deletion reviewed with a reason, and says who reviewed one already', async () => {
+        const fetch = stubFetch(() => ({ body: { data: { submission_id: 9, reviewed_at: '2026-10-20T09:00:00Z' } } }));
+        const onReviewed = vi.fn();
+        const rows = [deletion({}), deletion({ submission_id: 10, instance_id: 'uuid:del-2', reviewed: { at: '2026-10-20T09:00:00Z', by: 'Amina Bello' } })];
+        const { container } = renderUi(<DeletionsPanel deletions={{ rows, total: 2 }} onReviewed={onReviewed} />, translations);
+        const user = userEvent.setup();
+
+        expect(screen.getByText('Reviewed by Amina Bello, 20 Oct 2026, 10:00 WAT')).not.toBeNull();
+        expect(screen.queryByRole('button', { name: 'Mark uuid:del-2 reviewed' })).toBeNull();
+        expect(await axeCheck(container)).toHaveNoViolations();
+
+        await user.click(screen.getByRole('button', { name: 'Mark uuid:del-1 reviewed' }));
+        const dialog = screen.getByRole('dialog', { name: 'Mark this deletion reviewed?' });
+        expect(dialog.textContent).toContain('uuid:del-1 is no longer at KoboToolbox.');
+        await user.type(within(dialog).getByLabelText('Reason'), 'Confirmed with the LGA M&E officer');
+        await user.click(within(dialog).getByRole('button', { name: 'Mark reviewed' }));
+
+        await waitFor(() => expect(onReviewed).toHaveBeenCalled());
+        const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+        expect(url).toBe('/api/submissions/9/deletion-review');
+        expect(JSON.parse(String(init.body))).toEqual({ reason: 'Confirmed with the LGA M&E officer' });
+        expect(screen.queryByRole('dialog')).toBeNull();
     });
 
     it('says so when nothing was deleted at source', () => {

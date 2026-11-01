@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Domain\Ingestion\Events\DeletionReviewed;
+use App\Domain\Ingestion\Events\SourceDeletionDetected;
+use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Validation\Enums\QuarantineResolution;
 use App\Domain\Validation\Events\QuarantineResolved;
 use App\Domain\Validation\Events\SubmissionQuarantined;
@@ -31,6 +34,13 @@ const ADMIN_PAGES = [
 function configureOdk(): void
 {
     config(['edqa.sources.odk' => [...config('edqa.sources.odk'), 'url' => 'https://central.example.org', 'email' => 'svc@example.org', 'password' => 'x', 'project_id' => '7', 'form_id' => 'dqa']]);
+    Rows::sourceId('odk');
+}
+
+function shellConfigureKobo(): void
+{
+    config(['edqa.sources.kobo' => [...config('edqa.sources.kobo'), 'url' => 'https://kf.example.org', 'token' => 'kobo-token-for-tests', 'asset_uid' => 'aKdDqa2026']]);
+    Rows::sourceId('kobo');
 }
 
 it('redirects /admin to the Data sources page', function (): void {
@@ -42,7 +52,7 @@ it('serves each admin page with the admin props and strings, and no dashboard fi
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component($component)
-            ->where('admin.openQuarantineCount', 0)
+            ->where('admin.openIssueCount', 0)
             ->where('admin.staleIngestion.stale', false)
             ->has('translations.admin.tabs')
             ->missing('filters')
@@ -65,21 +75,43 @@ it('shows the open quarantine count, cached, and forgets it when a record is qua
     Rows::quarantined();
     Rows::quarantined(['status' => 'resolved', 'resolution' => 'rejected', 'resolved_at' => now()]);
 
-    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 2)->where('shell.quarantined', 2));
-    expect(Cache::get(QuarantineQuery::OPEN_COUNT_KEY))->toBe(2);
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openIssueCount', 2)->where('shell.quarantined', 2));
+    expect(Cache::get(QuarantineQuery::OPEN_ISSUES_KEY))->toBe(2);
 
     // A row written another way is not seen until the cache is forgotten (or lapses after 60 s)…
     $third = Rows::quarantined();
-    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 2));
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openIssueCount', 2));
 
     // …which a quarantine does,
     SubmissionQuarantined::dispatch($third, 1);
-    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 3));
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openIssueCount', 3));
 
     // and a resolution.
     DB::table('quarantined_records')->where('id', $third)->update(['status' => 'resolved']);
     QuarantineResolved::dispatch($third, null, QuarantineResolution::Rejected);
-    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openQuarantineCount', 2));
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openIssueCount', 2));
+});
+
+it('counts unreviewed deletions at source as open issues, and forgets the count when one is found or reviewed', function (): void {
+    Rows::quarantined();
+    Rows::submission(['deleted_at_source' => now()->subDay()]);
+    Rows::submission(['deleted_at_source' => now()->subDay(), 'deletion_reviewed_at' => now(), 'deletion_reviewed_by' => $this->admin->id]);
+    Rows::submission(); // still at its source
+
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page
+        ->where('admin.openIssueCount', 2) // 1 open record + 1 unreviewed deletion
+        ->where('shell.quarantined', 1));
+
+    // A reconcile finds another deletion…
+    $found = Rows::submission(['deleted_at_source' => now()]);
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openIssueCount', 2)); // cached
+    SourceDeletionDetected::dispatch($found, 'odk', 'uuid:found');
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openIssueCount', 3));
+
+    // …and an administrator reviews it.
+    DB::table('submissions')->where('id', $found)->update(['deletion_reviewed_at' => now(), 'deletion_reviewed_by' => $this->admin->id]);
+    DeletionReviewed::dispatch($found, 'odk');
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.openIssueCount', 2));
 });
 
 it('lapses the cached count after a minute anyway', function (): void {
@@ -123,7 +155,23 @@ it('says which round is open and when the last success was', function (): void {
     $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page
         ->where('admin.staleIngestion.round', ['year' => 2026, 'quarter' => 4])
         ->where('admin.staleIngestion.hours', 24)
-        ->where('admin.staleIngestion.lastSuccessAt', now()->subDays(2)->startOfSecond()->toIso8601String()));
+        ->where('admin.staleIngestion.sources', [['key' => 'odk', 'name' => config('edqa.sources.odk.name'), 'lastSuccessAt' => now()->subDays(2)->startOfSecond()->toIso8601String()]]));
+});
+
+it('names only the enabled sources that are behind: one healthy source does not hide another', function (): void {
+    configureOdk();
+    shellConfigureKobo();
+    Rows::round(['year' => 2026, 'quarter' => 4, 'window_start' => '2026-10-01', 'window_end' => '2026-12-31']);
+    Rows::pullRun(['source_id' => Rows::sourceId('odk'), 'outcome' => 'succeeded', 'started_at' => now()->subHour(), 'finished_at' => now()->subHour()]);
+
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page
+        ->where('admin.staleIngestion.stale', true)
+        ->where('admin.staleIngestion.sources', [['key' => 'kobo', 'name' => config('edqa.sources.kobo.name'), 'lastSuccessAt' => null]]));
+
+    // Switched off, it is not expected to pull: no banner.
+    DB::table('submission_sources')->where('key', 'kobo')->update(['is_enabled' => false]);
+    app(SourceRegistry::class)->flush();
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.staleIngestion.stale', false)->where('admin.staleIngestion.sources', []));
 });
 
 it('leaves the banner to the status bar while ODK is not configured', function (): void {

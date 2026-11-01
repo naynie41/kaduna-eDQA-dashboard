@@ -7,6 +7,7 @@ import CorrectIssueForm from '@/components/CorrectIssueForm';
 import DataIssueDrawer from '@/components/DataIssueDrawer';
 import DuplicateSides from '@/components/DuplicateSides';
 import Panel from '@/components/Panel';
+import SourceTag from '@/components/SourceTag';
 import PanelHeader from '@/components/PanelHeader';
 import RuleSummary from '@/components/RuleSummary';
 import SegmentedControl from '@/components/SegmentedControl';
@@ -326,7 +327,9 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                             {t('admin.issues.table.copy_short')}
                                         </button>
                                     </th>
-                                    <td className="px-3 py-2 whitespace-nowrap">{row.source?.name ?? t('admin.issues.table.source_unknown')}</td>
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                    <SourceTag source={row.source ?? null} />
+                                </td>
                                     <td className="px-3 py-2">
                                         <ul className="flex flex-wrap gap-1">
                                             {row.failures.map((failure, i) => (
@@ -416,7 +419,9 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                 </th>
                                 <td className="px-3 py-2">{row.lga?.name ?? '–'}</td>
                                 <td className="px-3 py-2 whitespace-nowrap">{roundLabel(row.round)}</td>
-                                <td className="px-3 py-2 whitespace-nowrap">{row.source?.name ?? t('admin.issues.table.source_unknown')}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                    <SourceTag source={row.source ?? null} />
+                                </td>
                                 <td className="px-3 py-2">{row.assessor}</td>
                                 <td className="px-3 py-2 whitespace-nowrap">{months.length === 12 ? formatDate(row.started_at, months) : row.started_at}</td>
                                 <td className="px-3 py-2">

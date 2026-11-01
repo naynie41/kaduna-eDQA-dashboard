@@ -52,9 +52,31 @@ final class QuarantineQuery
         return (int) Cache::remember(self::OPEN_COUNT_KEY, 60, fn (): int => $this->openCount());
     }
 
+    /** The cache key of openIssueCountCached(). */
+    public const OPEN_ISSUES_KEY = 'edqa:admin:open-issues';
+
+    /**
+     * What waits for an administrator (the Data issues badge, Phase 5): open quarantine records
+     * plus deletions at source not yet reviewed (D-62). An operational count, never a score.
+     */
+    public function openIssueCount(): int
+    {
+        return $this->openCount() + DB::table('submissions')->whereNotNull('deleted_at_source')->whereNull('deletion_reviewed_at')->count();
+    }
+
+    /**
+     * Cached like openCountCached(): forgotten on SubmissionQuarantined, QuarantineResolved,
+     * SourceDeletionDetected and DeletionReviewed, and lapsing after 60 s in any case.
+     */
+    public function openIssueCountCached(): int
+    {
+        return (int) Cache::remember(self::OPEN_ISSUES_KEY, 60, fn (): int => $this->openIssueCount());
+    }
+
     public static function forgetOpenCount(): void
     {
         Cache::forget(self::OPEN_COUNT_KEY);
+        Cache::forget(self::OPEN_ISSUES_KEY);
     }
 
     /**

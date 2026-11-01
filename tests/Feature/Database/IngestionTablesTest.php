@@ -179,3 +179,13 @@ it('maps a source\'s facility reference to one facility, once per source (D-72)'
     expectUniqueViolation(fn () => DB::table('facility_source_refs')->insert([...$row, 'facility_id' => Rows::facility()]), 'facility_source_refs_source_id_ref_unique');
     expectCheckViolation(fn () => DB::table('facility_source_refs')->insert([...$row, 'ref' => '  ']), 'facility_source_refs_ref_not_blank');
 });
+
+it('records a deletion at source as reviewed only once it is deleted there, with who and when', function (): void {
+    $admin = Rows::user();
+    $reviewed = Rows::submission(['deleted_at_source' => now()->subDay(), 'deletion_reviewed_at' => now(), 'deletion_reviewed_by' => $admin]);
+    expect(DB::table('submissions')->where('id', $reviewed)->value('deletion_reviewed_by'))->toBe($admin);
+
+    expectCheckViolation(fn () => Rows::submission(['deletion_reviewed_at' => now(), 'deletion_reviewed_by' => $admin]), 'submissions_deletion_review_valid');
+    expectCheckViolation(fn () => Rows::submission(['deleted_at_source' => now(), 'deletion_reviewed_at' => now()]), 'submissions_deletion_review_valid');
+    expectCheckViolation(fn () => Rows::submission(['deleted_at_source' => now(), 'deletion_reviewed_by' => $admin]), 'submissions_deletion_review_valid');
+});

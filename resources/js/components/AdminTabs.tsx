@@ -6,7 +6,8 @@ import { ADMIN_PAGES, type AdminPage } from '@/lib/pageMeta';
 export type AdminTabsProps = {
     current: AdminPage | null;
     /** Open quarantine records, from the server: the Data issues badge. */
-    openQuarantineCount: number;
+    /** Open quarantine records plus unreviewed deletions at source. */
+    openIssueCount: number;
 };
 
 /**
@@ -14,7 +15,7 @@ export type AdminTabsProps = {
  * count as a badge, in the alert style while there are any, and its accessible name says it in
  * words: "Data issues, 12 open".
  */
-export default function AdminTabs({ current, openQuarantineCount }: AdminTabsProps) {
+export default function AdminTabs({ current, openIssueCount }: AdminTabsProps) {
     const t = useTranslate();
 
     return (
@@ -25,13 +26,13 @@ export default function AdminTabs({ current, openQuarantineCount }: AdminTabsPro
                 if (page !== 'data-issues') {
                     return { href: `/admin/${page}`, label, current: page === current };
                 }
-                const count = formatCount(openQuarantineCount);
+                const count = formatCount(openIssueCount);
 
                 return {
                     href: `/admin/${page}`,
                     label,
                     current: page === current,
-                    badge: { text: count, tone: openQuarantineCount > 0 ? ('alert' as const) : ('default' as const) },
+                    badge: { text: count, tone: openIssueCount > 0 ? ('alert' as const) : ('default' as const) },
                     accessibleName: t('admin.tabs.data_issues_open', { label, count }),
                 };
             })}

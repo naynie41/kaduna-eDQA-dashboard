@@ -35,6 +35,8 @@ export type DeletionRow = {
     assessment: { id: number; status: string } | null;
     quarantined_record_id: number | null;
     source_url: string | null;
+    /** Marked reviewed by an administrator (D-62): who and when; null while it waits. */
+    reviewed: { at: string; by: string | null } | null;
 };
 
 export type PullCounters = {

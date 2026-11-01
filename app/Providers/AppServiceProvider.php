@@ -8,6 +8,8 @@ use App\Domain\Assessment\Events\AssessmentCorrected;
 use App\Domain\Assessment\Events\AssessmentScored;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Ingestion\Contracts\SubmissionSource;
+use App\Domain\Ingestion\Events\DeletionReviewed;
+use App\Domain\Ingestion\Events\SourceDeletionDetected;
 use App\Domain\Ingestion\Kobo\KoboConfig;
 use App\Domain\Ingestion\Odk\OdkConfig;
 use App\Domain\Ingestion\Odk\SessionTokenCache;
@@ -68,7 +70,8 @@ final class AppServiceProvider extends ServiceProvider
 
         // Domain listeners live outside app/Listeners, so they are registered here.
         Event::listen(QuarantineResolved::class, RescoreAfterQuarantineResolved::class);
-        Event::listen([SubmissionQuarantined::class, QuarantineResolved::class], FlushOpenQuarantineCount::class);
+        // The Data issues badge: open records and unreviewed deletions at source (Phase 5).
+        Event::listen([SubmissionQuarantined::class, QuarantineResolved::class, SourceDeletionDetected::class, DeletionReviewed::class], FlushOpenQuarantineCount::class);
         Event::listen(RuleVersionPublished::class, RescoreOpenRoundsAfterPublish::class);
         Event::listen(AssessmentCorrected::class, RescoreAfterAssessmentCorrected::class);
 

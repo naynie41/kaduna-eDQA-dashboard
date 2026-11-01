@@ -79,4 +79,12 @@ return [
         'checked' => 'The file is good: :count reference(s) for :source. Nothing was loaded (--dry-run).',
         'loaded' => ':count references loaded for :source; the ones it had before were replaced.',
     ],
+
+    // Reviewing a deletion at source (D-62).
+    'deletion_review' => [
+        'errors' => [
+            'not_deleted' => 'This submission is still at its source: there is no deletion to review.',
+            'already_reviewed' => 'This deletion has already been reviewed.',
+        ],
+    ],
 ];

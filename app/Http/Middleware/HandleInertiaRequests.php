@@ -56,10 +56,11 @@ final class HandleInertiaRequests extends Middleware
                 'sources' => app(SourceStatusAggregator::class)->all(),
                 'quarantined' => app(QuarantineQuery::class)->openCountCached(),
             ],
-            // The admin pages' tab badge and stale-ingestion banner (ARCHITECTURE.md §9.3, D-55).
+            // The admin pages' Data issues badge (open records + unreviewed deletions) and the
+            // stale-ingestion banner, per source (ARCHITECTURE.md §9.3, D-55, SECURITY.md §12).
             'admin' => fn (): ?array => $user === null || ! $request->routeIs('admin.*') ? null : [
-                'openQuarantineCount' => app(QuarantineQuery::class)->openCountCached(),
-                'staleIngestion' => app(ShellStatusAggregator::class)->staleIngestion(),
+                'openIssueCount' => app(QuarantineQuery::class)->openIssueCountCached(),
+                'staleIngestion' => app(SourceStatusAggregator::class)->staleIngestion(),
             ],
             // UI strings, read in React with t() (CONVENTION.md §7, CLAUDE.md hard rule 10).
             'translations' => fn (): array => collect([...self::TRANSLATION_GROUPS, ...$this->pageGroups($request)])

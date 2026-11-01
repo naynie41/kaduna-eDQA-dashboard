@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminTabs from '@/components/AdminTabs';
 import ConfirmWithReasonDialog, { type ConfirmOutcome } from '@/components/ConfirmWithReasonDialog';
 import ProgressPanel, { type ProgressStage } from '@/components/ProgressPanel';
+import SourceTag from '@/components/SourceTag';
 import StaleIngestionBanner from '@/components/StaleIngestionBanner';
 import { axeCheck, renderUi, testTranslations } from '@/test/render';
 
@@ -288,8 +289,9 @@ const shellTranslations = {
         },
         stale: {
             title: 'No successful pull for over :hours hours',
-            body: 'Round Q:quarter :year is open, and the last successful pull was at :time.',
-            body_never: 'Round Q:quarter :year is open, and no pull has succeeded yet.',
+            lead: 'Round Q:quarter :year is open, and new submissions from these sources are not reaching the dashboard:',
+            source: ':source: last successful pull at :time.',
+            source_never: ':source: no pull has succeeded yet.',
             link: 'Go to the Data sources page',
         },
     },
@@ -297,7 +299,7 @@ const shellTranslations = {
 
 describe('AdminTabs', () => {
     it('lists the five pages, the current one marked, and says the open count in the Data issues name', async () => {
-        const { container } = renderUi(<AdminTabs current="rounds" openQuarantineCount={12} />, shellTranslations);
+        const { container } = renderUi(<AdminTabs current="rounds" openIssueCount={12} />, shellTranslations);
 
         const nav = screen.getByRole('navigation', { name: 'Administration pages' });
         expect(within(nav).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
@@ -310,17 +312,58 @@ describe('AdminTabs', () => {
 });
 
 describe('StaleIngestionBanner', () => {
-    it('says which round is open and that no pull has succeeded, and links to the Data sources page', () => {
-        renderUi(<StaleIngestionBanner stale={{ stale: true, hours: 24, lastSuccessAt: null, round: { year: 2026, quarter: 4 } }} />, shellTranslations);
+    it('says which round is open, names each source that is behind with its last success, and links to the Data sources page', async () => {
+        const { container } = renderUi(
+            <StaleIngestionBanner
+                stale={{
+                    stale: true,
+                    hours: 24,
+                    round: { year: 2026, quarter: 4 },
+                    sources: [
+                        { key: 'odk', name: 'ODK Central', lastSuccessAt: null },
+                        { key: 'kobo', name: 'KoboToolbox', lastSuccessAt: '2026-10-29T08:05:00+01:00' },
+                    ],
+                }}
+            />,
+            shellTranslations,
+        );
 
         const banner = screen.getByRole('region', { name: 'No successful pull for over 24 hours' });
-        expect(banner.textContent).toContain('Round Q4 2026 is open, and no pull has succeeded yet.');
+        expect(banner.textContent).toContain('Round Q4 2026 is open, and new submissions from these sources are not reaching the dashboard:');
+        expect(within(banner).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+            'ODK Central: no pull has succeeded yet.',
+            'KoboToolbox: last successful pull at 29 Oct 2026, 08:05 WAT.',
+        ]);
         expect(within(banner).getByRole('link', { name: 'Go to the Data sources page' }).getAttribute('href')).toBe('/admin/sources');
+        expect(await axeCheck(container)).toHaveNoViolations();
     });
 
     it('renders nothing while ingestion is current', () => {
-        const { container } = renderUi(<StaleIngestionBanner stale={{ stale: false, hours: 24, lastSuccessAt: null, round: { year: 2026, quarter: 4 } }} />, shellTranslations);
+        const { container } = renderUi(<StaleIngestionBanner stale={{ stale: false, hours: 24, round: { year: 2026, quarter: 4 }, sources: [] }} />, shellTranslations);
 
         expect(container.textContent).toBe('');
+    });
+});
+
+describe('SourceTag', () => {
+    it('names the source in words, never by colour alone', async () => {
+        const { container } = renderUi(
+            <p>
+                <SourceTag source={{ key: 'odk', name: 'ODK Central' }} /> <SourceTag source={{ key: 'kobo', name: 'KoboToolbox' }} />
+            </p>,
+            shellTranslations,
+        );
+
+        expect(screen.getByText('ODK Central')).toBeTruthy();
+        expect(screen.getByText('KoboToolbox')).toBeTruthy();
+        // The two tags differ in their words, which a screen reader and a colour-blind reader both get.
+        expect(container.textContent).toBe('ODK Central KoboToolbox');
+        expect(await axeCheck(container)).toHaveNoViolations();
+    });
+
+    it('says the source is unknown rather than showing nothing', () => {
+        renderUi(<SourceTag source={null} />, { ...shellTranslations, common: { ...(shellTranslations.common as Record<string, unknown>), sources: { unknown: 'Unknown source' } } });
+
+        expect(screen.getByText('Unknown source')).toBeTruthy();
     });
 });

@@ -186,6 +186,14 @@ return [
             'open_in_source' => 'Check in :source',
             'new_tab' => '(opens in a new tab)',
             'more' => 'Showing the newest :shown of :total.',
+            'review' => 'Review',
+            'reviewed' => 'Reviewed by :name, :time',
+            'mark' => 'Mark reviewed',
+            'mark_named' => 'Mark :instance reviewed',
+            'dialog_title' => 'Mark this deletion reviewed?',
+            'dialog_consequence' => ':instance is no longer at :source. Marking it reviewed records that you have looked into it. Nothing is removed from the portal, and it stops counting as an open issue.',
+            'dialog_confirm' => 'Mark reviewed',
+            'saved' => 'Deletion marked reviewed.',
         ],
         'backfill' => [
             'title' => 'Historical backfill',
@@ -391,8 +399,10 @@ return [
     // SECURITY.md §12: no successful pull for a day while a round is open.
     'stale' => [
         'title' => 'No successful pull for over :hours hours',
-        'body' => 'Round Q:quarter :year is open, and the last successful pull was at :time. New submissions are not reaching the dashboard.',
-        'body_never' => 'Round Q:quarter :year is open, and no pull has succeeded yet. New submissions are not reaching the dashboard.',
+        // Each enabled source that is behind is named, so a healthy one never hides another.
+        'lead' => 'Round Q:quarter :year is open, and new submissions from these sources are not reaching the dashboard:',
+        'source' => ':source: last successful pull at :time.',
+        'source_never' => ':source: no pull has succeeded yet.',
         'link' => 'Go to the Data sources page',
     ],
 

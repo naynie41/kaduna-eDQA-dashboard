@@ -59,6 +59,11 @@ return [
         'log_out' => 'Log out',
     ],
 
+    // A record's field-collection source, when it cannot be told (SourceTag).
+    'sources' => [
+        'unknown' => 'Unknown source',
+    ],
+
     // The shell (ARCHITECTURE.md §9.1).
     'shell' => [
         'seal' => 'KD',

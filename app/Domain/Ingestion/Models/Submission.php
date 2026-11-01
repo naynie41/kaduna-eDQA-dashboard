@@ -27,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $form_ref
  * @property CarbonImmutable|null $source_updated_at
  * @property CarbonImmutable|null $deleted_at_source
+ * @property CarbonImmutable|null $deletion_reviewed_at
+ * @property int|null $deletion_reviewed_by
  * @property array<string, mixed> $payload
  * @property SubmissionStatus $status
  * @property CarbonImmutable $submitted_at
@@ -44,6 +46,7 @@ final class Submission extends Model
     protected $fillable = [
         'source_id', 'external_id', 'instance_id', 'deprecated_id', 'form_ref', 'form_version', 'payload', 'submitted_at',
         'source_updated_at', 'received_at', 'processed_at', 'status', 'superseded_by_id', 'deleted_at_source',
+        'deletion_reviewed_at', 'deletion_reviewed_by',
     ];
 
     protected static function booted(): void
@@ -66,6 +69,8 @@ final class Submission extends Model
             'processed_at' => 'immutable_datetime',
             'source_updated_at' => 'immutable_datetime',
             'deleted_at_source' => 'immutable_datetime',
+            'deletion_reviewed_at' => 'immutable_datetime',
+            'deletion_reviewed_by' => 'integer',
             'source_id' => 'integer',
         ];
     }

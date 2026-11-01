@@ -26,6 +26,7 @@ use App\Http\Controllers\Sources\PullRunController;
 use App\Http\Controllers\Sources\SourceIndexController;
 use App\Http\Controllers\Sources\SourcePullController;
 use App\Http\Controllers\SourceWebhookController;
+use App\Http\Controllers\Submissions\ReviewDeletionController;
 use App\Http\Middleware\ShareDashboardContext;
 use Illuminate\Support\Facades\Route;
 
@@ -115,6 +116,7 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
         Route::get('facility-options', FacilityOptionsController::class)->name('facility-options');
         Route::post('quarantine/bulk-resolve', BulkResolveQuarantineController::class)->name('quarantine.bulk-resolve');
         Route::post('quarantine/{record}/resolve', ResolveQuarantineController::class)->whereNumber('record')->name('quarantine.resolve');
+        Route::post('submissions/{submission}/deletion-review', ReviewDeletionController::class)->whereNumber('submission')->name('submissions.deletion-review');
         Route::post('assessments/{assessment}/corrections', CorrectAssessmentController::class)->whereNumber('assessment')->name('assessments.corrections.store');
         Route::post('assessments/{assessment}/flags/{code}/override', OverrideSoftFlagController::class)
             ->whereNumber('assessment')->name('assessments.flags.override');

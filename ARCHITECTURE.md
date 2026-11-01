@@ -1152,6 +1152,27 @@ The admin tab shows a red badge with the open quarantine count.
   - **Duplicates.** A DUPLICATE_ASSESSMENT row shows both sides (`duplicate_of`, from
     `QuarantineQuery::duplicateOriginals`). The accepted assessment shows with its source,
     instance ID and link, and this submission with its source.
+**Built (Phase 5 step 0): the admin shell.**
+- **Badge.** `admin.openIssueCount` = open quarantine records + deletions at source not yet reviewed
+  (`QuarantineQuery::openIssueCountCached`, 60 s), forgotten on `SubmissionQuarantined`,
+  `QuarantineResolved`, `SourceDeletionDetected` and `DeletionReviewed`. The Data issues tab is named
+  "Data issues, 12 open".
+- **Reviewing a deletion at source** (D-62). `submissions.deletion_reviewed_at` / `deletion_reviewed_by`
+  (CHECK `submissions_deletion_review_valid`: only for a deletion, with both who and when).
+  `POST /api/submissions/{submission}/deletion-review` with a reason (`ReviewSourceDeletion`): audited
+  as `deletion_reviewed`, refused (409) for a submission still at its source or already reviewed.
+  The Data sources page's deletions list has a Review column: "Mark reviewed" through
+  ConfirmWithReasonDialog, or who reviewed it and when. Nothing is removed from the portal.
+- **Stale-ingestion banner, per source.** `SourceStatusAggregator::staleIngestion()` (moved from
+  Reporting, which may not read the source registry): a round is open and an enabled source has had
+  no successful non-backfill pull for 24 h, or ever. The banner names each such source with its last
+  success, so a healthy source never hides another.
+- **SourceTag**: a record's source as its name in words, the same look for every source, in the
+  pull history, Data issues and deletions tables.
+- Already in place from 2C.7 and kept: the rail item, the five tabs, `/admin` → `/admin/sources`,
+  no dashboard filters on admin pages, the sync bar, ConfirmWithReasonDialog, ProgressPanel (2 s →
+  10 s, stage changes announced only), `useApiAction` (CSRF, 422, 409) and AdminTable.
+
 - **Facility list** is still a placeholder (Phase 5). Until it is built, the facility media file
   panel ("Regenerate facility media file") is on the Data sources page. It says the one file is
   attached to the form on both platforms.

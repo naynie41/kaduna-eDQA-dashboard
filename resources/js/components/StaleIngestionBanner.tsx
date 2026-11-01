@@ -19,11 +19,7 @@ export default function StaleIngestionBanner({ stale }: StaleIngestionBannerProp
     if (!stale.stale || stale.round === null) {
         return null;
     }
-    const round = { quarter: stale.round.quarter, year: stale.round.year };
-    const body =
-        stale.lastSuccessAt === null
-            ? t('admin.stale.body_never', round)
-            : t('admin.stale.body', { ...round, time: months.length === 12 ? formatDateTime(stale.lastSuccessAt, months) : stale.lastSuccessAt });
+    const when = (value: string) => (months.length === 12 ? formatDateTime(value, months) : value);
 
     return (
         <section aria-labelledby="stale-ingestion-title" className="notice notice-warn mb-6 px-4 py-3.5 text-warn forced-colors:border-[CanvasText]">
@@ -31,7 +27,16 @@ export default function StaleIngestionBanner({ stale }: StaleIngestionBannerProp
                 <StateMark mark="▲" className="text-warn-fill" />
                 {t('admin.stale.title', { hours: stale.hours })}
             </h2>
-            <p className="mt-1 text-sm text-ink">{body}</p>
+            <p className="mt-1 text-sm text-ink">{t('admin.stale.lead', { quarter: stale.round.quarter, year: stale.round.year })}</p>
+            <ul className="mt-1.5 flex flex-col gap-0.5 text-sm text-ink">
+                {stale.sources.map((source) => (
+                    <li key={source.key}>
+                        {source.lastSuccessAt === null
+                            ? t('admin.stale.source_never', { source: source.name })
+                            : t('admin.stale.source', { source: source.name, time: when(source.lastSuccessAt) })}
+                    </li>
+                ))}
+            </ul>
             <p className="mt-1.5 text-sm">
                 <Link href="/admin/sources" className="font-medium text-deep underline">
                     {t('admin.stale.link')}

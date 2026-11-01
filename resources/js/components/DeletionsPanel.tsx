@@ -1,26 +1,38 @@
 import { Link } from '@inertiajs/react';
+import { useState } from 'react';
+import { useAnnounce } from '@/components/Announcer';
+import ConfirmWithReasonDialog from '@/components/ConfirmWithReasonDialog';
 import DataTable from '@/components/DataTable';
 import Panel from '@/components/Panel';
 import PanelHeader from '@/components/PanelHeader';
+import SourceTag from '@/components/SourceTag';
 import { formatCount, formatDateTime } from '@/lib/format';
 import { useTranslate, useTranslationList } from '@/lib/i18n';
+import { useApiAction } from '@/lib/useApiAction';
 import type { DeletionRow } from '@/types/admin';
 
 export type DeletionsPanelProps = {
     deletions: { rows: DeletionRow[]; total: number };
+    /** After a deletion is marked reviewed: the page reloads the list and the Data issues badge. */
+    onReviewed?: () => void;
 };
 
 /**
  * Deletions at source (ARCHITECTURE.md §5.3, §9.3, D-62): the submissions a source no longer
  * returns, newest first, for an administrator to review; nothing is removed by the portal. Each
  * row links to the record it touches: the assessment built from it (the facility drawer, in its
- * round) or Data issues when it is in quarantine, and the submission on its source.
+ * round) or Data issues when it is in quarantine, and the submission on its source. An unreviewed
+ * deletion is marked reviewed with a reason (ConfirmWithReasonDialog), which takes it off the
+ * Data issues badge; a reviewed one says who and when.
  */
-export default function DeletionsPanel({ deletions }: DeletionsPanelProps) {
+export default function DeletionsPanel({ deletions, onReviewed }: DeletionsPanelProps) {
     const t = useTranslate();
+    const announce = useAnnounce();
+    const api = useApiAction();
     const months = useTranslationList('common.months_short');
     const when = (value: string) => (months.length === 12 ? formatDateTime(value, months) : value);
     const { rows, total } = deletions;
+    const [reviewing, setReviewing] = useState<DeletionRow | null>(null);
 
     return (
         <Panel labelledBy="sources-deletions-title">
@@ -35,6 +47,7 @@ export default function DeletionsPanel({ deletions }: DeletionsPanelProps) {
                     { key: 'facility', header: t('admin.sources.deletions.facility') },
                     { key: 'round', header: t('admin.sources.deletions.round') },
                     { key: 'portal', header: t('admin.sources.deletions.in_portal') },
+                    { key: 'review', header: t('admin.sources.deletions.review') },
                 ]}
                 empty={<p className="px-3 py-6 text-center text-sm text-ink-2">{t('admin.sources.deletions.none')}</p>}
             >
@@ -43,7 +56,9 @@ export default function DeletionsPanel({ deletions }: DeletionsPanelProps) {
                         <th scope="row" className="px-3 py-2 text-left font-normal whitespace-nowrap">
                             {when(row.deleted_at)}
                         </th>
-                        <td className="px-3 py-2 whitespace-nowrap">{row.source?.name ?? t('admin.sources.history.unknown_source')}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                            <SourceTag source={row.source} />
+                        </td>
                         <td className="px-3 py-2">
                             <code className="block max-w-56 text-xs break-all">{row.instance_id}</code>
                             {row.source !== null && row.source_url !== null && (
@@ -66,10 +81,44 @@ export default function DeletionsPanel({ deletions }: DeletionsPanelProps) {
                         <td className="px-3 py-2">
                             <RecordLink row={row} />
                         </td>
+                        <td className="px-3 py-2">
+                            {row.reviewed !== null ? (
+                                <span className="text-xs text-ink-2">{t('admin.sources.deletions.reviewed', { name: row.reviewed.by ?? '—', time: when(row.reviewed.at) })}</span>
+                            ) : (
+                                <button type="button" onClick={() => setReviewing(row)} className="btn btn-secondary btn-sm">
+                                    <span aria-hidden="true">{t('admin.sources.deletions.mark')}</span>
+                                    <span className="sr-only">{t('admin.sources.deletions.mark_named', { instance: row.instance_id })}</span>
+                                </button>
+                            )}
+                        </td>
                     </tr>
                 ))}
             </DataTable>
             {total > rows.length && <p className="px-5 pt-2 pb-4 text-xs text-ink-2">{t('admin.sources.deletions.more', { shown: formatCount(rows.length), total: formatCount(total) })}</p>}
+            <ConfirmWithReasonDialog
+                open={reviewing !== null}
+                title={t('admin.sources.deletions.dialog_title')}
+                consequence={
+                    reviewing === null
+                        ? ''
+                        : t('admin.sources.deletions.dialog_consequence', { instance: reviewing.instance_id, source: reviewing.source?.name ?? t('common.sources.unknown') })
+                }
+                confirmLabel={t('admin.sources.deletions.dialog_confirm')}
+                onClose={() => setReviewing(null)}
+                onConfirm={async (reason) => {
+                    if (reviewing === null) {
+                        return { ok: true };
+                    }
+                    const result = await api.run('POST', `/api/submissions/${reviewing.submission_id}/deletion-review`, { reason });
+                    if (!result.ok) {
+                        return { ok: false, message: result.message, fieldError: result.fieldErrors.reason ?? null };
+                    }
+                    announce(t('admin.sources.deletions.saved'));
+                    onReviewed?.();
+
+                    return { ok: true };
+                }}
+            />
         </Panel>
     );
 }

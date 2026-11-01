@@ -3,6 +3,7 @@ import { useId } from 'react';
 import AdminTable from '@/components/AdminTable';
 import { useAnnounce } from '@/components/Announcer';
 import Panel from '@/components/Panel';
+import SourceTag from '@/components/SourceTag';
 import StateMark from '@/components/StateMark';
 
 import PanelHeader from '@/components/PanelHeader';
@@ -138,7 +139,9 @@ export default function PullHistoryPanel({ history, filters, sources }: PullHist
                         <th scope="row" className="px-3 py-2 text-left font-normal whitespace-nowrap">
                             {months.length === 12 ? formatDateTime(row.started_at, months) : row.started_at}
                         </th>
-                        <td className="px-3 py-2 whitespace-nowrap">{row.source?.name ?? t('admin.sources.history.unknown_source')}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                            <SourceTag source={row.source ?? null} />
+                        </td>
                         <td className="px-3 py-2 whitespace-nowrap">{t(`enums.pull_trigger.${row.trigger}`)}</td>
                         <td className="px-3 py-2">{row.triggered_by ?? t('admin.sources.history.system')}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatCount(row.fetched)}</td>

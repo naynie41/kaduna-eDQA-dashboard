@@ -255,6 +255,20 @@ it('lists the deletions at source, newest first, with what each touches and a li
             && $row['source_url'] === 'https://central.example.org/#/projects/7/forms/dqa/submissions/uuid%3A6f1c2a9e-3b4d-4e5f-8a7b-9c0d1e2f3a4b'));
 });
 
+it('says who reviewed a deletion at source, and when; an unreviewed one has no review', function (): void {
+    odkPageConfigure();
+    $this->freezeSecond();
+    $reviewer = Rows::user(['name' => 'Amina Bello']);
+    $reviewed = Rows::submission(['deleted_at_source' => now()->subDays(2), 'deletion_reviewed_at' => now()->subDay(), 'deletion_reviewed_by' => $reviewer]);
+    $waiting = Rows::submission(['deleted_at_source' => now()]);
+
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page
+        ->where('deletions.rows.0.submission_id', $waiting)
+        ->where('deletions.rows.0.reviewed', null)
+        ->where('deletions.rows.1.submission_id', $reviewed)
+        ->where('deletions.rows.1.reviewed', ['at' => now()->subDay()->toIso8601String(), 'by' => 'Amina Bello']));
+});
+
 it('sends the old ODK pull address, and /admin, to the Data sources page', function (): void {
     $this->actingAs($this->admin)->get('/admin/odk')->assertRedirect('/admin/sources')->assertStatus(301);
     $this->actingAs($this->admin)->get('/admin')->assertRedirect('/admin/sources');

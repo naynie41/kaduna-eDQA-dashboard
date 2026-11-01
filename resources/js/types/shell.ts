@@ -32,14 +32,14 @@ export type ShellStatus = {
 
 /** The admin pages' shared prop (HandleInertiaRequests, D-55). */
 export type AdminShell = {
-    /** Open quarantine records: the Data issues tab's badge (cached on the server). */
-    openQuarantineCount: number;
-    /** SECURITY.md §12: a round is open and no pull has succeeded for `hours` (or ever). */
+    /** Open quarantine records plus unreviewed deletions at source: the Data issues tab's badge (cached on the server). */
+    openIssueCount: number;
+    /** SECURITY.md §12: a round is open and these enabled sources have had no successful pull for `hours` (or ever). */
     staleIngestion: {
         stale: boolean;
         hours: number;
-        lastSuccessAt: string | null;
         round: { year: number; quarter: number } | null;
+        sources: { key: string; name: string; lastSuccessAt: string | null }[];
     };
 };
 

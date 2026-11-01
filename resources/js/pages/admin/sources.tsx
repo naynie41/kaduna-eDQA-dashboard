@@ -62,7 +62,7 @@ export default function AdminSources({ sources, backfill, history, historyFilter
                 ))}
             </div>
             <PullHistoryPanel history={history} filters={historyFilters} sources={sources.map(({ key, name }) => ({ key, name }))} />
-            <DeletionsPanel deletions={deletions} />
+            <DeletionsPanel deletions={deletions} onReviewed={refresh} />
             <BackfillPanel backfill={backfill} />
             <CascadePanel howUrl={docs.cascade} />
         </div>

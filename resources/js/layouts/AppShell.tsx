@@ -95,7 +95,7 @@ function Shell({ children }: AppShellProps) {
                             <DashboardTabs current={dashboardPage} filters={props.filters} lgaCount={props.summary?.lgas ?? 0} />
                         </>
                     )}
-                    {adminPage !== null && admin !== null && <AdminTabs current={adminPage} openQuarantineCount={admin.openQuarantineCount} />}
+                    {adminPage !== null && admin !== null && <AdminTabs current={adminPage} openIssueCount={admin.openIssueCount} />}
                 </TopBar>
                 <main id="main" tabIndex={-1} className="w-full max-w-[1320px] px-4 pt-6 pb-16 rail:px-7">
                     {adminPage !== null && admin !== null && <StaleIngestionBanner stale={admin.staleIngestion} />}

@@ -37,6 +37,37 @@ final class SourceStatusAggregator
     ) {}
 
     /**
+     * The admin pages' banner (SECURITY.md §12, D-55): a round is open and an enabled source has
+     * had no successful pull for edqa.status.banner_after_hours (24), or ever. It names every such
+     * source, so a healthy one never hides another. A source not configured or switched off is not
+     * expected to pull (the status bar says so); a backfill's runs do not count.
+     *
+     * @return array{stale: bool, hours: int, round: ?array{year: int, quarter: int}, sources: list<array{key: string, name: string, lastSuccessAt: ?string}>}
+     */
+    public function staleIngestion(): array
+    {
+        $hours = (int) config('edqa.status.banner_after_hours', 24);
+        $round = DB::table('rounds')->where('status', 'open')->orderByDesc('year')->orderByDesc('quarter')->first(['year', 'quarter']);
+        $behind = [];
+        if ($round !== null) {
+            foreach ($this->sources->enabled() as $key) {
+                $status = $this->source($key);
+                $last = $status['lastSuccessAt'] === null ? null : CarbonImmutable::parse($status['lastSuccessAt']);
+                if ($last === null || $last->lessThan(now()->subHours($hours))) {
+                    $behind[] = ['key' => $key, 'name' => $status['name'], 'lastSuccessAt' => $status['lastSuccessAt']];
+                }
+            }
+        }
+
+        return [
+            'stale' => $behind !== [],
+            'hours' => $hours,
+            'round' => $round === null ? null : ['year' => (int) $round->year, 'quarter' => (int) $round->quarter],
+            'sources' => $behind,
+        ];
+    }
+
+    /**
      * Every source in config, worst state first.
      *
      * @return list<array{key: string, name: string, state: string, lastSuccessAt: ?string, minutesSinceSuccess: ?int, sinceSuccess: ?array{value: int, unit: string}, lastFailedAt: ?string, lastError: ?string, lastErrorClass: ?string, lastErrorHttpStatus: ?int, staleAfterMinutes: int}>
