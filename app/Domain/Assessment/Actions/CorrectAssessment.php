@@ -25,7 +25,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * "Correct this assessment" (SECURITY.md §4 item 5, ARCHITECTURE.md §7, D-58). An administrator
- * changes item results (pass, fail, N/A) and the visit's start and end, with a typed reason.
+ * changes item results (pass, fail, N/A; for a question answered as several checks, how many of
+ * them passed, D-67) and the visit's start and end, with a typed reason.
  * Scores are never edited (CLAUDE.md rule 2): the corrected assessment is scored again at once,
  * through ScoreCalculator, by the same code a round rescore uses (RescoreAssessments::score), so
  * the facility drawer shows the new scores straight away; the round's rescore is then queued
@@ -58,7 +59,20 @@ final class CorrectAssessment
         #[Config('edqa.validation.rules')] private readonly array $rules,
     ) {}
 
-    /** @param  array<string, string>  $items  item key => pass | fail | na */
+    /**
+     * Whether a corrected value fits an item: pass, fail or na for an item; na or a count from 0
+     * to its checks for a question answered as several checks (D-67).
+     */
+    public static function fits(string $value, int $checks): bool
+    {
+        if ($checks <= 1) {
+            return in_array($value, self::OUTCOMES, true);
+        }
+
+        return $value === 'na' || (ctype_digit($value) && (int) $value <= $checks);
+    }
+
+    /** @param  array<string, string>  $items  item key => pass | fail | na, or for a question answered as several checks na | a count of them passed */
     public function execute(Assessment $assessment, array $items, ?CarbonImmutable $startedAt, ?CarbonImmutable $endedAt, User $actor, string $reason): CorrectionResult
     {
         $reason = Reason::require($reason);
@@ -74,17 +88,36 @@ final class CorrectAssessment
             }
 
             $rules = $this->versions->config($round);
-            $rows = ItemResponse::query()->where('assessment_id', $assessment->id)->orderBy('id')->get()
-                ->keyBy(fn (ItemResponse $r): string => ItemKey::make($r->dimension, $r->month_slot, (string) $r->item_code));
+            // The checks of each item key, in stored order: one for an item, several for a
+            // question answered as several checks (D-67), corrected together by their count.
+            $groups = ItemResponse::query()->where('assessment_id', $assessment->id)->orderBy('id')->get()
+                ->groupBy(fn (ItemResponse $r): string => ItemKey::make($r->dimension, $r->month_slot, (string) $r->item_code));
 
-            /** @var list<array{row: ItemResponse, key: string, old: string, new: string}> $changes */
+            /** @var list<array{key: string, old: string, new: string, rows: list<array{row: ItemResponse, new: string}>}> $changes */
             $changes = [];
             foreach ($items as $key => $outcome) {
-                $row = $rows->get($key) ?? throw CorrectionRefused::unknownItem($key);
-                $current = $row->is_applicable ? $rules->outcome((string) $row->value) : 'na';
-                if ($current !== $outcome) {
-                    $changes[] = ['row' => $row, 'key' => $key, 'old' => $current, 'new' => $outcome];
+                $checks = $groups->get($key) ?? throw CorrectionRefused::unknownItem($key);
+                if (! self::fits($outcome, $checks->count())) {
+                    throw CorrectionRefused::unknownItem($key);
                 }
+                $now = $checks->map(fn (ItemResponse $r): string => $r->is_applicable ? $rules->outcome((string) $r->value) : 'na')->values();
+                $current = $checks->count() === 1
+                    ? (string) $now[0]
+                    : ($now->every(fn (string $o): bool => $o === 'na') ? 'na' : (string) $now->filter(fn (string $o): bool => $o === 'pass')->count());
+                if ($current === $outcome) {
+                    continue;
+                }
+                // A count k: the first k checks pass, the rest fail; na: every check N/A.
+                $target = $checks->count() === 1
+                    ? [$outcome]
+                    : array_map(fn (int $i): string => $outcome === 'na' ? 'na' : ($i < (int) $outcome ? 'pass' : 'fail'), range(0, $checks->count() - 1));
+                $rows = [];
+                foreach ($checks->values() as $i => $row) {
+                    if ($now[$i] !== $target[$i]) {
+                        $rows[] = ['row' => $row, 'new' => $target[$i]];
+                    }
+                }
+                $changes[] = ['key' => $key, 'old' => $current, 'new' => $outcome, 'rows' => $rows];
             }
 
             $tz = (string) config('app.timezone');
@@ -110,14 +143,16 @@ final class CorrectAssessment
             }
 
             foreach ($changes as $change) {
-                $old = (string) $change['row']->value;
-                activity()->withoutLogs(fn () => $change['row']->update(['value' => $change['new'], 'is_applicable' => $change['new'] !== 'na']));
-                AuditLog::record($change['row'], $actor, 'corrected',
-                    old: ['value' => $old],
-                    new: ['value' => $change['new']],
-                    reason: $reason,
-                    extra: ['key' => $change['key'], 'assessment_id' => $assessment->id],
-                );
+                foreach ($change['rows'] as ['row' => $row, 'new' => $new]) {
+                    $old = (string) $row->value;
+                    activity()->withoutLogs(fn () => $row->update(['value' => $new, 'is_applicable' => $new !== 'na']));
+                    AuditLog::record($row, $actor, 'corrected',
+                        old: ['value' => $old],
+                        new: ['value' => $new],
+                        reason: $reason,
+                        extra: ['key' => $change['key'], 'assessment_id' => $assessment->id],
+                    );
+                }
             }
             if ($timesChanged) {
                 activity()->withoutLogs(fn () => $assessment->update(['started_at' => $newStart, 'ended_at' => $newEnd]));

@@ -271,6 +271,8 @@ return [
             'fail' => 'Fail',
             'na' => 'N/A',
             'unknown' => 'Not scored',
+            // A question answered as several checks (D-67): how many of them passed.
+            'count' => ':passed of :total',
         ],
         'history_title' => 'Overall by round',
         'history_none' => 'No scored rounds yet.',

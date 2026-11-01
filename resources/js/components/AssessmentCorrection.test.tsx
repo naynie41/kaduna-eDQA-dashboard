@@ -31,7 +31,7 @@ const translations = {
             overall: 'Overall',
             items_title: 'Item responses',
             items_none: 'None.',
-            results: { pass: 'Pass', fail: 'Fail', na: 'N/A', unknown: 'Not scored' },
+            results: { pass: 'Pass', fail: 'Fail', na: 'N/A', unknown: 'Not scored', count: ':passed of :total' },
             history_title: 'Overall by round',
             history_none: 'No scored rounds yet.',
             flags_title: 'Flags',
@@ -154,6 +154,40 @@ describe('Correct this assessment', () => {
         expect(url).toBe('/api/assessments/9/corrections');
         expect(JSON.parse(String(init.body))).toEqual({ items: { avail_m2_reporting_rate: 'pass' }, reason: 'Supervisor re-checked the register' });
         expect(announce).toHaveBeenCalledWith('Correction saved.');
+    });
+
+    it('shows a question answered as several checks as its count, and corrects it by count', async () => {
+        const fetch = vi.fn(async () => new Response(JSON.stringify({ data: { assessment_id: 9 } }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        vi.stubGlobal('fetch', fetch);
+        const checked = detail();
+        checked.items.push({
+            dimension: 'consistency',
+            dimension_label: 'Consistency',
+            slot: 2,
+            month: 'May 2026',
+            score: score('71.4'),
+            items: [{ code: 'q21', key: 'consist_m2_q21', label: 'How many of the three clients were transcribed correctly?', result: '2', checks: { passed: 2, total: 3 } }],
+        });
+        const { container } = renderUi(<FacilityDetailView detail={checked} onCorrected={() => undefined} />, translations);
+        const user = userEvent.setup();
+
+        expect(screen.getByText('2 of 3')).not.toBeNull();
+        await user.click(screen.getByRole('button', { name: 'Correct this assessment' }));
+
+        const select = screen.getByRole('combobox', { name: 'How many of the three clients were transcribed correctly?, May 2026' });
+        expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['N/A', '0 of 3', '1 of 3', '2 of 3', '3 of 3']);
+        await user.selectOptions(select, '3');
+        expect(screen.getByRole('status').textContent).toBe('1 item changed: consist_m2_q21 2 of 3 → 3 of 3');
+        expect(await axeCheck(container)).toHaveNoViolations();
+
+        await user.click(screen.getByRole('button', { name: 'Review and save' }));
+        const dialog = screen.getByRole('dialog', { name: 'Save this correction?' });
+        await user.type(within(dialog).getByLabelText('Reason'), 'Supervisor re-checked the register');
+        await user.click(within(dialog).getByRole('button', { name: 'Save correction' }));
+
+        await waitFor(() => expect(fetch).toHaveBeenCalled());
+        const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+        expect(JSON.parse(String(init.body))).toEqual({ items: { consist_m2_q21: '3' }, reason: 'Supervisor re-checked the register' });
     });
 
     it('cancels back to the results as they were', async () => {

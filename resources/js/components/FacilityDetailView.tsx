@@ -1,10 +1,10 @@
 import { useId, type ReactNode } from 'react';
-import CorrectionPanel, { ItemResultSelect, useCorrection } from '@/components/AssessmentCorrection';
+import CorrectionPanel, { ItemResultSelect, useCorrection, valueLabel } from '@/components/AssessmentCorrection';
 import HistorySparkline from '@/components/HistorySparkline';
 import ScoreTag from '@/components/ScoreTag';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useTranslate, useTranslationList, type Translate } from '@/lib/i18n';
-import type { Dimension, FacilityDetail, ItemResult } from '@/types/dashboard';
+import type { Dimension, FacilityDetail, ItemResult, ItemValue } from '@/types/dashboard';
 
 export type FacilityDetailViewProps = {
     detail: FacilityDetail;
@@ -81,10 +81,11 @@ export default function FacilityDetailView({ detail, onCorrected }: FacilityDeta
                                                                     id={`${idBase}-${item.key}`}
                                                                     label={t('dashboard.drawer.correct.item_label', { item: item.label ?? item.code, month: group.month })}
                                                                     value={correction.results[item.key] ?? item.result}
+                                                                    total={item.checks?.total ?? null}
                                                                     onChange={(result) => correction.setResult(item.key, result)}
                                                                 />
                                                             ) : (
-                                                                <Result result={item.result} t={t} />
+                                                                <Result result={item.result} checks={item.checks ?? null} t={t} />
                                                             )}
                                                         </li>
                                                     ))}
@@ -231,9 +232,20 @@ function Term({ label, children }: { label: string; children: ReactNode }) {
 
 const RESULT_TONE: Record<ItemResult, string> = { pass: 'text-ok', fail: 'text-bad', na: 'text-ink-2' };
 
-/** Pass / Fail / N/A as an icon and a word: the word carries the meaning, never the colour. */
-function Result({ result, t }: { result: ItemResult | null; t: Translate }) {
+/**
+ * Pass / Fail / N/A as an icon and a word: the word carries the meaning, never the colour. A
+ * question answered as several checks reads "2 of 3", toned by how many passed.
+ */
+function Result({ result, checks, t }: { result: ItemValue | null; checks: { passed: number; total: number } | null; t: Translate }) {
     if (result === null) {
+        return <span className="shrink-0 text-ink-2">{t('dashboard.drawer.results.unknown')}</span>;
+    }
+    if (checks !== null && result !== 'na') {
+        const tone = checks.passed === checks.total ? 'text-ok' : checks.passed === 0 ? 'text-bad' : 'text-warn';
+
+        return <span className={`shrink-0 font-medium tabular-nums ${tone}`}>{valueLabel(t, result, checks.total)}</span>;
+    }
+    if (result !== 'pass' && result !== 'fail' && result !== 'na') {
         return <span className="shrink-0 text-ink-2">{t('dashboard.drawer.results.unknown')}</span>;
     }
 

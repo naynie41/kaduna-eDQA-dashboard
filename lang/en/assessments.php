@@ -18,6 +18,8 @@ return [
         'validation' => [
             'not_a_key' => ':key is not an item name.',
             'not_this_assessment' => ':key is not one of this assessment\'s items.',
+            'result_for_item' => ':key is a single item: send pass, fail or na.',
+            'count_for_checks' => ':key is answered as :total checks: send how many passed, from 0 to :total, or na.',
         ],
     ],
 ];

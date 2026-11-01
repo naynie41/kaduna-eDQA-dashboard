@@ -166,6 +166,9 @@ export type HomeProps = {
 /** GET /api/facilities/{id} (FacilityDetailAggregator), snake_case as the JSON API serves it. */
 export type ItemResult = "pass" | "fail" | "na";
 
+/** An item's value: its result, or for a question answered as several checks (D-67) the count of them passed, "0"–"3". */
+export type ItemValue = ItemResult | `${number}`;
+
 export type FacilityDetail = {
     facility: {
         id: number;
@@ -207,7 +210,9 @@ export type FacilityDetail = {
             /** The form's name, e.g. avail_m2_reporting_rate: what a correction sends. */
             key: string;
             label: string | null;
-            result: ItemResult | null;
+            result: ItemValue | null;
+            /** A question answered as several checks: how many passed of how many; null for an item. */
+            checks?: { passed: number; total: number } | null;
         }[];
     }[];
     history: {

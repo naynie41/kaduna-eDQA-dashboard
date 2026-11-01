@@ -3,18 +3,23 @@ import { useAnnounce } from '@/components/Announcer';
 import ConfirmWithReasonDialog from '@/components/ConfirmWithReasonDialog';
 import { correctionBody, draftCorrection, offsetOf, toLocalInput, type CorrectionDraft } from '@/lib/corrections';
 import { formatTime } from '@/lib/format';
-import { useTranslate } from '@/lib/i18n';
+import { useTranslate, type Translate } from '@/lib/i18n';
 import { useApiAction } from '@/lib/useApiAction';
-import type { FacilityDetail, ItemResult } from '@/types/dashboard';
+import type { FacilityDetail, ItemResult, ItemValue } from '@/types/dashboard';
 
 const RESULTS: ItemResult[] = ['pass', 'fail', 'na'];
+
+/** A value in words: "Pass", "N/A", or for a question answered as several checks "2 of 3". */
+export function valueLabel(t: Translate, value: ItemValue, total: number | null): string {
+    return total !== null && value !== 'na' && /^\d+$/.test(value) ? t('dashboard.drawer.results.count', { passed: value, total: String(total) }) : t(`dashboard.drawer.results.${value}`);
+}
 
 export type Correction = {
     editing: boolean;
     begin: () => void;
     cancel: () => void;
-    results: Record<string, ItemResult>;
-    setResult: (key: string, result: ItemResult) => void;
+    results: Record<string, ItemValue>;
+    setResult: (key: string, result: ItemValue) => void;
     start: string;
     setStart: (value: string) => void;
     end: string;
@@ -27,7 +32,7 @@ export function useCorrection(detail: FacilityDetail): Correction {
     const initialResults = () =>
         Object.fromEntries(detail.items.flatMap((group) => group.items.flatMap((item) => (item.result === null ? [] : [[item.key, item.result] as const]))));
     const [editing, setEditing] = useState(false);
-    const [results, setResults] = useState<Record<string, ItemResult>>(initialResults);
+    const [results, setResults] = useState<Record<string, ItemValue>>(initialResults);
     const [start, setStart] = useState(detail.assessment === null ? '' : toLocalInput(detail.assessment.started_at));
     const [end, setEnd] = useState(detail.assessment === null ? '' : toLocalInput(detail.assessment.ended_at));
 
@@ -58,18 +63,20 @@ export function useCorrection(detail: FacilityDetail): Correction {
 }
 
 /** One item's result as a select while correcting: the label names the item and its month. */
-export function ItemResultSelect({ id, label, value, onChange }: { id: string; label: string; value: ItemResult; onChange: (result: ItemResult) => void }) {
+export function ItemResultSelect({ id, label, value, total = null, onChange }: { id: string; label: string; value: ItemValue; total?: number | null; onChange: (result: ItemValue) => void }) {
     const t = useTranslate();
+    // An item: pass, fail or N/A. A question answered as several checks: N/A or how many passed.
+    const options: ItemValue[] = total === null ? RESULTS : ['na', ...Array.from({ length: total + 1 }, (_, i) => String(i) as ItemValue)];
 
     return (
         <>
             <label htmlFor={id} className="sr-only">
                 {label}
             </label>
-            <select id={id} value={value} onChange={(event) => onChange(event.target.value as ItemResult)} className="control min-h-9 shrink-0 text-xs">
-                {RESULTS.map((result) => (
-                    <option key={result} value={result}>
-                        {t(`dashboard.drawer.results.${result}`)}
+            <select id={id} value={value} onChange={(event) => onChange(event.target.value as ItemValue)} className="control min-h-9 shrink-0 text-xs">
+                {options.map((option) => (
+                    <option key={option} value={option}>
+                        {valueLabel(t, option, total)}
                     </option>
                 ))}
             </select>
@@ -113,7 +120,12 @@ export default function CorrectionPanel({ detail, correction, onSaved }: Correct
     }
 
     const { draft } = correction;
-    const label = (key: string, old: string, next: string) => t('dashboard.drawer.correct.change', { key, old: t(`dashboard.drawer.results.${old}`), new: t(`dashboard.drawer.results.${next}`) });
+    const totals = new Map(detail.items.flatMap((group) => group.items.map((item) => [item.key, item.checks?.total ?? null] as const)));
+    const label = (key: string, old: ItemValue, next: ItemValue) => {
+        const total = totals.get(key) ?? null;
+
+        return t('dashboard.drawer.correct.change', { key, old: valueLabel(t, old, total), new: valueLabel(t, next, total) });
+    };
     const list = draft.changes.map((change) => label(change.key, change.old, change.new)).join('; ');
     const lines = [
         ...(draft.changes.length === 1 ? [t('dashboard.drawer.correct.summary_item', { list })] : []),

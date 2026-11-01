@@ -42,6 +42,9 @@ final class ParsedSubmissionBuilder
     /** @var array<string, string> "dimension:slot:item" => value. */
     private array $itemValues = [];
 
+    /** @var list<array{0: Dimension, 1: int, 2: string, 3: list<string>}> questions answered as several checks. */
+    private array $checks = [];
+
     private ?int $visitMinutes = null;
 
     public static function new(): self
@@ -171,6 +174,19 @@ final class ParsedSubmissionBuilder
         return $this;
     }
 
+    /**
+     * An extra question answered as several checks under one code, as the real Kobo form's
+     * consistency items are (D-67: "2 of 3 clients" is 2 passes of 3 checks).
+     *
+     * @param  list<'pass'|'fail'|'na'>  $values
+     */
+    public function withChecks(Dimension $dimension, int $monthSlot, string $itemCode, array $values): self
+    {
+        $this->checks[] = [$dimension, $monthSlot, $itemCode, $values];
+
+        return $this;
+    }
+
     /** @param  'pass'|'fail'|'na'  $value */
     public function withAllItems(string $value): self
     {
@@ -246,6 +262,11 @@ final class ParsedSubmissionBuilder
                     $value = $this->itemValues["{$dimension->value}:{$slot}:{$code}"] ?? ($i === 3 ? 'fail' : 'pass');
                     $items[] = new ItemResponseData($dimension, $slot, $code, $value, in_array($value, ['pass', 'fail'], true));
                 }
+            }
+        }
+        foreach ($this->checks as [$dimension, $slot, $code, $values]) {
+            foreach ($values as $value) {
+                $items[] = new ItemResponseData($dimension, $slot, $code, $value, in_array($value, ['pass', 'fail'], true));
             }
         }
 

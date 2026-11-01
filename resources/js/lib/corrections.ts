@@ -1,11 +1,11 @@
-import type { FacilityDetail, ItemResult } from '@/types/dashboard';
+import type { FacilityDetail, ItemValue } from '@/types/dashboard';
 
-export type ItemChange = { key: string; old: ItemResult; new: ItemResult };
+export type ItemChange = { key: string; old: ItemValue; new: ItemValue };
 
 /** What correction mode would send (POST /api/assessments/{id}/corrections, D-58), and why. */
 export type CorrectionDraft = {
     changes: ItemChange[];
-    items: Record<string, ItemResult>;
+    items: Record<string, ItemValue>;
     startedAt: string | null;
     endedAt: string | null;
 };
@@ -31,7 +31,7 @@ export function fromLocalInput(local: string, offset: string): string {
  * The difference between the assessment as the drawer shows it and the edited values: only the
  * items whose result changed, and a time only when it changed. Scores are never part of it.
  */
-export function draftCorrection(detail: FacilityDetail, results: Record<string, ItemResult>, start: string, end: string): CorrectionDraft {
+export function draftCorrection(detail: FacilityDetail, results: Record<string, ItemValue>, start: string, end: string): CorrectionDraft {
     const changes: ItemChange[] = [];
     for (const group of detail.items) {
         for (const item of group.items) {

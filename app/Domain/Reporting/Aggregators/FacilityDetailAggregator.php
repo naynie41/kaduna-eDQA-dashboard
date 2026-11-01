@@ -26,6 +26,7 @@ use App\Domain\Scoring\RuleVersionForRound;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Container\Attributes\Config;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -174,7 +175,7 @@ final class FacilityDetailAggregator
      * mapped pass or fail. Null only when no rule version can be read.
      *
      * @param  array<string, array<int, float|null>>  $slots
-     * @return list<array{dimension: string, dimension_label: string, slot: int, month: string, score: ScoreValue, items: list<array{code: string, key: string, label: ?string, result: ?string}>}>
+     * @return list<array{dimension: string, dimension_label: string, slot: int, month: string, score: ScoreValue, items: list<array{code: string, key: string, label: ?string, result: ?string, checks: array{passed: int, total: int}|null}>}>
      */
     private function items(int $assessmentId, Round $round, array $slots, ?RuleConfig $rules): array
     {
@@ -182,13 +183,29 @@ final class FacilityDetailAggregator
         $responses = ItemResponse::query()->where('assessment_id', $assessmentId)->orderBy('month_slot')->orderBy('id')->get();
         foreach (Dimension::cases() as $dimension) {
             foreach ([1, 2, 3] as $slot) {
+                // One row per question: a question answered as several checks under one code (the
+                // real Kobo form's consistency items, D-67) is one item whose result is the count
+                // of checks passed, or N/A when none applies.
                 $items = $responses->filter(fn (ItemResponse $r): bool => $r->dimension === $dimension && $r->month_slot === $slot)
-                    ->map(fn (ItemResponse $r): array => [
-                        'code' => (string) $r->item_code,
-                        'key' => ItemKey::make($dimension, $slot, (string) $r->item_code),
-                        'label' => self::itemLabel($dimension, (string) $r->item_code),
-                        'result' => self::result((string) $r->value, $r->is_applicable, $rules),
-                    ])->values()->all();
+                    ->groupBy(fn (ItemResponse $r): string => (string) $r->item_code)
+                    ->map(function (Collection $checks, string $code) use ($dimension, $slot, $rules): array {
+                        $results = $checks->map(fn (ItemResponse $r): ?string => self::result((string) $r->value, $r->is_applicable, $rules));
+                        $single = $checks->count() === 1;
+                        $passed = $results->filter(fn (?string $r): bool => $r === 'pass')->count();
+
+                        return [
+                            'code' => $code,
+                            'key' => ItemKey::make($dimension, $slot, $code),
+                            'label' => self::itemLabel($dimension, $code),
+                            'result' => match (true) {
+                                $single => $results->first(),
+                                $results->contains(null) => null,
+                                $results->every(fn (?string $r): bool => $r === 'na') => 'na',
+                                default => (string) $passed,
+                            },
+                            'checks' => $single ? null : ['passed' => $passed, 'total' => $checks->count()],
+                        ];
+                    })->values()->all();
                 if ($items === []) {
                     continue;
                 }

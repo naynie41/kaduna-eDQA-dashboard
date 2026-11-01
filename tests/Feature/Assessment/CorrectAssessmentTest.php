@@ -269,3 +269,79 @@ it('gives the drawer what correction mode needs: the round open, the times and e
     $this->round->update(['status' => 'closed', 'rule_version_id' => $this->version->id]);
     $this->actingAs($this->admin)->getJson("/api/facilities/{$this->facility->id}?round={$this->round->id}")->assertJsonPath('data.round.open', false);
 });
+
+// ---- A question answered as several checks (the real Kobo form's consistency items, D-67)
+
+/** An assessment whose consistency month 2 also has q21, answered as 3 checks (2 of 3 by default). */
+function withCheckedQuestion(Facility $facility, Round $round, array $checks = ['pass', 'pass', 'fail']): Assessment
+{
+    return acceptedAssessment($facility, $round, ParsedSubmissionBuilder::new()->withChecks(Dimension::Consistency, 2, 'q21', $checks));
+}
+
+/** @return list<array<string, mixed>> the drawer's items for one dimension and month */
+function drawerItems(mixed $test, Facility $facility, Round $round, string $dimension, int $slot): array
+{
+    $groups = $test->actingAs($test->admin)->getJson("/api/facilities/{$facility->id}?round={$round->id}")->assertOk()->json('data.items');
+
+    return collect($groups)->firstWhere(fn (array $g): bool => $g['dimension'] === $dimension && $g['slot'] === $slot)['items'];
+}
+
+it('shows a question answered as several checks once, as its count of checks passed', function (): void {
+    withCheckedQuestion($this->facility, $this->round);
+
+    $items = drawerItems($this, $this->facility, $this->round, 'consistency', 2);
+    $q21 = collect($items)->where('code', 'q21')->values();
+
+    expect($q21)->toHaveCount(1)
+        ->and($q21[0])->toMatchArray(['key' => 'consist_m2_q21', 'result' => '2', 'checks' => ['passed' => 2, 'total' => 3]])
+        ->and(collect($items)->pluck('key')->duplicates())->toBeEmpty()
+        // A single-check item is as before, with no checks.
+        ->and(collect($items)->firstWhere('code', 'reporting_rate'))->toMatchArray(['result' => 'fail', 'checks' => null]);
+});
+
+it('shows a question whose checks are all not applicable as N/A', function (): void {
+    withCheckedQuestion($this->facility, $this->round, ['na', 'na', 'na']);
+
+    expect(collect(drawerItems($this, $this->facility, $this->round, 'consistency', 2))->firstWhere('code', 'q21'))
+        ->toMatchArray(['result' => 'na', 'checks' => ['passed' => 0, 'total' => 3]]);
+});
+
+it('corrects a checked question by its count: the checks follow, each change is audited, and the score is recomputed', function (): void {
+    $assessment = withCheckedQuestion($this->facility, $this->round);
+    expect(round(storedScores($assessment, $this->version->id)['consistency:2'], 2))->toBe(71.43); // 5 of 7
+
+    correct($this, $assessment, ['items' => ['consist_m2_q21' => '3']])->assertOk()
+        ->assertJsonPath('data.changes.0', ['key' => 'consist_m2_q21', 'old' => '2', 'new' => '3']);
+
+    $checks = ItemResponse::query()->where('assessment_id', $assessment->id)->where('item_code', 'q21')->orderBy('id')->get();
+    expect($checks->pluck('value')->all())->toBe(['pass', 'pass', 'pass'])
+        ->and(round(storedScores($assessment, $this->version->id)['consistency:2'], 2))->toBe(85.71) // 6 of 7
+        // Only the check that changed is audited, with the question's key and the reason.
+        ->and(Activity::query()->where('event', 'corrected')->where('subject_type', (new ItemResponse)->getMorphClass())->get()
+            ->map(fn (Activity $a): array => [$a->subject_id, $a->properties['old']['value'] ?? null, $a->properties['attributes']['value'] ?? $a->properties['new']['value'] ?? null, $a->properties['key'] ?? null])->all())
+        ->toBe([[$checks[2]->id, 'fail', 'pass', 'consist_m2_q21']]);
+});
+
+it('corrects a checked question to none passed, or to not applicable', function (string $to, array $values): void {
+    $assessment = withCheckedQuestion($this->facility, $this->round);
+
+    correct($this, $assessment, ['items' => ['consist_m2_q21' => $to]])->assertOk();
+
+    $checks = ItemResponse::query()->where('assessment_id', $assessment->id)->where('item_code', 'q21')->orderBy('id')->get();
+    expect($checks->pluck('value')->all())->toBe($values)
+        ->and($checks->pluck('is_applicable')->unique()->all())->toBe([$to !== 'na']);
+})->with([
+    'none passed' => ['0', ['fail', 'fail', 'fail']],
+    'not applicable' => ['na', ['na', 'na', 'na']],
+]);
+
+it('refuses a result that does not fit the item: pass for a checked question, a count above its checks, a count for a single item', function (string $key, string $value): void {
+    $assessment = withCheckedQuestion($this->facility, $this->round);
+
+    correct($this, $assessment, ['items' => [$key => $value]])->assertUnprocessable()->assertJsonValidationErrors("items.{$key}");
+    expect(ItemResponse::query()->where('assessment_id', $assessment->id)->where('item_code', 'q21')->orderBy('id')->pluck('value')->all())->toBe(['pass', 'pass', 'fail']);
+})->with([
+    'pass for checks' => ['consist_m2_q21', 'pass'],
+    'too many' => ['consist_m2_q21', '4'],
+    'count for a single item' => ['avail_m2_reporting_rate', '2'],
+]);
