@@ -1291,21 +1291,31 @@ real month names for single-quarter views, LGA tile grid, Data issues "why it ex
 
 ### 11.4 Open questions for the client
 
+Kobo answers name their source, from Kobo credentials day (2026-10-31, read-only against the live
+asset): **K.1** inventory (`discovery/out/kobo_inventory.md`), **K.2** form diff
+(`discovery/out/kobo_form_diff.md`), **K.3** defect scan (`discovery/out/kobo_defect_scan.md`),
+**K.4** dry run, **K.5** local backfill and its report. The client-facing summary is
+`discovery/KOBO_FINDINGS.md`.
+
 | # | Question | Blocks |
 |---|---|---|
 | Q-01 | ODK Central (OData) or legacy ODK Aggregate? | Phase 2 |
-| Q-02 | Does the form use a cascading facility select and `select_one` scored items? | Phase 2 estimate |
-| Q-03 | How are dimensions scored today — pass rate or weighted rubric? | Phase 3 |
+| Q-02 | Does the form use a cascading facility select and `select_one` scored items?<br>**Answered for Kobo (K.2):** no. The facility cascades LGA → ward → facility, but from the form's own 1,070 choices, not a CSV. Scored items come in three kinds: yes/no, 0–3 counts and three-number matches. The portal reads the form as it is (D-65–D-68). ODK waits for its credentials. | Phase 2 estimate |
+| Q-03 | How are dimensions scored today — pass rate or weighted rubric?<br>**Answered for Kobo (K.2; client answers Q3–Q6):** the form's own formulas give points (2, 1 per check, 10). Every item in a dimension carries the same weight, so the pass rate gives the same percentage (D-69). K.4 confirms: portal scores equal the form's, except D-67's unanswered consistency. | Phase 3 |
 | Q-04 | Aggregation weighted or unweighted? | Every number |
-| Q-05 | How many form versions exist and how far do names drift? | Backfill estimate |
-| Q-06 | Who owns and signs off the facility master list, by when? | Phase 2+ |
+| Q-05 | How many form versions exist and how far do names drift?<br>**Answered for Kobo (K.1, K.2):** 7 deployed versions (25 Sep–22 Oct 2026). The answered questions are the same in all seven, with no renames, so one field map covers them (D-63). ODK waits for its credentials. | Backfill estimate |
+| Q-06 | Who owns and signs off the facility master list, by when?<br>**Kobo finding (K.3, K.5):** the form names facilities by its own slugs. All 6 used so far quarantine as `FACILITY_UNKNOWN` until the master list arrives and the slug mapping is signed off (D-72). | Phase 2+, every Kobo score |
 | Q-07 | VPS acceptable (Postgres ≥ 14)? Who pays? | Deployment |
 | Q-08 | How many administrator logins? (> 3 → revisit roles before launch) | Launch |
 | Q-09 | Display rounding: half-up or truncate? (explains 73 vs 74) | Phase 3 tests |
-| Q-10 | Round assessment windows for historical quarters — exact dates?<br>**Kobo finding (2026-10-31):** the real form is filled in after the period it reviews (all 4 Q3 2026 visits were made 22–25 Oct), and `ROUND_WINDOW` needs the visit date inside the reviewed quarter's window. Locally, 2026 Q3 runs 1 Jul–31 Oct (one month's lag, assumed). To confirm: how long after a quarter ends may its visits still be made? If always one month, windows run Jul–Oct, Nov–Jan and so on, and the next window starts the day after the last one ends. | Backfill, every round window |
-| Q-11 | Webhooks available on their ODK Central host? Kobo REST Services enabled on their Kobo account? | Optional latency |
-| Q-15 | Why both ODK and Kobo? Split by LGA, by period (e.g. history on Kobo, current on ODK), by partner, or overlapping? Which is authoritative if the same facility+round appears on both? | Duplicate handling, backfill triage |
-| Q-16 | Is the same XLSForm deployed on both platforms, and are versions kept in step?<br>**Kobo side known (2026-10-31):** the real form on Kobo is not the contract form (D-65); which form ODK Central carries waits for its credentials. | Field-map effort |
-| Q-17 | Which KoboToolbox server — global, EU, or self-hosted (URL)? Hosted servers sit outside Nigeria; any data-residency requirement?<br>**Answered for the server (2026-10-31):** `eu.kobotoolbox.org`, hosted in the EU. Whether EU hosting is acceptable for data protection is still the client's to confirm. | Config, hosting, data protection |
-| Q-18 | Can the client create a dedicated read-only Kobo account (view submissions only on the asset) for the API token? | Security |
+| Q-10 | Round assessment windows for historical quarters — exact dates?<br>**Kobo finding (K.5):** the real form is filled in after the period it reviews (all 4 Q3 2026 visits were made 22–25 Oct), and `ROUND_WINDOW` needs the visit date inside the reviewed quarter's window. Locally, 2026 Q3 runs 1 Jul–31 Oct (one month's lag, assumed). To confirm: how long after a quarter ends may its visits still be made? If always one month, windows run Jul–Oct, Nov–Jan and so on, and the next window starts the day after the last one ends. | Backfill, every round window |
+| Q-11 | Webhooks available on their ODK Central host? Kobo REST Services enabled on their Kobo account?<br>**Kobo side (K.1):** no REST Services are configured on the asset. Whether the client will enable one is still open; the scheduled pull works without it. | Optional latency |
+| Q-15 | Why both ODK and Kobo? Split by LGA, by period (e.g. history on Kobo, current on ODK), by partner, or overlapping? Which is authoritative if the same facility+round appears on both?<br>**Kobo finding (K.1, K.5):** the Kobo asset holds 6 submissions, all from 22–25 Oct 2026, so it holds no history (see Q-19). Still open. | Duplicate handling, backfill triage |
+| Q-16 | Is the same XLSForm deployed on both platforms, and are versions kept in step?<br>**Kobo side known (K.2):** the real form on Kobo is not the contract form (D-65); which form ODK Central carries waits for its credentials. | Field-map effort |
+| Q-17 | Which KoboToolbox server — global, EU, or self-hosted (URL)? Hosted servers sit outside Nigeria; any data-residency requirement?<br>**Answered for the server (K.1):** `eu.kobotoolbox.org`, hosted in the EU. Whether EU hosting is acceptable for data protection is still the client's to confirm. | Config, hosting, data protection |
+| Q-18 | Can the client create a dedicated read-only Kobo account (view submissions only on the asset) for the API token?<br>**Kobo finding (K.1):** the token in use is the asset **owner's**: it can add, change, validate and delete submissions, change, delete and manage the asset, and its account owns 4 other assets. Only GETs were made. The request is in `discovery/KOBO_FINDINGS.md` §6, for the client. Still open. | Security, go-live |
 | Q-12 | Standard action texts and default owners for the plan — confirm wording | Phase 6 |
+| Q-19 | Where is the history the Looker Studio report shows? The Kobo asset has nothing before 22 Oct 2026 (K.1, K.5). On ODK Central, another Kobo asset (the owning account has 4 others), or elsewhere? | Backfill (step 14), "every historical round loaded or gaps explained" |
+| Q-20 | Two Kobo submissions name future periods (January 2027 and Q1 2029, both visited 25 Oct 2026; K.3, K.5). Tests or mistakes? Will they be removed or corrected at source? The portal quarantines them as `ROUND_WINDOW` either way | Clean data at go-live |
+| Q-21 | Will the client switch the Kobo form's LGA/ward/facility questions to `select_one_from_file` with the portal's CSV (D-72)? If not, who keeps the slug mapping in step with the form's facility list? | Facility matching, every Kobo score |
+| Q-22 | Is the 20-minute minimum visit (`VISIT_TOO_SHORT`, soft) right for the real Kobo form? 3 of the 6 real visits took 11–18 minutes (K.3, K.5) | Flag noise on the Data issues page |

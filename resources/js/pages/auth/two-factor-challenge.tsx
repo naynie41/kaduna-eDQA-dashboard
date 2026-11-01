@@ -13,7 +13,7 @@ export default function TwoFactorChallenge() {
     return (
         <>
             <Head title={t('auth.two_factor.challenge.title')} />
-            <h1 className="text-2xl font-semibold">{t('auth.two_factor.challenge.title')}</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.02em]">{t('auth.two_factor.challenge.title')}</h1>
             <p className="mt-1 mb-6 text-ink-2">
                 {useRecovery ? t('auth.two_factor.challenge.intro_recovery') : t('auth.two_factor.challenge.intro_code')}
             </p>

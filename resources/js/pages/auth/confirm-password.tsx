@@ -11,7 +11,7 @@ export default function ConfirmPassword() {
     return (
         <>
             <Head title={t('auth.confirm_password.title')} />
-            <h1 className="text-2xl font-semibold">{t('auth.confirm_password.title')}</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.02em]">{t('auth.confirm_password.title')}</h1>
             <p className="mt-1 mb-6 text-ink-2">{t('auth.confirm_password.intro')}</p>
 
             <Form {...store.form()} resetOnSuccess={['password']} className="space-y-5">

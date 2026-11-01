@@ -23,16 +23,18 @@ export type TabsProps = {
  */
 export default function Tabs({ label, items }: TabsProps) {
     return (
-        <nav aria-label={label} className="overflow-x-auto">
-            <ul className="flex gap-0.5">
+        <nav aria-label={label} className="-mx-1 overflow-x-auto">
+            <ul className="flex gap-1">
                 {items.map((item) => (
                     <li key={item.href}>
                         <Link
                             href={item.href}
                             aria-current={item.current ? 'page' : undefined}
                             aria-label={item.accessibleName}
-                            className={`inline-flex items-center rounded-t-[5px] border-b-[2.5px] px-3 pt-2 pb-2.5 text-[13.5px] whitespace-nowrap forced-colors:forced-color-adjust-none forced-colors:bg-[Canvas] forced-colors:text-[LinkText] ${
-                                item.current ? 'border-deep font-semibold text-deep forced-colors:border-[Highlight]' : 'border-transparent text-ink-2 hover:bg-paper hover:text-ink'
+                            className={`-mb-px inline-flex items-center border-b-2 px-2.5 pt-1.5 pb-2.5 text-sm whitespace-nowrap transition-colors duration-150 forced-colors:forced-color-adjust-none forced-colors:bg-[Canvas] forced-colors:text-[LinkText] ${
+                                item.current
+                                    ? 'border-deep font-semibold text-ink forced-colors:border-[Highlight]'
+                                    : 'border-transparent text-ink-2 hover:border-rule-strong hover:text-ink'
                             }`}
                         >
                             {item.label}
@@ -46,10 +48,10 @@ export default function Tabs({ label, items }: TabsProps) {
 }
 
 function Badge({ text, label, tone = 'default', current }: NonNullable<TabItem['badge']> & { current: boolean }) {
-    const colour = tone === 'alert' ? 'bg-bad-bg text-bad' : current ? 'bg-wash text-deep' : 'bg-paper text-ink-2';
+    const colour = tone === 'alert' ? 'bg-bad text-panel' : current ? 'bg-deep text-panel' : 'bg-paper text-ink-2 ring-1 ring-rule ring-inset';
 
     return (
-        <span className={`ml-1.5 rounded-full px-1.5 py-px text-[11px] ${colour}`}>
+        <span className={`ml-2 min-w-5 rounded-full px-1.5 py-px text-center text-2xs font-semibold tabular-nums ${colour}`}>
             <span aria-hidden={label !== undefined}>{text}</span>
             {label !== undefined && <VisuallyHidden>{label}</VisuallyHidden>}
         </span>

@@ -48,7 +48,7 @@ export default function TrendFigure({ trend, strongAt }: TrendFigureProps) {
                         <tr key={point.roundId} className="border-b border-paper">
                             <th scope="row" className="px-3 py-2 text-left font-normal">
                                 {point.label}
-                                {trend.selected.includes(point.roundId) && <span className="text-[11.5px] text-ink-2"> ({t('dashboard.home.in_view')})</span>}
+                                {trend.selected.includes(point.roundId) && <span className="text-2xs text-ink-2"> ({t('dashboard.home.in_view')})</span>}
                             </th>
                             <td className="px-3 py-2 text-right">
                                 <ScoreTag score={point.overall} />

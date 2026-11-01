@@ -75,7 +75,7 @@ export default function Components() {
     return (
         <>
             <div className="mx-auto flex max-w-[1280px] flex-col gap-5">
-                <p className="max-w-[70ch] text-[12.5px] text-ink-2">{t('dev.intro')}</p>
+                <p className="max-w-[70ch] text-xs text-ink-2">{t('dev.intro')}</p>
                 <PanelSection t={t} />
                 <Section id="score-tag" title={t('dev.sections.score_tag')}>
                     <div className="flex flex-wrap gap-3">
@@ -92,8 +92,8 @@ export default function Components() {
                     </div>
                 </Section>
                 <Section id="heat-cell" title={t('dev.sections.heat_cell')}>
-                    <table className="border-collapse text-[13px]">
-                        <caption className="pb-2 text-left text-[12.5px] text-ink-2">{t('dev.sample.heat_caption')}</caption>
+                    <table className="border-collapse text-sm">
+                        <caption className="pb-2 text-left text-xs text-ink-2">{t('dev.sample.heat_caption')}</caption>
                         <tbody>
                             <tr>
                                 {HEAT_SAMPLES.map((sample) => (
@@ -113,7 +113,7 @@ export default function Components() {
                         title={t('dev.sample.empty_title')}
                         description={t('dev.sample.empty_description')}
                         action={
-                            <button type="button" className="rounded-md border border-rule bg-panel px-3 py-1.5 text-[13.5px] hover:bg-paper">
+                            <button type="button" className="btn btn-secondary btn-sm">
                                 {t('dev.sample.empty_action')}
                             </button>
                         }
@@ -122,7 +122,7 @@ export default function Components() {
                 <FigureSection t={t} />
                 <TableSection t={t} />
                 <Section id="visually-hidden" title={t('dev.sections.visually_hidden')}>
-                    <p className="text-[13px] text-ink-2">{t('dev.sample.hidden_demo')}</p>
+                    <p className="text-sm text-ink-2">{t('dev.sample.hidden_demo')}</p>
                     <button type="button" className="mt-2 rounded-md border border-rule px-2.5 py-1">
                         <span aria-hidden="true">✕</span>
                         <VisuallyHidden>{t('dev.sample.close')}</VisuallyHidden>
@@ -132,7 +132,7 @@ export default function Components() {
                 <Section id="tokens" title={t('dev.sections.tokens')}>
                     <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
                         {TOKENS.map((token) => (
-                            <li key={token} className="flex items-center gap-2 text-[12.5px]">
+                            <li key={token} className="flex items-center gap-2 text-xs">
                                 <span aria-hidden="true" className="h-6 w-6 rounded border border-rule" style={{ backgroundColor: `var(--color-${token})` }} />
                                 <code>{token}</code>
                             </li>
@@ -163,12 +163,12 @@ function PanelSection({ t }: { t: Translate }) {
                 title={t('dev.sample.panel_title')}
                 description={t('dev.sample.panel_description')}
                 actions={
-                    <button type="button" className="rounded-md border border-rule bg-panel px-3 py-1.5 text-[13.5px] hover:bg-paper">
+                    <button type="button" className="btn btn-secondary btn-sm">
                         {t('dev.sample.action')}
                     </button>
                 }
             />
-            <div className="px-5 pt-3 pb-5 text-[12.5px] text-ink-2">{t('dev.sections.panel')}</div>
+            <div className="px-5 pt-3 pb-5 text-xs text-ink-2">{t('dev.sections.panel')}</div>
         </Panel>
     );
 }
@@ -319,7 +319,7 @@ function AnnouncerSection({ t }: { t: Translate }) {
         <Section id="announcer" title={t('dev.sections.announcer')}>
             <button
                 type="button"
-                className="rounded-md border border-deep bg-deep px-3 py-1.5 text-[13.5px] text-panel hover:bg-deep-2"
+                className="btn btn-primary btn-sm"
                 onClick={() => {
                     const message = t('dev.sample.announced', { count: '439' });
                     announce(message);
@@ -328,7 +328,7 @@ function AnnouncerSection({ t }: { t: Translate }) {
             >
                 {t('dev.sample.announce')}
             </button>
-            <p className="mt-2 text-[12.5px] text-ink-2">{last === null ? t('dev.sample.nothing_announced') : t('dev.sample.last_announced', { message: last })}</p>
+            <p className="mt-2 text-xs text-ink-2">{last === null ? t('dev.sample.nothing_announced') : t('dev.sample.last_announced', { message: last })}</p>
         </Section>
     );
 }

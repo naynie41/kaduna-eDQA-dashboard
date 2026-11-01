@@ -140,12 +140,12 @@ export default function Facility({ facilities }: FacilityProps) {
     return (
         <div className="flex flex-col gap-3">
             <Panel>
-                <div className="flex flex-wrap items-start gap-4 px-5 pt-4">
+                <div className="flex flex-wrap items-start gap-x-4 gap-y-2 px-5 pt-4.5">
                     <div className="min-w-56 flex-1">
-                        <h2 className="text-[15.5px]">
+                        <h2 className="text-md">
                             {t("dashboard.facility.table_title")}
                         </h2>
-                        <p className="mt-0.5 max-w-[70ch] text-[12.5px] text-ink-2">
+                        <p className="mt-0.5 max-w-[70ch] text-xs text-ink-2">
                             {t("dashboard.pages.facility.subtitle", {
                                 count: formatCount(facilities?.page.total ?? 0),
                             })}
@@ -192,7 +192,7 @@ export default function Facility({ facilities }: FacilityProps) {
                     </Deferred>
                 </div>
             </Panel>
-            <p className="max-w-[78ch] text-[12.5px] text-ink-2">
+            <p className="max-w-[78ch] text-xs text-ink-2">
                 {t("dashboard.facility.weakest_note")}
             </p>
             {Number.isInteger(openId) && openId > 0 && (

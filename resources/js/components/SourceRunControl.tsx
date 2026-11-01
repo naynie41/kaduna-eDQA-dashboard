@@ -20,6 +20,8 @@ export type SourceRunControlProps = {
     onStarted: (runId: number, alreadyRunning: boolean) => void;
     /** A followed run reached its end: the page reloads the status and the history. */
     onFinished: () => void;
+    /** Primary for the panel's main action (Pull now), secondary for the rest (Reconcile). */
+    tone?: 'primary' | 'secondary';
 };
 
 /**
@@ -28,7 +30,7 @@ export type SourceRunControlProps = {
  * counters are shown. The page owns which run is followed, so a run started by Pull all is
  * followed here too. The button stays disabled while the run is going.
  */
-export default function SourceRunControl({ url, runId, attached, counters, labels, onStarted, onFinished }: SourceRunControlProps) {
+export default function SourceRunControl({ url, runId, attached, counters, labels, onStarted, onFinished, tone = 'primary' }: SourceRunControlProps) {
     const t = useTranslate();
     const action = useApiAction<{ run_id: number; already_running: boolean }>();
     const [finished, setFinished] = useState<number | null>(null);
@@ -54,17 +56,17 @@ export default function SourceRunControl({ url, runId, attached, counters, label
                     type="button"
                     onClick={() => void start()}
                     disabled={action.pending || running}
-                    className="min-h-11 rounded-md bg-deep px-4 text-[13.5px] font-medium text-panel disabled:cursor-not-allowed disabled:opacity-50"
+                    className={`btn btn-${tone} min-h-11 self-start`}
                 >
                     {action.pending ? labels.starting : labels.button} <span className="sr-only">{labels.source}</span>
                 </button>
             </div>
             {action.error !== null && (
-                <p role="alert" className="rounded-md border border-bad bg-bad-bg px-3 py-2 text-[13px] text-bad">
+                <p role="alert" className="notice notice-bad text-bad">
                     {action.error}
                 </p>
             )}
-            {attached && running && <p className="text-[13px] text-ink-2">{labels.attached}</p>}
+            {attached && running && <p className="text-sm text-ink-2">{labels.attached}</p>}
             {runId !== null && (
                 <ProgressPanel<{ data: PullRun }>
                     key={runId}

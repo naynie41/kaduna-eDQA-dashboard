@@ -96,17 +96,17 @@ export default function FacilityTable({ state, caption, onSort, onOpen }: Facili
                                                 type="button"
                                                 aria-haspopup="dialog"
                                                 onClick={() => onOpen(facility)}
-                                                className="text-left font-medium text-deep underline decoration-rule underline-offset-2 hover:decoration-deep"
+                                                className="inline-block py-1 text-left font-medium text-deep underline decoration-rule underline-offset-2 hover:decoration-deep"
                                             >
                                                 {facility.name}
                                             </button>
-                                            <span className="block text-[11.5px] text-ink-2">{facility.code}</span>
+                                            <span className="block text-2xs text-ink-2">{facility.code}</span>
                                         </th>
                                     );
                                 case 'owner':
                                     return (
                                         <td key={cell.id} className="px-3 py-2">
-                                            <span className={`rounded-full px-2 py-0.5 text-[11.5px] ${facility.ownership === 'public' ? 'bg-pub-bg text-pub' : 'bg-priv-bg text-priv'}`}>
+                                            <span className={`rounded-full px-2 py-0.5 text-2xs ${facility.ownership === 'public' ? 'bg-pub-bg text-pub' : 'bg-priv-bg text-priv'}`}>
                                                 {t(`enums.ownership.${facility.ownership}`)}
                                             </span>
                                         </td>
@@ -115,7 +115,7 @@ export default function FacilityTable({ state, caption, onSort, onOpen }: Facili
                                     return (
                                         <td key={cell.id} className="px-3 py-2 whitespace-nowrap tabular-nums">
                                             {facility.roundLabel}
-                                            <span className="block text-[11.5px] text-ink-2">{monthsShort.length === 12 ? formatDate(facility.assessedOn, monthsShort) : facility.assessedOn}</span>
+                                            <span className="block text-2xs text-ink-2">{monthsShort.length === 12 ? formatDate(facility.assessedOn, monthsShort) : facility.assessedOn}</span>
                                         </td>
                                     );
                                 case 'm1':

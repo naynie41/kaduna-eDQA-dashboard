@@ -54,13 +54,13 @@ export default function Pagination({
 }: PaginationProps) {
     const t = useTranslate();
 
-    const base = "min-h-9 min-w-9 rounded-md border px-2.5 text-[13px]";
-    const button = `${base} border-rule bg-panel hover:bg-paper disabled:cursor-not-allowed disabled:text-ink-2 disabled:hover:bg-panel`;
-    const current = `${base} border-deep bg-deep font-medium text-panel forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]`;
+    const base = "btn btn-sm min-h-9 min-w-9 px-2.5 text-sm";
+    const button = `${base} btn-secondary`;
+    const current = `${base} border-deep bg-deep font-semibold text-panel forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]`;
 
     return (
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-            <p className="text-[12.5px] text-ink-2">
+            <p className="text-xs text-ink-2">
                 {from === 0
                     ? (labels?.none ?? t("dashboard.facility.showing_none"))
                     : (labels?.showing ?? ((figures) => t("dashboard.facility.showing", figures)))({

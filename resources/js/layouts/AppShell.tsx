@@ -77,11 +77,11 @@ function Shell({ children }: AppShellProps) {
     }, []);
 
     return (
-        <div className="min-h-svh rail:grid rail:grid-cols-[210px_minmax(0,1fr)]">
+        <div className="min-h-svh rail:grid rail:grid-cols-[232px_minmax(0,1fr)]">
             {title !== null && <Head title={title} />}
             <a
                 href="#main"
-                className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-panel focus:px-4 focus:py-2 focus:shadow-panel"
+                className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-panel focus:px-4 focus:py-2 focus:shadow-overlay"
             >
                 {t('common.skip_to_content')}
             </a>
@@ -97,7 +97,7 @@ function Shell({ children }: AppShellProps) {
                     )}
                     {adminPage !== null && admin !== null && <AdminTabs current={adminPage} openQuarantineCount={admin.openQuarantineCount} />}
                 </TopBar>
-                <main id="main" tabIndex={-1} className="w-full max-w-[1280px] px-4 pt-5 pb-14 rail:px-6.5">
+                <main id="main" tabIndex={-1} className="w-full max-w-[1320px] px-4 pt-6 pb-16 rail:px-7">
                     {adminPage !== null && admin !== null && <StaleIngestionBanner stale={admin.staleIngestion} />}
                     {children}
                 </main>

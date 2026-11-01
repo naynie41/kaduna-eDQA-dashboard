@@ -38,14 +38,14 @@ function PlanView({ plan }: { plan: Plan }) {
     ];
 
     return (
-        <div className="flex flex-col gap-4.5">
+        <div className="flex flex-col gap-5">
             <Panel labelledBy="plan-actions" className="overflow-hidden">
                 <PanelHeader
                     id="plan-actions"
                     title={t('dashboard.plan.title')}
                     description={plan.round === null || threshold === null ? t('dashboard.plan.description_none') : t('dashboard.plan.description', { round: plan.round, ...threshold })}
                 />
-                <p className="px-5 pt-1 text-[12px] text-ink-2">{t('dashboard.plan.read_only')}</p>
+                <p className="px-5 pt-1 text-xs text-ink-2">{t('dashboard.plan.read_only')}</p>
                 <div className="mt-2">
                     <DataTable caption={t('dashboard.plan.title')} captionHidden columns={columns} empty={<EmptyState title={t('dashboard.plan.none')} />}>
                         {plan.actions.map((row) => (
@@ -60,7 +60,7 @@ function PlanView({ plan }: { plan: Plan }) {
                                 <HeatCell score={row.score} />
                                 <td className="min-w-56 px-3 py-2">
                                     {row.action}
-                                    {row.stored && <span className="ml-2 inline-block rounded-full bg-wash px-2 py-0.5 text-[11.5px] font-semibold text-ink-2">{t('dashboard.plan.saved')}</span>}
+                                    {row.stored && <span className="ml-2 inline-block rounded-full bg-wash px-2 py-0.5 text-2xs font-semibold text-ink-2">{t('dashboard.plan.saved')}</span>}
                                 </td>
                                 <td className="px-3 py-2 whitespace-nowrap">{row.owner}</td>
                                 <td className="px-3 py-2 whitespace-nowrap tabular-nums">
@@ -79,11 +79,11 @@ function PlanView({ plan }: { plan: Plan }) {
             <Panel labelledBy="plan-clear">
                 <PanelHeader id="plan-clear" title={t('dashboard.plan.clear_title')} {...(threshold === null ? {} : { description: t('dashboard.plan.clear_description', threshold) })} />
                 {plan.clear.length === 0 ? (
-                    <p className="px-5 pt-2 pb-4 text-[13px] text-ink-2">{t('dashboard.plan.clear_none')}</p>
+                    <p className="px-5 pt-2 pb-4 text-sm text-ink-2">{t('dashboard.plan.clear_none')}</p>
                 ) : (
                     <ul aria-label={t('dashboard.plan.clear_list')} className="flex flex-wrap gap-2 px-5 pt-2 pb-4">
                         {plan.clear.map((lga) => (
-                            <li key={lga.lgaId} className="flex items-center gap-2 rounded-md border border-rule px-2.5 py-1 text-[13px]">
+                            <li key={lga.lgaId} className="flex items-center gap-2 rounded-md border border-rule px-2.5 py-1 text-sm">
                                 <span className="font-medium">{lga.name}</span>
                                 <ScoreTag score={lga.overall} />
                             </li>
@@ -92,7 +92,7 @@ function PlanView({ plan }: { plan: Plan }) {
                 )}
             </Panel>
 
-            <div className="grid grid-cols-1 items-start gap-4.5 lg:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
                 <Panel labelledBy="plan-types" className="min-w-0 overflow-hidden">
                     <PanelHeader id="plan-types" title={t('dashboard.plan.types_title')} description={t('dashboard.plan.types_description')} />
                     <div className="mt-2">
@@ -109,7 +109,7 @@ function PlanView({ plan }: { plan: Plan }) {
                                 <tr key={type.dimension} className="border-b border-paper last:border-b-0">
                                     <th scope="row" className="min-w-48 px-3 py-2 text-left font-normal">
                                         {type.action}
-                                        <span className="block text-[11.5px] text-ink-2">{t('dashboard.plan.for_dimension', { dimension: t(`enums.dimension.${type.dimension}`) })}</span>
+                                        <span className="block text-2xs text-ink-2">{t('dashboard.plan.for_dimension', { dimension: t(`enums.dimension.${type.dimension}`) })}</span>
                                     </th>
                                     <td className="px-3 py-2 text-right font-semibold tabular-nums">{formatCount(type.count)}</td>
                                     <td className="px-3 py-2 whitespace-nowrap">{type.owner}</td>
@@ -134,7 +134,7 @@ function PlanView({ plan }: { plan: Plan }) {
                                 <tr key={type.dimension} className="border-b border-paper last:border-b-0">
                                     <th scope="row" className="min-w-40 px-3 py-2 text-left">
                                         {t(`enums.dimension.${type.dimension}`)}
-                                        <span className="block text-[11.5px] font-normal text-ink-2">{type.meaning}</span>
+                                        <span className="block text-2xs font-normal text-ink-2">{type.meaning}</span>
                                     </th>
                                     <td className="min-w-48 px-3 py-2">{type.action}</td>
                                 </tr>

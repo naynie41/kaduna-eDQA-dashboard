@@ -203,14 +203,49 @@ Define in `resources/css/app.css` with Tailwind 4 `@theme`:
   --font-sans: "IBM Plex Sans", "Segoe UI", Roboto, system-ui, sans-serif;
   --font-display: "Archivo", "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
 
-  --shadow-panel: 0 1px 2px rgba(23,48,43,.06), 0 8px 24px -16px rgba(23,48,43,.28);
-  --radius-panel: 10px;
+  --color-rule-strong: #C3CDC6;  /* section dividers, the line under the page title */
+  --color-control: #7B8D86;      /* input, select and secondary-button borders: 3.3:1 (WCAG 1.4.11) */
+
+  --shadow-panel: none;          /* panels are ruled, not floating */
+  --shadow-overlay: 0 1px 3px rgba(13,40,36,.12), 0 24px 48px -16px rgba(13,40,36,.32);
+  --radius-panel: 6px;
 }
 ```
 
+**Visual direction (2026-11 redesign): a statistical bulletin, not a card dashboard.** Flat paper
+and white panels separated by hairline rules; hierarchy comes from type and figures, never from
+shadows. Only what sits above the page (the drawer, a dialog, the skip link) casts
+`shadow-overlay`. Colour marks state only: Kaduna green for the institution and the primary
+action, ok / warn / bad for bands. No gradients, glass, coloured side borders on cards or tiles,
+or glyph characters standing in for icons.
+
+**Type scale.** Components use these steps only, never a pixel size (`text-[13px]` is a defect):
+
+| Token | Size (15px root) | Role |
+|---|---|---|
+| `text-2xs` | 11.5px | badges, legends, table headers, tile captions |
+| `text-xs` | 12.5px | captions, help under a label, the sync line |
+| `text-sm` | 13.5px | table cells, controls, panel descriptions |
+| `text-base` | 15px | body |
+| `text-md` | 16.5px | panel and figure titles |
+| `text-lg` | 21px | the page title (h1) |
+| `text-xl` | 24px | figures in tiles; auth page titles |
+| `text-2xl` | 36px | owner-split figures |
+| `text-display` | 63px | the headline quality score |
+
+**Control vocabulary** (`@layer components` in `app.css`): `.btn` with `.btn-primary` (one main
+action per panel), `.btn-secondary` (every other action), `.btn-quiet` (low-weight actions in a
+header or row), `.btn-danger` (behind a confirmation), and `.btn-sm` / `.btn-block`; `.control`
+for every input and select; `.notice` with `-ok` / `-warn` / `-bad` / `-info` for in-page
+messages. A state's shape is drawn by `StateMark` (circle, ring, half, triangle, square), never
+typed as a glyph.
+
+**Motion.** 150 ms colour transitions on controls, 500 ms ease-out on score bars, and the
+skeleton shimmer; all of it off under `prefers-reduced-motion`. No page-load choreography.
+
 - Fonts **self-hosted** via `@fontsource/archivo` (500/600/700) and `@fontsource/ibm-plex-sans`
   (400/500/600), `font-display: swap`. No Google Fonts CDN (CSP + 3G).
-- Base: body 15px / 1.5, `-webkit-font-smoothing: antialiased`, numbers `tabular-nums`.
+- Base: body 15px / 1.5, `-webkit-font-smoothing: antialiased`, numbers `tabular-nums`; headings `text-wrap: balance`, paragraphs `pretty`.
 - Headings use `font-display`, letter-spacing `-0.012em`.
 - Focus: `outline: 2px solid deep-2; outline-offset: 2px` — never removed (`ACCESSIBILITY.md` §5).
 - Secondary text uses `ink-2` (5.37:1 on white, 4.81:1 on paper). `ink-3` is for dividers and
@@ -241,7 +276,7 @@ Strong/Acceptable → ok, Review → warn, Needs action → bad. Always render t
 
 ### Component inventory
 `AppShell`, `Rail`, `SyncStatusBar`, `TopBar`, `FilterBar`, `Tabs`, `Panel`, `SegmentedControl`,
-`ScoreTag`, `StatusLabel`, `HeatCell`, `DimensionBar`, `OwnerSplit`, `LgaTile`, `RankedBars`,
+`ScoreTag`, `StatusLabel`, `StateMark`, `HeatCell`, `DimensionBar`, `OwnerSplit`, `LgaTile`, `RankedBars`,
 `TrendChart`, `MonthGroupChart`, `DataTable`, `Drawer`, `Toast`, `ConfirmWithReasonDialog`,
 `EmptyState`, `Skeleton`.
 

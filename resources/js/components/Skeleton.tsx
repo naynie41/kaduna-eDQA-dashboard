@@ -11,7 +11,11 @@ export default function Skeleton({ className = 'h-40 w-full' }: SkeletonProps) {
     const t = useTranslate();
 
     return (
-        <div role="status" aria-busy="true" className={`animate-pulse rounded-md bg-paper motion-reduce:animate-none ${className}`}>
+        <div
+            role="status"
+            aria-busy="true"
+            className={`rounded-panel border border-rule bg-[linear-gradient(100deg,var(--color-paper)_30%,var(--color-panel)_50%,var(--color-paper)_70%)] bg-[length:200%_100%] motion-safe:animate-[shimmer_1.6s_linear_infinite] ${className}`}
+        >
             <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
         </div>
     );

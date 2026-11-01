@@ -64,7 +64,7 @@ return [
         'seal' => 'KD',
         'brand' => 'eDQA e-tool',
         'brand_place' => 'Kaduna State',
-        'assessments' => ':count assessments',
+        'assessments_label' => 'assessments recorded',
         'support' => 'Support: HSDF',
         'title' => ':page · :app',
     ],

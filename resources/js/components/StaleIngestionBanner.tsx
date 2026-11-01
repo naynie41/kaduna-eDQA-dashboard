@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import StateMark from '@/components/StateMark';
 import { formatDateTime } from '@/lib/format';
 import { useTranslate, useTranslationList } from '@/lib/i18n';
 import type { AdminShell } from '@/types/shell';
@@ -25,13 +26,13 @@ export default function StaleIngestionBanner({ stale }: StaleIngestionBannerProp
             : t('admin.stale.body', { ...round, time: months.length === 12 ? formatDateTime(stale.lastSuccessAt, months) : stale.lastSuccessAt });
 
     return (
-        <section aria-labelledby="stale-ingestion-title" className="mb-5 rounded-md border border-warn-fill bg-warn-bg px-4 py-3 text-warn forced-colors:border-[CanvasText]">
-            <h2 id="stale-ingestion-title" className="flex items-center gap-2 text-[14px] font-semibold">
-                <span aria-hidden="true">▲</span>
+        <section aria-labelledby="stale-ingestion-title" className="notice notice-warn mb-6 px-4 py-3.5 text-warn forced-colors:border-[CanvasText]">
+            <h2 id="stale-ingestion-title" className="flex items-center gap-2 text-base font-semibold">
+                <StateMark mark="▲" className="text-warn-fill" />
                 {t('admin.stale.title', { hours: stale.hours })}
             </h2>
-            <p className="mt-1 text-[13px] text-ink">{body}</p>
-            <p className="mt-1.5 text-[13px]">
+            <p className="mt-1 text-sm text-ink">{body}</p>
+            <p className="mt-1.5 text-sm">
                 <Link href="/admin/sources" className="font-medium text-deep underline">
                     {t('admin.stale.link')}
                 </Link>

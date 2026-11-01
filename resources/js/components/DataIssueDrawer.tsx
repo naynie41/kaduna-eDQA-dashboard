@@ -37,9 +37,9 @@ export default function DataIssueDrawer({ recordId, instanceId, onClose }: DataI
     return (
         <Drawer title={t('admin.issues.drawer.title', { instance: instanceId })} closeLabel={t('admin.issues.drawer.close')} onClose={onClose}>
             {detail === null ? (
-                <p className="text-[13px] text-ink-2">{t('admin.issues.drawer.loading')}</p>
+                <p className="text-sm text-ink-2">{t('admin.issues.drawer.loading')}</p>
             ) : (
-                <div className="flex flex-col gap-5 text-[13px]">
+                <div className="flex flex-col gap-5 text-sm">
                     <Section title={t('admin.issues.drawer.failures')}>
                         <ul className="flex flex-col gap-2">
                             {detail.failures.map((failure, i) => (
@@ -47,9 +47,9 @@ export default function DataIssueDrawer({ recordId, instanceId, onClose }: DataI
                                     <span className="flex flex-wrap items-center gap-2">
                                         <SeverityTag severity={failure.severity} label={t(`admin.issues.summary.${failure.severity === 'soft' ? 'soft' : 'hard'}`)} />
                                         <span className="font-medium">{failure.name}</span>
-                                        <code className="text-[11.5px] text-ink-2">{failure.code}</code>
+                                        <code className="text-2xs text-ink-2">{failure.code}</code>
                                     </span>
-                                    <code className="rounded bg-paper px-2 py-1 text-[12.5px] break-words whitespace-pre-wrap">{failure.detail}</code>
+                                    <code className="rounded bg-paper px-2 py-1 text-xs break-words whitespace-pre-wrap">{failure.detail}</code>
                                 </li>
                             ))}
                         </ul>
@@ -64,11 +64,11 @@ export default function DataIssueDrawer({ recordId, instanceId, onClose }: DataI
                     </Section>
 
                     <Section title={t('admin.issues.drawer.payload')}>
-                        <p className="mb-1.5 text-[12.5px] text-ink-2">{t('admin.issues.drawer.payload_hint')}</p>
+                        <p className="mb-1.5 text-xs text-ink-2">{t('admin.issues.drawer.payload_hint')}</p>
                         <details className="rounded-md border border-rule">
                             <summary className="min-h-11 cursor-pointer px-3 py-2.5 font-medium">{t('admin.issues.drawer.payload_show')}</summary>
                             <div role="region" aria-label={t('common.ui.scroll_region', { label: t('admin.issues.drawer.payload') })} tabIndex={0} className="max-h-96 overflow-auto bg-paper">
-                                <pre className="px-3 py-2 text-[12px] leading-snug">{JSON.stringify(detail.payload, null, 2)}</pre>
+                                <pre className="px-3 py-2 text-xs leading-snug">{JSON.stringify(detail.payload, null, 2)}</pre>
                             </div>
                         </details>
                     </Section>
@@ -104,7 +104,7 @@ export default function DataIssueDrawer({ recordId, instanceId, onClose }: DataI
 function Section({ title, children }: { title: string; children: ReactNode }) {
     return (
         <section>
-            <h3 className="mb-2 text-[14px]">{title}</h3>
+            <h3 className="mb-2 text-base">{title}</h3>
             {children}
         </section>
     );

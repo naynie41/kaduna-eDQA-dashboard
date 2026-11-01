@@ -22,7 +22,7 @@ export default function Monitor({ owners, coverage, windows, sources }: MonitorP
 
     return (
         <div className="flex flex-col">
-            <h2 id="monitor-owners" className="mb-2.75 text-[13px] text-ink-2">
+            <h2 id="monitor-owners" className="mb-3.5 flex items-center gap-4 text-md font-semibold tracking-[-0.015em] text-ink after:h-px after:flex-1 after:bg-rule-strong">
                 {t('dashboard.monitor.owners_title')}
             </h2>
             <Panel labelledBy="monitor-owners" className="overflow-hidden">
@@ -31,7 +31,7 @@ export default function Monitor({ owners, coverage, windows, sources }: MonitorP
                 </Deferred>
             </Panel>
 
-            <div className="mt-4.5 grid grid-cols-1 items-start gap-4.5 lg:grid-cols-2">
+            <div className="mt-5 grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
                 <Panel labelledBy="monitor-lgas">
                     <PanelHeader id="monitor-lgas" title={t('dashboard.monitor.lgas_title')} description={t('dashboard.monitor.lgas_description')} />
                     <Deferred data="coverage" fallback={<Skeleton className="m-5 h-[520px]" />}>
@@ -39,7 +39,7 @@ export default function Monitor({ owners, coverage, windows, sources }: MonitorP
                     </Deferred>
                 </Panel>
 
-                <div className="flex min-w-0 flex-col gap-4.5">
+                <div className="flex min-w-0 flex-col gap-5">
                     <Panel labelledBy="monitor-levels">
                         <PanelHeader id="monitor-levels" title={t('dashboard.monitor.levels_title')} description={t('dashboard.monitor.levels_description')} />
                         <Deferred data="coverage" fallback={<Skeleton className="m-5 h-[120px]" />}>

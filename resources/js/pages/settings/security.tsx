@@ -20,8 +20,8 @@ export default function Security({ status, twoFactorEnabled, recoveryCodes }: Se
         <>
             {/* The title (h1 and <title>) comes from AppShell. */}
             <div className="grid max-w-xl gap-8">
-                <section aria-labelledby="password-title" className="rounded-[var(--radius-panel)] bg-panel p-6 shadow-[var(--shadow-panel)]">
-                    <h2 id="password-title" className="mb-4 text-lg font-semibold">
+                <section aria-labelledby="password-title" className="rounded-panel border border-rule bg-panel p-6">
+                    <h2 id="password-title" className="mb-4 text-md font-semibold">
                         {t('auth.settings.password_title')}
                     </h2>
                     {status && (
@@ -70,8 +70,8 @@ export default function Security({ status, twoFactorEnabled, recoveryCodes }: Se
                     </Form>
                 </section>
 
-                <section aria-labelledby="two-factor-title" className="rounded-[var(--radius-panel)] bg-panel p-6 shadow-[var(--shadow-panel)]">
-                    <h2 id="two-factor-title" className="mb-2 text-lg font-semibold">
+                <section aria-labelledby="two-factor-title" className="rounded-panel border border-rule bg-panel p-6">
+                    <h2 id="two-factor-title" className="mb-2 text-md font-semibold">
                         {t('auth.settings.two_factor_title')}
                     </h2>
                     {!twoFactorEnabled ? (

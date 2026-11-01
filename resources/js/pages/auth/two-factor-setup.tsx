@@ -21,7 +21,7 @@ export default function TwoFactorSetup({ step, qrCodeSvg, setupKey, recoveryCode
     return (
         <>
             <Head title={t('auth.two_factor.setup.title')} />
-            <h1 className="text-2xl font-semibold">
+            <h1 className="text-xl font-semibold tracking-[-0.02em]">
                 {step === 'recovery-codes' ? t('auth.two_factor.setup.codes_title') : t('auth.two_factor.setup.title')}
             </h1>
 
@@ -79,7 +79,7 @@ export default function TwoFactorSetup({ step, qrCodeSvg, setupKey, recoveryCode
                     <RecoveryCodeList codes={recoveryCodes} />
                     <Link
                         href={home()}
-                        className="mt-6 inline-flex w-full items-center justify-center rounded-md bg-deep px-4 py-2.5 font-semibold text-panel hover:bg-deep-2"
+                        className="btn btn-primary btn-block mt-6 min-h-11 text-base"
                     >
                         {t('auth.two_factor.setup.done')}
                     </Link>

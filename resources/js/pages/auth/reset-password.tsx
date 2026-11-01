@@ -16,7 +16,7 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
     return (
         <>
             <Head title={t('auth.reset.title')} />
-            <h1 className="mb-6 text-2xl font-semibold">{t('auth.reset.title')}</h1>
+            <h1 className="mb-6 text-xl font-semibold tracking-[-0.02em]">{t('auth.reset.title')}</h1>
 
             <Form {...update.form()} transform={(data) => ({ ...data, token })} resetOnSuccess={['password', 'password_confirmation']} className="space-y-5">
                 {({ processing, errors }) => (

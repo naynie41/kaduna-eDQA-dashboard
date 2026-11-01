@@ -59,15 +59,15 @@ export default function FacilityDrawer({ facilityId, name, year, quarter, onClos
         <Drawer title={title} subtitle={subtitle} closeLabel={t('dashboard.drawer.close')} onClose={onClose}>
             {current === null ? (
                 <div role="status" className="flex flex-col gap-3">
-                    <p className="text-[13px] text-ink-2">{t('dashboard.drawer.loading')}</p>
+                    <p className="text-sm text-ink-2">{t('dashboard.drawer.loading')}</p>
                     <Skeleton className="h-24 w-full" />
                     <Skeleton className="h-64 w-full" />
                 </div>
             ) : 'error' in current ? (
-                <div role="alert" className="flex flex-col items-start gap-3 text-[13px]">
+                <div role="alert" className="flex flex-col items-start gap-3 text-sm">
                     <p>{current.error === 404 ? t('dashboard.drawer.not_found') : t('dashboard.drawer.error')}</p>
                     {current.error !== 404 && (
-                        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="min-h-9 rounded-md border border-rule bg-panel px-3 hover:bg-paper">
+                        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="btn btn-secondary min-h-9">
                             {t('dashboard.drawer.retry')}
                         </button>
                     )}

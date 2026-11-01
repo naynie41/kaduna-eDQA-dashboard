@@ -16,7 +16,7 @@ export default function Login({ status }: LoginProps) {
     return (
         <>
             <Head title={t('auth.login.title')} />
-            <h1 className="text-2xl font-semibold">{t('auth.login.title')}</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.02em]">{t('auth.login.title')}</h1>
             <p className="mt-1 mb-6 text-ink-2">{t('auth.login.intro')}</p>
 
             {status && (

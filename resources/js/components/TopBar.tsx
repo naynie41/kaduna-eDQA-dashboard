@@ -21,22 +21,22 @@ export default function TopBar({ title, subtitle, titleRef, headerRef, children 
     const { user } = usePage().props.auth;
 
     return (
-        <header ref={headerRef} className="z-20 border-b border-rule bg-panel px-4 pt-3.5 rail:sticky rail:top-0 rail:px-6">
-            <div className="flex flex-wrap items-start gap-x-4 gap-y-3 pb-3">
-                <div className="min-w-0 flex-1 basis-72">
+        <header ref={headerRef} className="z-20 border-b border-rule-strong bg-panel px-4 pt-4 rail:sticky rail:top-0 rail:px-7 rail:pt-5">
+            <div className="flex flex-wrap items-start gap-x-6 gap-y-3 pb-4">
+                <div className="min-w-0 flex-1 basis-80">
                     {title !== null && (
-                        <h1 ref={titleRef} tabIndex={-1} className="text-[17px] outline-offset-4">
+                        <h1 ref={titleRef} tabIndex={-1} className="text-lg font-semibold tracking-[-0.02em] text-ink outline-offset-4">
                             {title}
                         </h1>
                     )}
-                    {subtitle !== undefined && subtitle !== null && <p className="mt-0.5 max-w-[70ch] text-[12.5px] text-ink-2">{subtitle}</p>}
+                    {subtitle !== undefined && subtitle !== null && <p className="mt-1 max-w-[72ch] text-sm text-ink-2">{subtitle}</p>}
                 </div>
-                <nav aria-label={t('common.user_menu.label')} className="flex items-center gap-3 text-[12.5px]">
-                    {user && <span className="text-ink-2">{t('common.user_menu.signed_in_as', { name: user.name })}</span>}
-                    <Link href={securityEdit()} className="text-deep-2 underline-offset-2 hover:underline">
+                <nav aria-label={t('common.user_menu.label')} className="flex items-center gap-1 text-xs">
+                    {user && <span className="mr-2 hidden text-ink-2 sm:inline">{t('common.user_menu.signed_in_as', { name: user.name })}</span>}
+                    <Link href={securityEdit()} className="btn btn-quiet btn-sm">
                         {t('common.user_menu.security')}
                     </Link>
-                    <Link href={logout()} as="button" className="rounded-md border border-rule px-2.5 py-1 font-medium whitespace-nowrap text-ink hover:bg-paper">
+                    <Link href={logout()} as="button" className="btn btn-secondary btn-sm">
                         {t('common.user_menu.log_out')}
                     </Link>
                 </nav>

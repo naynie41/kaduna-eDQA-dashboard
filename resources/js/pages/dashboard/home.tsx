@@ -29,7 +29,7 @@ export default function Home({ hero, dimensions, owners, trend, weakest }: HomeP
                     description={t('dashboard.home.empty_description')}
                     action={
                         filtered ? (
-                            <Link href={path} className="text-[13.5px] text-deep-2 underline underline-offset-2">
+                            <Link href={path} className="text-sm text-deep-2 underline underline-offset-2">
                                 {t('dashboard.filters.clear')}
                             </Link>
                         ) : undefined
@@ -43,7 +43,7 @@ export default function Home({ hero, dimensions, owners, trend, weakest }: HomeP
         <div className="flex flex-col">
             <HomeHero hero={hero} dimensions={dimensions} />
 
-            <h2 id="home-owners" className="mt-6.5 mb-2.75 text-[13px] text-ink-2">
+            <h2 id="home-owners" className="mt-9 mb-3.5 flex items-center gap-4 text-md font-semibold tracking-[-0.015em] text-ink after:h-px after:flex-1 after:bg-rule-strong">
                 {t('dashboard.home.owners_title')}
             </h2>
             <Panel labelledBy="home-owners" className="overflow-hidden">
@@ -52,7 +52,7 @@ export default function Home({ hero, dimensions, owners, trend, weakest }: HomeP
                 </Deferred>
             </Panel>
 
-            <div className="mt-4.5 grid items-start gap-4.5 lg:grid-cols-[1.15fr_1fr]">
+            <div className="mt-5 grid items-start gap-5 lg:grid-cols-[1.15fr_1fr]">
                 <Panel>
                     <Deferred data="trend" fallback={<Skeleton className="h-[300px] w-full" />}>
                         {trend !== undefined && <TrendFigure trend={trend} strongAt={hero.strongAt} />}

@@ -41,23 +41,23 @@ export default function PullAllPanel({ names, onStarted }: PullAllPanelProps) {
     return (
         <Panel labelledBy="sources-pull-all-title">
             <PanelHeader id="sources-pull-all-title" title={t('admin.sources.pull_all.title')} description={t('admin.sources.pull_all.description')} />
-            <div className="flex flex-col gap-3 px-5 pb-5 text-[13.5px]">
+            <div className="flex flex-col gap-3 px-5 pb-5 text-sm">
                 <div>
                     <button
                         type="button"
                         onClick={() => void start()}
                         disabled={action.pending}
-                        className="min-h-11 rounded-md bg-deep px-4 text-[13.5px] font-medium text-panel disabled:cursor-not-allowed disabled:opacity-50"
+                        className="btn btn-primary min-h-11"
                     >
                         {action.pending ? t('admin.sources.pull_all.starting') : t('admin.sources.pull_all.button')}
                     </button>
                 </div>
                 {action.error !== null && (
-                    <p role="alert" className="rounded-md border border-bad bg-bad-bg px-3 py-2 text-[13px] text-bad">
+                    <p role="alert" className="notice notice-bad text-bad">
                         {action.error}
                     </p>
                 )}
-                <p role="status" className="text-[13px]">
+                <p role="status" className="text-sm">
                     {started}
                 </p>
             </div>

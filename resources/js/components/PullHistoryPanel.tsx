@@ -3,6 +3,8 @@ import { useId } from 'react';
 import AdminTable from '@/components/AdminTable';
 import { useAnnounce } from '@/components/Announcer';
 import Panel from '@/components/Panel';
+import StateMark from '@/components/StateMark';
+
 import PanelHeader from '@/components/PanelHeader';
 import { formatCount, formatDateTime } from '@/lib/format';
 import { useTranslate, useTranslationList } from '@/lib/i18n';
@@ -72,14 +74,14 @@ export default function PullHistoryPanel({ history, filters, sources }: PullHist
         { key: 'outcome', header: t('admin.sources.history.outcome') },
     ];
 
-    const select = 'min-h-11 rounded-md border border-rule bg-panel px-2.5 text-[13.5px]';
+    const select = 'control min-h-11';
 
     return (
         <Panel labelledBy="sources-history-title">
             <PanelHeader id="sources-history-title" title={t('admin.sources.history.title')} />
             <div className="flex flex-wrap gap-3 px-5 pb-3">
                 <div className="flex flex-col gap-1">
-                    <label htmlFor={ids.source} className="text-[12.5px] text-ink-2">
+                    <label htmlFor={ids.source} className="text-xs text-ink-2">
                         {t('admin.sources.history.filter_source')}
                     </label>
                     <select id={ids.source} className={select} value={filters.source ?? ''} onChange={(event) => visit({ source: event.target.value || null, page: 1 })}>
@@ -92,7 +94,7 @@ export default function PullHistoryPanel({ history, filters, sources }: PullHist
                     </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label htmlFor={ids.trigger} className="text-[12.5px] text-ink-2">
+                    <label htmlFor={ids.trigger} className="text-xs text-ink-2">
                         {t('admin.sources.history.filter_trigger')}
                     </label>
                     <select id={ids.trigger} className={select} value={filters.trigger ?? ''} onChange={(event) => visit({ trigger: event.target.value || null, page: 1 })}>
@@ -105,7 +107,7 @@ export default function PullHistoryPanel({ history, filters, sources }: PullHist
                     </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label htmlFor={ids.outcome} className="text-[12.5px] text-ink-2">
+                    <label htmlFor={ids.outcome} className="text-xs text-ink-2">
                         {t('admin.sources.history.filter_outcome')}
                     </label>
                     <select id={ids.outcome} className={select} value={filters.outcome ?? ''} onChange={(event) => visit({ outcome: event.target.value || null, page: 1 })}>
@@ -122,7 +124,7 @@ export default function PullHistoryPanel({ history, filters, sources }: PullHist
                 caption={t('admin.sources.history.caption')}
                 captionHidden
                 columns={columns}
-                empty={<p className="px-3 py-6 text-center text-[13px] text-ink-2">{t('admin.sources.history.none')}</p>}
+                empty={<p className="px-3 py-6 text-center text-sm text-ink-2">{t('admin.sources.history.none')}</p>}
                 meta={{ page: history.current_page, lastPage: history.last_page, from: history.from ?? 0, to: history.to ?? 0, total: history.total }}
                 onPage={(page) => visit({ page })}
                 labels={{
@@ -167,13 +169,11 @@ function Outcome({ outcome, label, error }: { outcome: PullOutcomeValue; label: 
 
     return (
         <span className="flex flex-col gap-0.5">
-            <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] whitespace-nowrap ${style.tone}`}>
-                <span aria-hidden="true" className="text-[9px]">
-                    {style.mark}
-                </span>
+            <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs whitespace-nowrap ${style.tone}`}>
+                <StateMark mark={style.mark} className="size-2" />
                 {label}
             </span>
-            {error !== null && <span className="max-w-72 text-[12px] break-words text-ink-2">{error}</span>}
+            {error !== null && <span className="max-w-72 text-xs break-words text-ink-2">{error}</span>}
         </span>
     );
 }

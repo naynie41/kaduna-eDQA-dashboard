@@ -49,7 +49,7 @@ export default function Visuals({ ownerView, monthSlots, lgas }: VisualsProps) {
     const ranksTitle = ownerView.value === 'all' ? t('dashboard.visuals.ranks_title') : t('dashboard.visuals.ranks_title_owner', { owner: t(`dashboard.visuals.owners.${ownerView.value}`) });
 
     return (
-        <div className="flex flex-col gap-4.5">
+        <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <SegmentedControl
                     label={t('dashboard.visuals.view')}
@@ -60,7 +60,7 @@ export default function Visuals({ ownerView, monthSlots, lgas }: VisualsProps) {
                     options={VIEWS.map((view) => ({ value: view, label: t(`dashboard.visuals.views.${view}`) }))}
                 />
                 {ownerView.locked !== null && (
-                    <p id={lockedId} className="max-w-[70ch] text-[12.5px] text-ink-2">
+                    <p id={lockedId} className="max-w-[70ch] text-xs text-ink-2">
                         {t('dashboard.visuals.locked', { owner: t(`dashboard.visuals.views.${ownerView.locked}`) })}
                     </p>
                 )}

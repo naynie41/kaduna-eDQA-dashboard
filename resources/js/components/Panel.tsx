@@ -10,7 +10,7 @@ export type PanelProps = {
 /** A white card on the paper background (CONVENTION.md §6). */
 export default function Panel({ children, labelledBy, className = '' }: PanelProps) {
     return (
-        <section aria-labelledby={labelledBy} className={`rounded-panel border border-rule bg-panel shadow-panel ${className}`}>
+        <section aria-labelledby={labelledBy} className={`rounded-panel border border-rule bg-panel ${className}`}>
             {children}
         </section>
     );

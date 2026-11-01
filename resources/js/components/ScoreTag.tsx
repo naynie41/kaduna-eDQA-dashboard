@@ -21,9 +21,9 @@ export default function ScoreTag({ score }: ScoreTagProps) {
     const tone = score.band === null ? NO_DATA_TONE : TONE[score.band];
 
     return (
-        <span className={`inline-flex items-baseline gap-1.5 rounded-md px-2 py-0.5 text-sm font-medium tabular-nums ${tone}`}>
+        <span className={`inline-flex items-baseline gap-1.5 rounded-sm px-1.5 py-0.5 text-sm font-semibold tabular-nums ${tone}`}>
             <span>{score.display}</span>
-            <span className="text-xs font-semibold">{score.bandLabel}</span>
+            <span className="text-2xs font-medium">{score.bandLabel}</span>
         </span>
     );
 }

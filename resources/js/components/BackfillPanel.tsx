@@ -22,8 +22,8 @@ export default function BackfillPanel({ backfill }: BackfillPanelProps) {
     return (
         <Panel labelledBy="sources-backfill-title">
             <PanelHeader id="sources-backfill-title" title={t('admin.sources.backfill.title')} description={t('admin.sources.backfill.description')} />
-            <dl className="grid gap-x-6 gap-y-2.5 px-5 pb-5 text-[13.5px] rail:grid-cols-[minmax(12rem,auto)_1fr]">
-                <dt className="text-[12.5px] text-ink-2">{t('admin.sources.backfill.last_run')}</dt>
+            <dl className="grid gap-x-6 gap-y-2.5 px-5 pb-5 text-sm rail:grid-cols-[minmax(12rem,auto)_1fr]">
+                <dt className="text-xs text-ink-2">{t('admin.sources.backfill.last_run')}</dt>
                 <dd>
                     {run === null
                         ? t('admin.sources.backfill.none')
@@ -37,7 +37,7 @@ export default function BackfillPanel({ backfill }: BackfillPanelProps) {
                               duplicates: formatCount(run.duplicates),
                           })}
                 </dd>
-                <dt className="text-[12.5px] text-ink-2">{t('admin.sources.backfill.checkpoint')}</dt>
+                <dt className="text-xs text-ink-2">{t('admin.sources.backfill.checkpoint')}</dt>
                 <dd>
                     {t('admin.sources.backfill.checkpoint_value', {
                         position: formatCount(checkpoint.position),
@@ -45,7 +45,7 @@ export default function BackfillPanel({ backfill }: BackfillPanelProps) {
                         size: formatCount(checkpoint.page_size),
                     })}
                 </dd>
-                <dt className="text-[12.5px] text-ink-2">{t('admin.sources.backfill.report')}</dt>
+                <dt className="text-xs text-ink-2">{t('admin.sources.backfill.report')}</dt>
                 <dd>
                     {report === null ? (
                         t('admin.sources.backfill.report_none')
@@ -54,7 +54,7 @@ export default function BackfillPanel({ backfill }: BackfillPanelProps) {
                             <a href={report.url} className="font-medium text-deep underline">
                                 {t('admin.sources.backfill.report_link', { time: when(report.at) })}
                             </a>
-                            <span className="block text-[12.5px] text-ink-2">{t('admin.sources.backfill.report_expiry')}</span>
+                            <span className="block text-xs text-ink-2">{t('admin.sources.backfill.report_expiry')}</span>
                         </>
                     )}
                 </dd>

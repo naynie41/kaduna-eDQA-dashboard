@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Panel from '@/components/Panel';
 import PanelHeader from '@/components/PanelHeader';
 import SourceRunControl, { type RunCounter } from '@/components/SourceRunControl';
+import StateMark from '@/components/StateMark';
 import { formatCount, formatDateTime, formatTime } from '@/lib/format';
 import { useTranslate, useTranslationList, type Translate } from '@/lib/i18n';
 import type { SourceEntry } from '@/types/admin';
@@ -44,13 +45,13 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
         return (
             <Panel labelledBy={titleId}>
                 <PanelHeader id={titleId} title={t('admin.sources.panel.title', name)} />
-                <div className="flex flex-col gap-2 px-5 pb-5 text-[13.5px]">
+                <div className="flex flex-col gap-2 px-5 pb-5 text-sm">
                     <State mark="○" tone="text-ink-2" label={t('admin.sources.panel.not_configured')} />
                     <p>{t('admin.sources.panel.not_configured_body', name)}</p>
                     <ul className="list-disc pl-5">
                         {source.problems.map((problem) => (
                             <li key={problem}>
-                                <code className="rounded bg-paper px-1 py-px text-[12.5px]">{problem}</code>
+                                <code className="rounded bg-paper px-1 py-px text-xs">{problem}</code>
                             </li>
                         ))}
                     </ul>
@@ -79,7 +80,7 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
     return (
         <Panel labelledBy={titleId}>
             <PanelHeader id={titleId} title={t('admin.sources.panel.title', name)} />
-            <div className="flex flex-col gap-3 px-5 pb-5 text-[13.5px]">
+            <div className="flex flex-col gap-3 px-5 pb-5 text-sm">
                 {!source.enabled ? (
                     <div>
                         <State mark="○" tone="text-ink-2" label={t('admin.sources.panel.disabled')} />
@@ -98,12 +99,12 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
                 )}
 
                 {(sync.state === 'failed' || sync.state === 'auth_failed') && sync.lastFailedAt !== null && (
-                    <div className="rounded-md border border-bad bg-bad-bg px-3 py-2 text-bad">
+                    <div className="notice notice-bad text-bad">
                         <p className="font-medium">{t('admin.sources.panel.last_error')}</p>
                         <p className="text-ink">
                             {errorSentence(t, source.name, sync, formatTime(sync.lastFailedAt), sync.lastSuccessAt === null ? t('admin.sources.panel.never_inline') : formatTime(sync.lastSuccessAt))}
                         </p>
-                        {sync.lastError !== null && <p className="mt-0.5 text-[12.5px] break-words text-ink-2">{t('admin.sources.panel.error_detail', { error: sync.lastError })}</p>}
+                        {sync.lastError !== null && <p className="mt-0.5 text-xs break-words text-ink-2">{t('admin.sources.panel.error_detail', { error: sync.lastError })}</p>}
                     </div>
                 )}
 
@@ -164,7 +165,7 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
                             onFinished={onFinished}
                         />
                         <div className="flex flex-col gap-2">
-                            <p className="text-[13px] text-ink-2">{t('admin.sources.reconcile.description')}</p>
+                            <p className="text-sm text-ink-2">{t('admin.sources.reconcile.description')}</p>
                             <SourceRunControl
                                 url={`/api/sources/${source.key}/reconcile`}
                                 runId={reconcile?.id ?? null}
@@ -177,6 +178,7 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
                                     attached: t('admin.sources.reconcile.attached', name),
                                     progress: t('admin.sources.reconcile.progress', name),
                                 }}
+                                tone="secondary"
                                 onStarted={(id, attached) => onReconcile({ id, attached })}
                                 onFinished={onFinished}
                             />
@@ -221,9 +223,7 @@ function errorKind(errorClass: string | null): 'auth' | 'unreachable' | 'unexpec
 function State({ mark, tone, label }: { mark: string; tone: string; label: string }) {
     return (
         <p className={`flex items-center gap-2 font-semibold ${tone}`}>
-            <span aria-hidden="true" className="text-[11px]">
-                {mark}
-            </span>
+            <StateMark mark={mark} />
             {label}
         </p>
     );
@@ -232,7 +232,7 @@ function State({ mark, tone, label }: { mark: string; tone: string; label: strin
 function Term({ label, children }: { label: string; children: ReactNode }) {
     return (
         <>
-            <dt className="text-[12.5px] text-ink-2">{label}</dt>
+            <dt className="text-xs text-ink-2">{label}</dt>
             <dd>{children}</dd>
         </>
     );

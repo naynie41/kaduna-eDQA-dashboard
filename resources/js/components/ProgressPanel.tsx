@@ -99,9 +99,9 @@ export default function ProgressPanel<T>({ title, url, stage, children, onDone, 
 
     return (
         <section aria-label={title} className="rounded-md border border-rule bg-panel px-4 py-3">
-            <p className="text-[14px] font-medium">{current === null ? t('common.loading') : current.label}</p>
-            {data !== null && <div className="mt-1.5 text-[13px] text-ink-2">{children(data)}</div>}
-            {failed && <p className="mt-1.5 text-[12.5px] text-bad">{t('common.progress.failed')}</p>}
+            <p className="text-base font-medium">{current === null ? t('common.loading') : current.label}</p>
+            {data !== null && <div className="mt-1.5 text-sm text-ink-2">{children(data)}</div>}
+            {failed && <p className="mt-1.5 text-xs text-bad">{t('common.progress.failed')}</p>}
         </section>
     );
 }

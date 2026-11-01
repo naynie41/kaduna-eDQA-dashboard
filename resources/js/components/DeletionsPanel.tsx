@@ -36,7 +36,7 @@ export default function DeletionsPanel({ deletions }: DeletionsPanelProps) {
                     { key: 'round', header: t('admin.sources.deletions.round') },
                     { key: 'portal', header: t('admin.sources.deletions.in_portal') },
                 ]}
-                empty={<p className="px-3 py-6 text-center text-[13px] text-ink-2">{t('admin.sources.deletions.none')}</p>}
+                empty={<p className="px-3 py-6 text-center text-sm text-ink-2">{t('admin.sources.deletions.none')}</p>}
             >
                 {rows.map((row) => (
                     <tr key={row.submission_id} className="border-b border-rule align-top last:border-b-0">
@@ -45,9 +45,9 @@ export default function DeletionsPanel({ deletions }: DeletionsPanelProps) {
                         </th>
                         <td className="px-3 py-2 whitespace-nowrap">{row.source?.name ?? t('admin.sources.history.unknown_source')}</td>
                         <td className="px-3 py-2">
-                            <code className="block max-w-56 text-[12px] break-all">{row.instance_id}</code>
+                            <code className="block max-w-56 text-xs break-all">{row.instance_id}</code>
                             {row.source !== null && row.source_url !== null && (
-                                <a href={row.source_url} target="_blank" rel="noopener noreferrer" className="text-[12.5px] text-deep underline">
+                                <a href={row.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-deep underline">
                                     {t('admin.sources.deletions.open_in_source', { source: row.source.name })} <span className="sr-only">{t('admin.sources.deletions.new_tab')}</span>
                                 </a>
                             )}
@@ -58,7 +58,7 @@ export default function DeletionsPanel({ deletions }: DeletionsPanelProps) {
                             ) : (
                                 <>
                                     {row.facility.name}
-                                    <code className="block text-[12px] text-ink-2">{row.facility.code}</code>
+                                    <code className="block text-xs text-ink-2">{row.facility.code}</code>
                                 </>
                             )}
                         </td>
@@ -69,7 +69,7 @@ export default function DeletionsPanel({ deletions }: DeletionsPanelProps) {
                     </tr>
                 ))}
             </DataTable>
-            {total > rows.length && <p className="px-5 pt-2 pb-4 text-[12.5px] text-ink-2">{t('admin.sources.deletions.more', { shown: formatCount(rows.length), total: formatCount(total) })}</p>}
+            {total > rows.length && <p className="px-5 pt-2 pb-4 text-xs text-ink-2">{t('admin.sources.deletions.more', { shown: formatCount(rows.length), total: formatCount(total) })}</p>}
         </Panel>
     );
 }
@@ -83,7 +83,7 @@ function RecordLink({ row }: { row: DeletionRow }) {
         return (
             <span className="flex flex-col gap-0.5">
                 <span>{t('admin.sources.deletions.assessment', { status: t(`enums.submission_status.${row.assessment.status}`) })}</span>
-                <Link href={href} className="text-[12.5px] text-deep underline">
+                <Link href={href} className="text-xs text-deep underline">
                     {t('admin.sources.deletions.open_assessment', { facility: row.facility.name })}
                 </Link>
             </span>
@@ -95,7 +95,7 @@ function RecordLink({ row }: { row: DeletionRow }) {
         return (
             <span className="flex flex-col gap-0.5">
                 <span>{t('admin.sources.deletions.quarantined')}</span>
-                <Link href={href} className="text-[12.5px] text-deep underline">
+                <Link href={href} className="text-xs text-deep underline">
                     {t('admin.sources.deletions.open_issues')}
                 </Link>
             </span>

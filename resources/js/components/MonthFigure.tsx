@@ -36,7 +36,7 @@ export default function MonthFigure({ slot, points, takeaway }: MonthFigureProps
             description={takeaway ?? t('dashboard.visuals.no_scores')}
             chart={
                 <>
-                    <ul aria-label={t('dashboard.visuals.legend')} className="mb-2 flex flex-wrap gap-x-3.5 gap-y-1 text-[12px] text-ink-2">
+                    <ul aria-label={t('dashboard.visuals.legend')} className="mb-2 flex flex-wrap gap-x-3.5 gap-y-1 text-xs text-ink-2">
                         {SERIES.map((series) => (
                             <li key={series} className="flex items-center gap-1.5">
                                 <span aria-hidden="true" className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: SERIES_COLOUR[series] }} />

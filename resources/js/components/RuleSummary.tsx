@@ -1,5 +1,7 @@
 import Panel from '@/components/Panel';
 import PanelHeader from '@/components/PanelHeader';
+import StateMark from '@/components/StateMark';
+
 import { formatCount } from '@/lib/format';
 import { useTranslate } from '@/lib/i18n';
 import type { RuleSummary as Rule } from '@/types/admin';
@@ -35,19 +37,19 @@ export default function RuleSummary({ rules, active, onChoose }: RuleSummaryProp
                                 type="button"
                                 aria-pressed={pressed}
                                 onClick={() => onChoose(pressed ? null : rule.code)}
-                                className={`flex w-full flex-col gap-1 rounded-md border px-3 py-2.5 text-left text-[13px] ${
+                                className={`flex w-full flex-col gap-1 rounded-md border px-3 py-2.5 text-left text-sm ${
                                     pressed ? 'border-deep bg-wash forced-colors:border-[Highlight]' : 'border-rule bg-panel hover:bg-paper'
                                 }`}
                             >
                                 <span className="flex flex-wrap items-center gap-2">
                                     <SeverityTag severity={rule.severity} label={t(`admin.issues.summary.${rule.severity}`)} />
                                     <span className="font-medium">{rule.name}</span>
-                                    <code className={`text-[11.5px] ${secondary}`}>{rule.code}</code>
-                                    <span className={`ml-auto rounded-full px-2 py-px text-[12px] tabular-nums ${rule.open > 0 ? 'bg-bad-bg text-bad' : 'bg-paper text-ink-2'}`}>
+                                    <code className={`text-2xs ${secondary}`}>{rule.code}</code>
+                                    <span className={`ml-auto rounded-full px-2 py-px text-xs tabular-nums ${rule.open > 0 ? 'bg-bad-bg text-bad' : 'bg-paper text-ink-2'}`}>
                                         {t('admin.issues.summary.open', { count: formatCount(rule.open) })}
                                     </span>
                                 </span>
-                                <span className={`text-[12.5px] ${secondary}`}>{rule.why}</span>
+                                <span className={`text-xs ${secondary}`}>{rule.why}</span>
                             </button>
                         </li>
                     );
@@ -61,10 +63,8 @@ export function SeverityTag({ severity, label }: { severity: string; label: stri
     const hard = severity === 'hard';
 
     return (
-        <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[11px] whitespace-nowrap ${hard ? 'bg-bad-bg text-bad' : 'bg-warn-bg text-warn'}`}>
-            <span aria-hidden="true" className="text-[9px]">
-                {hard ? '■' : '▲'}
-            </span>
+        <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-px text-2xs whitespace-nowrap ${hard ? 'bg-bad-bg text-bad' : 'bg-warn-bg text-warn'}`}>
+            <StateMark mark={hard ? '■' : '▲'} className="size-2" />
             {label}
         </span>
     );

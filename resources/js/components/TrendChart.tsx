@@ -30,15 +30,15 @@ export default function TrendChart({ points, selected, strongAt, strongLabel, la
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data} margin={{ top: 22, right: 64, bottom: 4, left: -8 }} accessibilityLayer={false}>
                     <CartesianGrid stroke="var(--color-paper)" vertical={false} />
-                    <XAxis dataKey="label" padding={{ left: 22, right: 22 }} tick={{ fontSize: 11, fill: 'var(--color-ink-2)' }} tickLine={false} axisLine={{ stroke: 'var(--color-rule)' }} />
-                    <YAxis domain={[50, 100]} allowDataOverflow ticks={[50, 60, 70, 80, 90, 100]} tick={{ fontSize: 11, fill: 'var(--color-ink-2)' }} tickLine={false} axisLine={false} width={40} />
+                    <XAxis dataKey="label" padding={{ left: 22, right: 22 }} tick={{ fontSize: 11.5, fill: 'var(--color-ink-2)' }} tickLine={false} axisLine={{ stroke: 'var(--color-rule)' }} />
+                    <YAxis domain={[50, 100]} allowDataOverflow ticks={[50, 60, 70, 80, 90, 100]} tick={{ fontSize: 11.5, fill: 'var(--color-ink-2)' }} tickLine={false} axisLine={false} width={40} />
                     {strongAt !== null && (
                         <ReferenceLine
                             y={strongAt}
                             stroke="var(--color-warn-fill)"
                             strokeWidth={1.5}
                             strokeDasharray="5 4"
-                            label={{ value: strongLabel, position: 'right', fill: 'var(--color-warn)', fontSize: 11 }}
+                            label={{ value: strongLabel, position: 'right', fill: 'var(--color-warn)', fontSize: 11.5 }}
                         />
                     )}
                     <Line
@@ -76,7 +76,7 @@ export default function TrendChart({ points, selected, strongAt, strongLabel, la
                             const above = strongAt === null || datum.value >= strongAt;
 
                             return (
-                                <text key={props.index} x={Number(props.x)} y={Number(props.y) + (above ? -12 : 20)} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--color-ink-2)">
+                                <text key={props.index} x={Number(props.x)} y={Number(props.y) + (above ? -12 : 20)} textAnchor="middle" fontSize={11.5} fontWeight={600} fill="var(--color-ink-2)">
                                     {datum.display}
                                 </text>
                             );

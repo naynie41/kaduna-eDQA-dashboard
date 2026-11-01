@@ -20,9 +20,9 @@ export default function LgaGrid({ lgas, selected, onToggle }: LgaGridProps) {
 
     return (
         <div role="group" aria-label={t('dashboard.lga.grid_label')}>
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-px overflow-hidden rounded-panel border border-rule bg-rule">
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] overflow-hidden rounded-panel border-t border-l border-rule bg-panel">
                 {ordered.map((lga) => (
-                    <li key={lga.code} className="flex">
+                    <li key={lga.code} className="flex border-r border-b border-rule">
                         <LgaTile lga={lga} pressed={lga.code === selected} onToggle={onToggle} />
                     </li>
                 ))}

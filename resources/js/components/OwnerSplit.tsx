@@ -28,23 +28,23 @@ function Side({ owner, scores, headingLevel }: SideProps) {
     const colour = owner === 'public' ? 'text-pub' : 'text-priv';
 
     return (
-        <div className="bg-panel px-4.5 py-4">
+        <div className="bg-panel px-5 py-5">
             <div className="flex items-baseline gap-2.5">
                 <Heading className={`text-sm font-semibold ${colour}`}>{t(`dashboard.home.${owner}`)}</Heading>
-                <span className="text-[12.5px] text-ink-2">{t('dashboard.home.visited', { count: formatCount(scores.facilities) })}</span>
+                <span className="text-xs text-ink-2">{t('dashboard.home.visited', { count: formatCount(scores.facilities) })}</span>
             </div>
             <dl className="mt-2 flex flex-col-reverse">
-                <dt className="text-[11.5px] text-ink-2">{t('dashboard.home.overall_caption')}</dt>
-                <dd className={`m-0 font-display text-[38px] leading-none font-bold tabular-nums ${colour}`}>
+                <dt className="text-2xs text-ink-2">{t('dashboard.home.overall_caption')}</dt>
+                <dd className={`m-0 mt-1 font-display text-2xl leading-none font-bold tracking-[-0.03em] tabular-nums ${colour}`}>
                     {scores.overall.headline}
-                    <span className="ml-2 align-middle font-sans text-[12px] font-medium text-ink-2">{scores.overall.bandLabel}</span>
+                    <span className="ml-2 align-middle font-sans text-xs font-medium text-ink-2">{scores.overall.bandLabel}</span>
                 </dd>
             </dl>
-            <dl className="mt-3.5 grid grid-cols-3 gap-px overflow-hidden rounded-[7px] border border-rule bg-rule">
+            <dl className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-rule bg-rule">
                 {DIMENSIONS.map((dimension) => (
-                    <div key={dimension} className="flex flex-col-reverse bg-panel-soft px-2.5 py-2">
-                        <dt className="text-[11px] text-ink-2">{t(`enums.dimension.${dimension}`)}</dt>
-                        <dd className="m-0 font-display text-[17px] font-semibold tabular-nums">{scores[dimension].headline}</dd>
+                    <div key={dimension} className="flex flex-col-reverse bg-panel px-3 py-2.5">
+                        <dt className="text-2xs text-ink-2">{t(`enums.dimension.${dimension}`)}</dt>
+                        <dd className="m-0 font-display text-lg font-semibold tabular-nums">{scores[dimension].headline}</dd>
                     </div>
                 ))}
             </dl>

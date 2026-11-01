@@ -13,7 +13,7 @@ export default function VerifyEmail({ status }: VerifyEmailProps) {
     return (
         <>
             <Head title={t('auth.verify_email.title')} />
-            <h1 className="text-2xl font-semibold">{t('auth.verify_email.title')}</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.02em]">{t('auth.verify_email.title')}</h1>
             <p className="mt-1 mb-6 text-ink-2">{t('auth.verify_email.intro')}</p>
 
             {status === 'verification-link-sent' && (
@@ -28,7 +28,7 @@ export default function VerifyEmail({ status }: VerifyEmailProps) {
                         <button
                             type="submit"
                             disabled={processing}
-                            className="rounded-md bg-deep px-4 py-2.5 font-semibold text-panel hover:bg-deep-2"
+                            className="btn btn-primary min-h-11"
                         >
                             {t('auth.verify_email.resend')}
                         </button>

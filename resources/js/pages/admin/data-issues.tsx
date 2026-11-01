@@ -150,15 +150,15 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
         void navigator.clipboard?.writeText(instance).then(() => announce(t('admin.issues.table.copied')));
     };
 
-    const select = 'min-h-11 rounded-md border border-rule bg-panel px-2.5 text-[13.5px]';
-    const button = 'min-h-11 rounded-md border border-rule bg-panel px-3 text-[13px] hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50';
+    const select = 'control min-h-11';
+    const button = 'btn btn-secondary min-h-11';
     const meta = { page: records.current_page, lastPage: records.last_page, from: records.from ?? 0, to: records.to ?? 0, total: records.total };
     const labels = {
         showing: (figures: { from: string; to: string; total: string }) => t('admin.issues.table.showing', figures),
         none: t('admin.issues.table.showing_none'),
         nav: t('admin.issues.table.pages'),
     };
-    const empty = <p className="px-3 py-6 text-center text-[13px] text-ink-2">{t('admin.issues.table.none')}</p>;
+    const empty = <p className="px-3 py-6 text-center text-sm text-ink-2">{t('admin.issues.table.none')}</p>;
 
     return (
         <div className="flex flex-col gap-5">
@@ -240,7 +240,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                 </div>
 
                 {outcome !== null && (
-                    <div role="status" className="mx-5 mb-3 rounded-md border border-ok bg-ok-bg px-3 py-2 text-[13px] text-ink">
+                    <div role="status" className="notice notice-ok mx-5 mb-3">
                         <p>{outcome.text}</p>
                         {outcome.rescore !== null && (
                             <p>
@@ -254,7 +254,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                 )}
 
                 {filters.tab === 'hard' && selected.length > 0 && (
-                    <div role="group" aria-label={t('admin.issues.bulk.label')} className="mx-5 mb-3 flex flex-wrap items-end gap-3 rounded-md border border-rule bg-paper px-3 py-2.5 text-[13px]">
+                    <div role="group" aria-label={t('admin.issues.bulk.label')} className="mx-5 mb-3 flex flex-wrap items-end gap-3 rounded-md border border-rule bg-paper px-3 py-2.5 text-sm">
                         <p className="self-center font-medium">{t('admin.issues.bulk.selected', { count: formatCount(selected.length) })}</p>
                         {sharedRule === null && (
                             <p id={ids.mixed} className="self-center text-bad">
@@ -321,8 +321,8 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                         )}
                                     </td>
                                     <th scope="row" className="px-3 py-2 text-left font-normal">
-                                        <code className="block max-w-56 text-[12px] break-all">{row.instance_id}</code>
-                                        <button type="button" className="mt-1 text-[12px] text-deep underline" onClick={() => copy(row.instance_id)} aria-label={t('admin.issues.table.copy', { instance: row.instance_id })}>
+                                        <code className="block max-w-56 text-xs break-all">{row.instance_id}</code>
+                                        <button type="button" className="mt-1 text-xs text-deep underline" onClick={() => copy(row.instance_id)} aria-label={t('admin.issues.table.copy', { instance: row.instance_id })}>
                                             {t('admin.issues.table.copy_short')}
                                         </button>
                                     </th>
@@ -331,14 +331,14 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                         <ul className="flex flex-wrap gap-1">
                                             {row.failures.map((failure, i) => (
                                                 <li key={`${failure.code}-${i}`}>
-                                                    <code className="rounded bg-bad-bg px-1.5 py-px text-[11.5px] text-bad">{failure.code}</code>
+                                                    <code className="rounded bg-bad-bg px-1.5 py-px text-2xs text-bad">{failure.code}</code>
                                                 </li>
                                             ))}
                                         </ul>
                                     </td>
                                     <td className="px-3 py-2">
-                                        {row.facility_ref === null ? '–' : <code className="text-[12px]">{row.facility_ref}</code>}
-                                        <span className="block text-[12px] text-ink-2">{row.facility_ref === null ? '' : (row.facility_name ?? t('admin.issues.table.facility_unknown'))}</span>
+                                        {row.facility_ref === null ? '–' : <code className="text-xs">{row.facility_ref}</code>}
+                                        <span className="block text-xs text-ink-2">{row.facility_ref === null ? '' : (row.facility_name ?? t('admin.issues.table.facility_unknown'))}</span>
                                     </td>
                                     <td className="px-3 py-2">{row.lga_ref ?? '–'}</td>
                                     <td className="px-3 py-2 whitespace-nowrap">{roundLabel(row.round)}</td>
@@ -346,7 +346,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                         <ul className="flex max-w-80 flex-col gap-1">
                                             {row.failures.map((failure, i) => (
                                                 <li key={`${failure.code}-${i}`}>
-                                                    <code className="text-[12px] break-words">{failure.detail}</code>
+                                                    <code className="text-xs break-words">{failure.detail}</code>
                                                     {failure.code === 'DUPLICATE_ASSESSMENT' && <DuplicateSides row={row} />}
                                                 </li>
                                             ))}
@@ -365,7 +365,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                                     </button>
                                                 </>
                                             ) : (
-                                                <span className="text-[12.5px] text-ink-2">
+                                                <span className="text-xs text-ink-2">
                                                     {t('admin.issues.table.resolved', { resolution: t(`admin.issues.table.resolutions.${row.resolution ?? 'reprocessed'}`), time: when(row.resolved_at) })}
                                                 </span>
                                             )}
@@ -373,7 +373,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                                 {t('admin.issues.actions.details')}
                                             </button>
                                             {row.source !== null && row.source_url !== null && (
-                                                <a href={row.source_url} target="_blank" rel="noopener noreferrer" className="text-[12.5px] text-deep underline">
+                                                <a href={row.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-deep underline">
                                                     {t('admin.issues.actions.open_in_source', { source: row.source.name })} <span className="sr-only">{t('admin.issues.actions.new_tab')}</span>
                                                 </a>
                                             )}
@@ -412,7 +412,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                             <tr key={row.id} className="border-b border-rule align-top">
                                 <th scope="row" className="px-3 py-2 text-left font-normal">
                                     {row.facility.name}
-                                    <code className="block text-[12px] text-ink-2">{row.facility.code}</code>
+                                    <code className="block text-xs text-ink-2">{row.facility.code}</code>
                                 </th>
                                 <td className="px-3 py-2">{row.lga?.name ?? '–'}</td>
                                 <td className="px-3 py-2 whitespace-nowrap">{roundLabel(row.round)}</td>
@@ -423,7 +423,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                     <ul className="flex flex-col gap-1.5">
                                         {row.flags.map((flag) => (
                                             <li key={flag.code} className="flex flex-wrap items-center gap-2">
-                                                <code className="rounded bg-warn-bg px-1.5 py-px text-[11.5px] text-warn">{flag.code}</code>
+                                                <code className="rounded bg-warn-bg px-1.5 py-px text-2xs text-warn">{flag.code}</code>
                                                 <button type="button" className={button} onClick={() => override(row, flag.code, flag.name)}>
                                                     {t('admin.issues.actions.override', { rule: flag.name })}
                                                 </button>
@@ -454,7 +454,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
 function Labelled({ id, label, children }: { id: string; label: string; children: ReactNode }) {
     return (
         <div className="flex flex-col gap-1">
-            <label htmlFor={id} className="text-[12.5px] text-ink-2">
+            <label htmlFor={id} className="text-xs text-ink-2">
                 {label}
             </label>
             {children}

@@ -43,7 +43,7 @@ export default function TextField({ name, label, type = 'text', error, hint, ...
                 type={type}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={describedBy || undefined}
-                className={`block w-full rounded-md border bg-panel px-3 py-2 text-ink ${error ? 'border-2 border-bad' : 'border-ink-2'}`}
+                className={`control block w-full py-2 ${error ? 'border-2 border-bad' : ''}`}
                 {...input}
             />
         </div>

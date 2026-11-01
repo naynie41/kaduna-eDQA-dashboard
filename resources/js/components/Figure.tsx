@@ -22,18 +22,18 @@ export default function Figure({ title, description, chart, table }: FigureProps
 
     return (
         <figure aria-labelledby={captionId} className="m-0">
-            <figcaption className="flex flex-wrap items-start gap-3 px-5 pt-4">
+            <figcaption className="flex flex-wrap items-start gap-x-4 gap-y-2 px-5 pt-4.5">
                 <div className="min-w-56 flex-1">
-                    <span id={captionId} className="block font-display text-[15.5px] font-semibold">
+                    <span id={captionId} className="block font-display text-md font-semibold tracking-[-0.015em]">
                         {title}
                     </span>
-                    {description !== undefined && <span className="mt-0.5 block max-w-[70ch] text-[12.5px] text-ink-2">{description}</span>}
+                    {description !== undefined && <span className="mt-1 block max-w-[72ch] text-sm text-ink-2">{description}</span>}
                 </div>
                 <button
                     type="button"
                     aria-controls={contentId}
                     onClick={() => setAsTable((current) => !current)}
-                    className="rounded-md px-2.5 py-1 text-[12.5px] text-deep-2 hover:bg-paper"
+                    className="btn btn-quiet btn-sm -mr-2"
                 >
                     {asTable ? t('common.ui.show_chart') : t('common.ui.show_table')}
                 </button>

@@ -29,8 +29,8 @@ export default function MonthGroupChart({ points, label }: MonthGroupChartProps)
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data} margin={{ top: 8, right: 4, bottom: 4, left: 0 }} barCategoryGap="18%" barGap={1} accessibilityLayer={false}>
                     <CartesianGrid stroke="var(--color-paper)" vertical={false} />
-                    <XAxis dataKey="label" interval={0} tick={{ fontSize: 10.5, fill: 'var(--color-ink-2)' }} tickLine={false} axisLine={{ stroke: 'var(--color-rule)' }} />
-                    <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 11, fill: 'var(--color-ink-2)' }} tickLine={false} axisLine={false} width={32} />
+                    <XAxis dataKey="label" interval={0} tick={{ fontSize: 11.5, fill: 'var(--color-ink-2)' }} tickLine={false} axisLine={{ stroke: 'var(--color-rule)' }} />
+                    <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 11.5, fill: 'var(--color-ink-2)' }} tickLine={false} axisLine={false} width={32} />
                     {SERIES.map((series) => (
                         <Bar key={series} dataKey={series} fill={SERIES_COLOUR[series]} radius={[2, 2, 0, 0]} isAnimationActive={false} />
                     ))}

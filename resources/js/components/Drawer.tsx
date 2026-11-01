@@ -108,16 +108,16 @@ export default function Drawer({ title, subtitle, closeLabel, onClose, children 
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
-                className="fixed inset-0 z-50 flex flex-col bg-paper rail:left-auto rail:w-[min(640px,92vw)] rail:border-l rail:border-rule rail:shadow-panel"
+                className="fixed inset-0 z-50 flex flex-col bg-paper rail:left-auto rail:w-[min(640px,92vw)] rail:border-l rail:border-rule rail:shadow-overlay"
             >
                 <div className="flex items-start gap-3 border-b border-rule bg-panel px-5 py-4">
                     <div className="min-w-0 flex-1">
-                        <h2 id={titleId} ref={headingRef} tabIndex={-1} className="text-[17px] leading-snug outline-offset-4">
+                        <h2 id={titleId} ref={headingRef} tabIndex={-1} className="text-lg leading-snug outline-offset-4">
                             {title}
                         </h2>
-                        {subtitle !== undefined && <p className="mt-0.5 text-[12.5px] text-ink-2">{subtitle}</p>}
+                        {subtitle !== undefined && <p className="mt-0.5 text-xs text-ink-2">{subtitle}</p>}
                     </div>
-                    <button type="button" onClick={onClose} className="min-h-9 shrink-0 rounded-md border border-rule bg-panel px-3 text-[13px] hover:bg-paper">
+                    <button type="button" onClick={onClose} className="btn btn-secondary min-h-9 shrink-0">
                         {closeLabel}
                     </button>
                 </div>

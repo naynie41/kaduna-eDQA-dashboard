@@ -48,7 +48,7 @@ export default function Lga({ rounds, tiles, lgas }: LgaProps) {
         <div className="flex flex-col">
             <LgaGrid lgas={tiles} selected={filters?.lga ?? null} onToggle={toggle} />
 
-            <h2 id="lga-table" className="mt-6.5 mb-2.75 text-[13px] text-ink-2">
+            <h2 id="lga-table" className="mt-9 mb-3.5 flex items-center gap-4 text-md font-semibold tracking-[-0.015em] text-ink after:h-px after:flex-1 after:bg-rule-strong">
                 {t('dashboard.lga.table_title')}
             </h2>
             <Panel labelledBy="lga-table" className="overflow-hidden">

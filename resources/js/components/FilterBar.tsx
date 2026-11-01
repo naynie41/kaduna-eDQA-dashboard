@@ -99,12 +99,12 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
 
     const anySet = KEYS.some((key) => values[key] !== '');
     const quarterHint = `${id}-quarter-hint`;
-    const select = 'min-w-[104px] rounded-md border border-rule bg-panel px-2 py-1.5 text-[13px] text-ink disabled:bg-paper disabled:text-ink-2';
-    const label = 'text-[11px] text-ink-2';
+    const select = 'control w-full min-h-9 sm:w-auto sm:min-w-[128px]';
+    const label = 'text-2xs font-medium text-ink-2';
 
     return (
-        <form role="search" aria-label={t('dashboard.filters.label')} className="flex flex-wrap items-end gap-2 pb-3" onSubmit={(event) => event.preventDefault()}>
-            <div className="flex flex-col gap-0.5">
+        <form role="search" aria-label={t('dashboard.filters.label')} className="grid grid-cols-2 gap-x-2.5 gap-y-2.5 pb-4 sm:flex sm:flex-wrap sm:items-end sm:gap-3" onSubmit={(event) => event.preventDefault()}>
+            <div className="flex min-w-0 flex-col gap-1">
                 <label htmlFor={`${id}-year`} className={label}>
                     {t('dashboard.filters.year')}
                 </label>
@@ -117,7 +117,7 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
                     ))}
                 </select>
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex min-w-0 flex-col gap-1">
                 <label htmlFor={`${id}-quarter`} className={label}>
                     {t('dashboard.filters.quarter')}
                 </label>
@@ -142,7 +142,7 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
                     </span>
                 )}
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex min-w-0 flex-col gap-1">
                 <label htmlFor={`${id}-lga`} className={label}>
                     {t('dashboard.filters.lga')}
                 </label>
@@ -155,7 +155,7 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
                     ))}
                 </select>
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex min-w-0 flex-col gap-1">
                 <label htmlFor={`${id}-level`} className={label}>
                     {t('dashboard.filters.level')}
                 </label>
@@ -168,7 +168,7 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
                     ))}
                 </select>
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
                 <label htmlFor={`${id}-owner`} className={label}>
                     {t('dashboard.filters.owner')}
                 </label>
@@ -187,7 +187,7 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
                     preserveScroll
                     preserveState
                     replace
-                    className="mb-1.5 text-[13px] text-deep-2 underline underline-offset-2"
+                    className="btn btn-quiet btn-sm self-end"
                     onSuccess={() => {
                         // The link goes away with the filters: put focus somewhere useful.
                         yearSelect.current?.focus();

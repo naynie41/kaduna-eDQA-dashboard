@@ -47,7 +47,7 @@ const TONE: Record<Band, string> = {
  */
 export default function RankedBars({ label, items, marker, max, empty }: RankedBarsProps) {
     if (items.length === 0) {
-        return <p className="px-5 py-4 text-[13px] text-ink-2">{empty}</p>;
+        return <p className="px-5 py-4 text-sm text-ink-2">{empty}</p>;
     }
 
     const full = max ?? Math.max(1, marker?.value ?? 0, ...items.map((item) => item.value ?? 0));
@@ -56,7 +56,7 @@ export default function RankedBars({ label, items, marker, max, empty }: RankedB
     return (
         <div className="px-5 pt-2 pb-4">
             {marker !== undefined && (
-                <p className="mb-2 flex items-center gap-2 text-[12px] text-ink-2">
+                <p className="mb-2 flex items-center gap-2 text-xs text-ink-2">
                     <span aria-hidden="true" className="inline-block h-3.5 w-0.5 bg-warn-fill" />
                     {marker.label}
                 </p>
@@ -64,9 +64,9 @@ export default function RankedBars({ label, items, marker, max, empty }: RankedB
             <ol aria-label={label} className="flex flex-col">
                 {items.map((item) => (
                     <li key={item.key} className="grid grid-cols-[1fr_auto] items-center gap-x-3 border-b border-paper py-1.5 last:border-b-0 sm:grid-cols-[minmax(7rem,11rem)_1fr_auto]">
-                        <span className="col-start-1 row-start-1 min-w-0 text-[13px]">
+                        <span className="col-start-1 row-start-1 min-w-0 text-sm">
                             <span className="block font-medium break-words">{item.label}</span>
-                            {item.valueText !== undefined && <span className="block text-[11.5px] text-ink-2">{item.valueText}</span>}
+                            {item.valueText !== undefined && <span className="block text-2xs text-ink-2">{item.valueText}</span>}
                         </span>
                         <svg aria-hidden="true" viewBox="0 0 100 10" preserveAspectRatio="none" className="col-span-2 row-start-2 mt-1 block h-2.5 w-full overflow-visible sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:mt-0">
                             <rect x="0" y="0" width="100" height="10" rx="2" className="fill-wash" />
@@ -77,7 +77,7 @@ export default function RankedBars({ label, items, marker, max, empty }: RankedB
                         </svg>
                         <span className="col-start-2 row-start-1 flex items-center gap-2 justify-self-end sm:col-start-3">
                             {item.valueText !== undefined && item.value !== null && (
-                                <span aria-hidden="true" className="min-w-[2.5ch] text-right text-[13px] font-semibold tabular-nums">
+                                <span aria-hidden="true" className="min-w-[2.5ch] text-right text-sm font-semibold tabular-nums">
                                     {formatCount(item.value)}
                                 </span>
                             )}

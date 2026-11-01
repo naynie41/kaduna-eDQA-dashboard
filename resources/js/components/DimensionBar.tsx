@@ -27,18 +27,18 @@ export default function DimensionBar({ label, help, score, strongAt }: Dimension
     const width = score.value === null ? 0 : Math.min(100, Math.max(0, score.value));
 
     return (
-        <li className="grid grid-cols-[minmax(0,96px)_1fr_auto] items-center gap-2.5 rail:grid-cols-[118px_1fr_auto] rail:gap-3.5">
-            <span className="text-[13px] leading-tight">
+        <li className="grid grid-cols-[minmax(0,96px)_1fr_auto] items-center gap-2.5 rail:grid-cols-[150px_1fr_auto] rail:gap-4">
+            <span className="text-sm leading-tight font-medium">
                 {label}
-                <span className="block text-[11px] text-ink-2">{help}</span>
+                <span className="mt-0.5 block text-2xs font-normal text-ink-2">{help}</span>
             </span>
-            <span aria-hidden="true" className="relative h-5 overflow-hidden rounded bg-paper">
-                {score.band !== null && <span className={`block h-full rounded motion-safe:transition-[width] ${FILL[score.band]}`} style={{ width: `${width}%` }} />}
-                {strongAt !== null && <span className="absolute inset-y-0 w-[1.5px] bg-ink/40" style={{ left: `${strongAt}%` }} />}
+            <span aria-hidden="true" className="relative h-3 rounded-full bg-paper ring-1 ring-rule ring-inset">
+                {score.band !== null && <span className={`block h-full rounded-full motion-safe:transition-[width] motion-safe:duration-500 motion-safe:ease-out ${FILL[score.band]}`} style={{ width: `${width}%` }} />}
+                {strongAt !== null && <span className="absolute -inset-y-1 w-0.5 rounded-full bg-ink/70" style={{ left: `${strongAt}%` }} />}
             </span>
             <span className="min-w-[56px] text-right leading-tight">
-                <span className="block text-sm font-semibold tabular-nums">{score.display}</span>
-                <span className="block text-[11px] text-ink-2">{score.bandLabel}</span>
+                <span className="block font-display text-md font-semibold tabular-nums">{score.display}</span>
+                <span className="block text-2xs text-ink-2">{score.bandLabel}</span>
             </span>
         </li>
     );

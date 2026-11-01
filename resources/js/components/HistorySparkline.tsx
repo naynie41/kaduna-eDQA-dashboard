@@ -23,7 +23,7 @@ export default function HistorySparkline({ history }: HistorySparklineProps) {
     const last = history[history.length - 1];
 
     if (first === undefined || last === undefined) {
-        return <p className="text-[13px] text-ink-2">{t('dashboard.drawer.history_none')}</p>;
+        return <p className="text-sm text-ink-2">{t('dashboard.drawer.history_none')}</p>;
     }
 
     const step = history.length > 1 ? (WIDTH - PAD * 2) / (history.length - 1) : 0;
@@ -58,11 +58,11 @@ export default function HistorySparkline({ history }: HistorySparklineProps) {
                     p.y === null ? null : <circle key={p.key} cx={p.x} cy={p.y} r={p.selected ? 4 : 2.5} className={p.selected ? 'fill-deep stroke-panel' : 'fill-deep'} strokeWidth={p.selected ? 1.5 : 0} />,
                 )}
             </svg>
-            <p className="text-[13px]">{summary}</p>
-            <table className="w-full max-w-sm text-[13px]">
+            <p className="text-sm">{summary}</p>
+            <table className="w-full max-w-sm text-sm">
                 <caption className="sr-only">{t('dashboard.drawer.history_title')}</caption>
                 <thead>
-                    <tr className="border-b border-rule text-left text-[12px] text-ink-2">
+                    <tr className="border-b border-rule text-left text-xs text-ink-2">
                         <th scope="col" className="py-1 pr-3 font-medium">
                             {t('dashboard.drawer.round')}
                         </th>

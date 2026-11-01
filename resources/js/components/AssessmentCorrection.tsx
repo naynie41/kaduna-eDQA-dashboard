@@ -66,7 +66,7 @@ export function ItemResultSelect({ id, label, value, onChange }: { id: string; l
             <label htmlFor={id} className="sr-only">
                 {label}
             </label>
-            <select id={id} value={value} onChange={(event) => onChange(event.target.value as ItemResult)} className="min-h-9 shrink-0 rounded-md border border-rule bg-panel px-2 text-[12.5px]">
+            <select id={id} value={value} onChange={(event) => onChange(event.target.value as ItemResult)} className="control min-h-9 shrink-0 text-xs">
                 {RESULTS.map((result) => (
                     <option key={result} value={result}>
                         {t(`dashboard.drawer.results.${result}`)}
@@ -102,11 +102,11 @@ export default function CorrectionPanel({ detail, correction, onSaved }: Correct
         return null;
     }
     if (!round.open) {
-        return <p className="mt-3 text-[12.5px] text-ink-2">{t('dashboard.drawer.correct.closed', { round: round.label })}</p>;
+        return <p className="mt-3 text-xs text-ink-2">{t('dashboard.drawer.correct.closed', { round: round.label })}</p>;
     }
     if (!correction.editing) {
         return (
-            <button type="button" onClick={correction.begin} className="mt-3 min-h-11 rounded-md border border-rule bg-panel px-3 text-[13px] font-medium hover:bg-paper">
+            <button type="button" onClick={correction.begin} className="btn btn-secondary mt-3 min-h-11">
                 {t('dashboard.drawer.correct.start')}
             </button>
         );
@@ -132,23 +132,23 @@ export default function CorrectionPanel({ detail, correction, onSaved }: Correct
     const nothing = lines.length === 0;
 
     return (
-        <section aria-labelledby={ids.title} className="mt-3 flex flex-col gap-3 rounded-md border border-deep bg-wash p-3 text-[13px]">
-            <h4 id={ids.title} className="text-[14px] font-semibold">
+        <section aria-labelledby={ids.title} className="mt-3 flex flex-col gap-3 rounded-md border border-deep bg-wash p-3 text-sm">
+            <h4 id={ids.title} className="text-base font-semibold">
                 {t('dashboard.drawer.correct.title')}
             </h4>
             <p className="text-ink">{t('dashboard.drawer.correct.intro')}</p>
             <fieldset className="flex flex-wrap gap-3">
                 <legend className="mb-1 font-medium">{t('dashboard.drawer.correct.times')}</legend>
-                <p id={ids.hint} className="w-full text-[12.5px] text-ink">
+                <p id={ids.hint} className="w-full text-xs text-ink">
                     {t('dashboard.drawer.correct.times_hint', { offset: offsetOf(assessment.started_at) })}
                 </p>
                 <div className="flex flex-col gap-1">
                     <label htmlFor={ids.start}>{t('dashboard.drawer.correct.started_at')}</label>
-                    <input id={ids.start} type="datetime-local" aria-describedby={ids.hint} value={correction.start} onChange={(event) => correction.setStart(event.target.value)} className="min-h-11 rounded-md border border-rule bg-panel px-2" />
+                    <input id={ids.start} type="datetime-local" aria-describedby={ids.hint} value={correction.start} onChange={(event) => correction.setStart(event.target.value)} className="control min-h-11" />
                 </div>
                 <div className="flex flex-col gap-1">
                     <label htmlFor={ids.end}>{t('dashboard.drawer.correct.ended_at')}</label>
-                    <input id={ids.end} type="datetime-local" aria-describedby={ids.hint} value={correction.end} onChange={(event) => correction.setEnd(event.target.value)} className="min-h-11 rounded-md border border-rule bg-panel px-2" />
+                    <input id={ids.end} type="datetime-local" aria-describedby={ids.hint} value={correction.end} onChange={(event) => correction.setEnd(event.target.value)} className="control min-h-11" />
                 </div>
             </fieldset>
             <div id={ids.summary} role="status" className="rounded-md bg-panel px-3 py-2">
@@ -163,10 +163,10 @@ export default function CorrectionPanel({ detail, correction, onSaved }: Correct
                 )}
             </div>
             <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={nothing} aria-describedby={ids.summary} onClick={() => setReviewing(true)} className="min-h-11 rounded-md bg-deep px-4 font-medium text-panel disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" disabled={nothing} aria-describedby={ids.summary} onClick={() => setReviewing(true)} className="btn btn-primary min-h-11">
                     {t('dashboard.drawer.correct.review')}
                 </button>
-                <button type="button" onClick={correction.cancel} className="min-h-11 rounded-md border border-rule bg-panel px-4">
+                <button type="button" onClick={correction.cancel} className="btn btn-secondary min-h-11">
                     {t('dashboard.drawer.correct.cancel')}
                 </button>
             </div>

@@ -1,4 +1,5 @@
 import DimensionBar from '@/components/DimensionBar';
+import StatusLabel from '@/components/StatusLabel';
 import { formatCount, formatThreshold } from '@/lib/format';
 import { useTranslate } from '@/lib/i18n';
 import type { DimensionScores, StateSummary } from '@/types/dashboard';
@@ -31,33 +32,36 @@ export default function HomeHero({ hero, dimensions }: HomeHeroProps) {
     const weakest = dimensions.weakest;
 
     return (
-        <div className="overflow-hidden rounded-panel border border-rule bg-panel shadow-panel lg:grid lg:grid-cols-[270px_minmax(0,1fr)]">
-            <div className="flex flex-col border-b border-rule bg-gradient-to-b from-panel-soft to-panel-tint p-5.5 lg:border-r lg:border-b-0">
+        <div className="overflow-hidden rounded-panel border border-rule bg-panel lg:grid lg:grid-cols-[300px_minmax(0,1fr)]">
+            <div className="flex flex-col border-b border-rule bg-panel p-6 lg:border-r lg:border-b-0">
                 <dl>
-                    <dt className="text-[12.5px] text-ink-2">{t('dashboard.home.average_label')}</dt>
-                    <dd className="m-0 mt-1.5 font-display text-[52px] leading-[0.94] font-bold tracking-[-0.03em] tabular-nums lg:text-[64px]">
+                    <dt className="text-sm font-medium text-ink-2">{t('dashboard.home.average_label')}</dt>
+                    <dd className="m-0 mt-3 font-display text-display font-bold tracking-[-0.04em] text-ink tabular-nums">
                         {hero.overall.headline}
-                        <span className="sr-only"> {hero.overall.bandLabel}</span>
+                        {' '}
+                        <span className="ml-1 inline-block align-[0.55em] font-sans text-base tracking-normal">
+                            <StatusLabel band={hero.overall.band} label={hero.overall.bandLabel} />
+                        </span>
                     </dd>
                 </dl>
-                <p className="mt-2.5 mb-5 max-w-[31ch] text-[13px] leading-snug text-ink-2">
+                <p className="mt-3 mb-6 max-w-[32ch] text-sm leading-snug text-ink-2">
                     {hasData ? t('dashboard.home.averaged_across', { count: formatCount(hero.facilitiesVisited) }) : t('dashboard.home.no_assessments')}
                 </p>
-                <dl className="-mx-5.5 mt-auto -mb-5.5 grid grid-cols-2 gap-px border-t border-rule bg-rule">
+                <dl className="-mx-6 mt-auto -mb-6 grid grid-cols-2 gap-px border-t border-rule bg-rule">
                     {minis.map(([label, value]) => (
-                        <div key={label} className="flex flex-col-reverse bg-panel-soft px-3.5 py-3">
-                            <dt className="mt-px text-[11.5px] leading-tight text-ink-2">{label}</dt>
-                            <dd className="m-0 font-display text-[19px] font-semibold tabular-nums">{value}</dd>
+                        <div key={label} className="flex flex-col-reverse bg-panel px-4 py-3.5">
+                            <dt className="mt-px text-2xs leading-tight text-ink-2">{label}</dt>
+                            <dd className="m-0 font-display text-xl font-semibold tabular-nums">{value}</dd>
                         </div>
                     ))}
                 </dl>
             </div>
-            <section aria-labelledby="home-dimensions" className="min-w-0 px-5.5 pt-4.5 pb-5">
-                <h2 id="home-dimensions" className="text-[15.5px]">
+            <section aria-labelledby="home-dimensions" className="min-w-0 px-6 pt-5 pb-6">
+                <h2 id="home-dimensions" className="text-md tracking-[-0.015em]">
                     {t('dashboard.home.dimensions_title')}
                 </h2>
-                <p className="mt-0.5 max-w-[62ch] text-[12.5px] text-ink-2">{t('dashboard.home.dimensions_intro')}</p>
-                <ul className="mt-3.5 flex flex-col gap-3">
+                <p className="mt-1 max-w-[64ch] text-sm text-ink-2">{t('dashboard.home.dimensions_intro')}</p>
+                <ul className="mt-5 flex flex-col gap-4">
                     {DIMENSIONS.map((dimension) => (
                         <DimensionBar
                             key={dimension}
@@ -69,9 +73,9 @@ export default function HomeHero({ hero, dimensions }: HomeHeroProps) {
                     ))}
                     <DimensionBar label={t('dashboard.home.overall')} help={t('dashboard.home.dimension_help.overall')} score={dimensions.overall} strongAt={hero.strongAt} />
                 </ul>
-                {typeof hero.strongAt === 'number' && <p className="mt-2.5 text-[12.5px] text-ink-2">{t('dashboard.home.marker_legend', { threshold: strong })}</p>}
+                {typeof hero.strongAt === 'number' && <p className="mt-2.5 text-xs text-ink-2">{t('dashboard.home.marker_legend', { threshold: strong })}</p>}
                 {weakest !== null && hasData && (
-                    <p className="mt-1 text-[12.5px] text-ink-2">
+                    <p className="mt-1 text-xs text-ink-2">
                         {t('dashboard.home.weakest_note', { dimension: t(`enums.dimension.${weakest}`), score: dimensions[weakest].display })}
                     </p>
                 )}

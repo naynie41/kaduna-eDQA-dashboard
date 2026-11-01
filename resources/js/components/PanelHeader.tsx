@@ -14,12 +14,12 @@ export default function PanelHeader({ title, id, description, actions, level = 2
     const Heading = level === 2 ? 'h2' : 'h3';
 
     return (
-        <div className="flex flex-wrap items-start gap-4 px-5 pt-4">
+        <div className="flex flex-wrap items-start gap-x-4 gap-y-2 px-5 pt-4.5">
             <div className="min-w-56 flex-1">
-                <Heading id={id} className={level === 2 ? 'text-[15.5px] font-semibold' : 'text-sm font-semibold'}>
+                <Heading id={id} className={level === 2 ? 'text-md font-semibold tracking-[-0.015em]' : 'text-base font-semibold'}>
                     {title}
                 </Heading>
-                {description !== undefined && <p className="mt-0.5 max-w-[70ch] text-[12.5px] text-ink-2">{description}</p>}
+                {description !== undefined && <p className="mt-1 max-w-[72ch] text-sm text-ink-2">{description}</p>}
             </div>
             {actions}
         </div>

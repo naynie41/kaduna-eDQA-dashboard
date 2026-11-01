@@ -1,3 +1,4 @@
+import StateMark from '@/components/StateMark';
 import { formatCount, formatDateTime } from '@/lib/format';
 import { useTranslate, useTranslationList, type Translate } from '@/lib/i18n';
 import type { ShellStatus, SyncState, SyncStatus } from '@/types/shell';
@@ -33,20 +34,18 @@ export default function SyncStatusBar({ status }: SyncStatusBarProps) {
     const counts = t('common.sync.counts', { assessments: formatCount(status.assessments), quarantined: formatCount(status.quarantined) });
 
     return (
-        <div role="status" aria-label={t('common.sync.label')} className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 border-b px-4 py-1.5 text-[12.5px] rail:px-6 ${TONE[worst]}`}>
+        <div role="status" aria-label={t('common.sync.label')} className={`flex flex-wrap items-center gap-x-5 gap-y-1 border-b px-4 py-1.5 text-xs rail:px-7 ${TONE[worst]}`}>
             {status.sources.length === 0 ? (
                 <span>{t('common.sync.none')}</span>
             ) : (
                 status.sources.map((source) => (
-                    <span key={source.key} className="inline-flex items-center gap-1.5">
-                        <span aria-hidden="true" className="text-[10px]">
-                            {MARK[source.state]}
-                        </span>
-                        <span>{sentence(t, source, at)} ·</span>
+                    <span key={source.key} className="inline-flex items-center gap-2">
+                        <StateMark mark={MARK[source.state]} className="size-2" />
+                        <span>{sentence(t, source, at)}</span>
                     </span>
                 ))
             )}
-            <span>{counts}</span>
+            <span className="tabular-nums rail:ml-auto">{counts}</span>
         </div>
     );
 }

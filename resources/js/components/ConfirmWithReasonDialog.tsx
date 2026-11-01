@@ -154,19 +154,19 @@ export default function ConfirmWithReasonDialog({
             ref={dialogRef}
             aria-labelledby={ids.title}
             aria-describedby={ids.consequence}
-            className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-panel border border-rule bg-panel p-0 text-ink shadow-panel backdrop:bg-ink/40"
+            className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-panel border border-rule bg-panel p-0 text-ink shadow-overlay backdrop:bg-ink/45"
         >
             {open && (
                 <form onSubmit={submit} className="flex flex-col gap-3 p-5" noValidate>
-                    <h2 id={ids.title} className="text-[17px]">
+                    <h2 id={ids.title} className="text-lg">
                         {title}
                     </h2>
-                    <div id={ids.consequence} className="text-[13.5px]">
+                    <div id={ids.consequence} className="text-sm">
                         {consequence}
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        <label htmlFor={ids.reason} className="text-[13px] font-medium">
+                        <label htmlFor={ids.reason} className="text-sm font-medium">
                             {t('common.reason.label')}
                         </label>
                         <textarea
@@ -178,34 +178,34 @@ export default function ConfirmWithReasonDialog({
                             required
                             aria-describedby={describedBy}
                             aria-invalid={error?.field !== null && error !== null ? true : undefined}
-                            className="min-h-24 rounded-md border border-rule bg-panel px-3 py-2 text-[14px] aria-invalid:border-bad"
+                            className="min-h-24 rounded-md border border-rule bg-panel px-3 py-2 text-base aria-invalid:border-bad"
                         />
-                        <p id={ids.hint} className="text-[12.5px] text-ink-2">
+                        <p id={ids.hint} className="text-xs text-ink-2">
                             {t('common.reason.hint', { min: minLength })}
                             {remaining > 0 && reason !== '' && <span> {t('common.reason.remaining', { count: remaining })}</span>}
                         </p>
                         {error !== null && error.field !== null && (
-                            <p id={ids.error} className="text-[12.5px] text-bad">
+                            <p id={ids.error} className="text-xs text-bad">
                                 {error.field}
                             </p>
                         )}
                     </div>
 
                     {error !== null && (
-                        <p role="alert" className="rounded-md border border-bad bg-bad-bg px-3 py-2 text-[13px] text-bad">
+                        <p role="alert" className="notice notice-bad text-bad">
                             {error.message}
                         </p>
                     )}
 
                     <div className="flex flex-wrap justify-end gap-2 pt-1">
-                        <button type="button" onClick={() => onCloseRef.current()} className="min-h-11 rounded-md border border-rule px-4 text-[13.5px] hover:bg-paper">
+                        <button type="button" onClick={() => onCloseRef.current()} className="btn btn-secondary min-h-11">
                             {t('common.ui.cancel')}
                         </button>
                         <button
                             type="submit"
                             disabled={remaining > 0 || pending}
                             aria-describedby={remaining > 0 ? ids.hint : undefined}
-                            className={`min-h-11 rounded-md px-4 text-[13.5px] font-medium text-panel disabled:cursor-not-allowed disabled:opacity-50 ${danger ? 'bg-bad' : 'bg-deep'}`}
+                            className={`btn min-h-11 ${danger ? 'btn-danger' : 'btn-primary'}`}
                         >
                             {pending ? t('common.ui.working') : confirmLabel}
                         </button>

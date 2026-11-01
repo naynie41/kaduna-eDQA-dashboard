@@ -25,10 +25,14 @@ export type SegmentedControlProps<T extends string> = {
  */
 export default function SegmentedControl<T extends string>({ label, options, value, onChange, disabled = false, describedBy }: SegmentedControlProps<T>) {
     return (
-        <div role="group" aria-label={label} aria-describedby={describedBy} className="inline-flex max-w-full flex-wrap gap-px overflow-hidden rounded-[7px] border border-rule bg-rule">
+        <div role="group" aria-label={label} aria-describedby={describedBy} className="inline-flex max-w-full flex-wrap gap-0.5 overflow-hidden rounded-md bg-paper p-0.5 ring-1 ring-rule ring-inset">
             {options.map((option) => {
                 const pressed = option.value === value;
-                const tone = pressed ? 'bg-deep font-medium text-panel forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]' : disabled ? 'bg-paper text-ink-2' : 'bg-panel text-ink-2 hover:text-ink';
+                const tone = pressed
+                    ? 'bg-panel font-semibold text-deep shadow-[0_1px_2px_rgba(13,40,36,0.12)] ring-1 ring-control ring-inset forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]'
+                    : disabled
+                      ? 'text-ink-2'
+                      : 'text-ink-2 hover:bg-panel/70 hover:text-ink';
 
                 return (
                     <button
@@ -41,7 +45,7 @@ export default function SegmentedControl<T extends string>({ label, options, val
                                 onChange(option.value);
                             }
                         }}
-                        className={`grow px-3.5 py-1.5 text-[13px] ${tone} ${disabled ? 'cursor-not-allowed' : ''}`}
+                        className={`grow rounded-[4px] px-3 py-1.5 text-sm transition-colors duration-150 ${tone} ${disabled ? 'cursor-not-allowed' : ''}`}
                     >
                         {option.label}
                     </button>
