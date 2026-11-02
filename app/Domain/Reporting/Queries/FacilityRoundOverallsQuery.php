@@ -40,7 +40,7 @@ final class FacilityRoundOverallsQuery
                 FROM assessments a
                 JOIN assessment_scores s ON s.assessment_id = a.id
                 JOIN round_rule_version rv ON rv.round_id = a.round_id AND rv.rule_version_id = s.rule_version_id
-                WHERE a.facility_id = ANY(?::bigint[])
+                WHERE a.facility_id = ANY(?::bigint[]) AND a.status IN ('accepted', 'flagged')
                 GROUP BY a.facility_id, a.round_id, s.dimension
             ),
             overalls AS (

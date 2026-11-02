@@ -5,6 +5,7 @@ import { useAnnounce } from '@/components/Announcer';
 import ConfirmWithReasonDialog, { type ConfirmOutcome } from '@/components/ConfirmWithReasonDialog';
 import CorrectIssueForm from '@/components/CorrectIssueForm';
 import DataIssueDrawer from '@/components/DataIssueDrawer';
+import DeletedAtSourceTable from '@/components/DeletedAtSourceTable';
 import DuplicateSides from '@/components/DuplicateSides';
 import Panel from '@/components/Panel';
 import SourceTag from '@/components/SourceTag';
@@ -15,12 +16,14 @@ import { formatCount, formatDate, formatDateTime } from '@/lib/format';
 import { useTranslate, useTranslationList } from '@/lib/i18n';
 import { bulkRule } from '@/lib/dataIssues';
 import { useApiAction } from '@/lib/useApiAction';
-import type { CorrectableField, DataIssueRow, DataIssuesFilters, FlaggedRow, IssueState, Paginated, Resolution, RoundRef, RuleSummary as Rule } from '@/types/admin';
+import type { CorrectableField, DataIssueRow, DataIssuesFilters, DeletedAssessmentRow, FlaggedRow, IssueState, Paginated, Resolution, RoundRef, RuleSummary as Rule } from '@/types/admin';
 
 export type AdminDataIssuesProps = {
     issueFilters: DataIssuesFilters;
     rules: Rule[];
-    records: Paginated<DataIssueRow> | Paginated<FlaggedRow>;
+    records: Paginated<DataIssueRow> | Paginated<FlaggedRow> | Paginated<DeletedAssessmentRow>;
+    /** Assessments deleted at source, not reviewed yet: the third tab's count (D-24). */
+    deletedOpen: number;
     lgas: { code: string; name: string }[];
     rounds: (RoundRef & { status: string })[];
     /** Every configured source, in config order: the source filter. */
@@ -32,6 +35,8 @@ type Pending = { title: string; consequence: string; confirm: string; danger: bo
 type Outcome = { text: string; rescore: RoundRef | null };
 
 const STATES: IssueState[] = ['open', 'resolved', 'rejected', 'superseded'];
+// The Deleted at source tab: not reviewed, or reviewed (kept or withdrawn).
+const DELETED_STATES: IssueState[] = ['open', 'resolved'];
 
 /**
  * The Data issues page (ARCHITECTURE.md §6, §9.3, D-57): what validation held back, and the
@@ -40,9 +45,11 @@ const STATES: IssueState[] = ['open', 'resolved', 'rejected', 'superseded'];
  * assessments whose flags can be overridden. Every resolution asks for a reason
  * (ConfirmWithReasonDialog), says what happened, reloads only the rows, the rule counts and the
  * badge, and links to the round's rescore. All filters are in the URL, the source among them: each
- * row names its source and links to the submission there, and a duplicate shows both sides.
+ * row names its source and links to the submission there, and a duplicate shows both sides with
+ * "Keep the existing one" or "Use this one instead" (§5.8). A third tab lists the assessments
+ * deleted at source, to keep, withdraw or restore (D-24).
  */
-export default function AdminDataIssues({ issueFilters: filters, rules, records, lgas, rounds, sources }: AdminDataIssuesProps) {
+export default function AdminDataIssues({ issueFilters: filters, rules, records, lgas, rounds, sources, deletedOpen }: AdminDataIssuesProps) {
     const t = useTranslate();
     const announce = useAnnounce();
     const months = useTranslationList('common.months_short');
@@ -67,7 +74,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             '/admin/data-issues',
             Object.fromEntries(Object.entries(query).filter(([key, value]) => value !== null && value !== undefined && value !== '' && !(key === 'tab' && value === 'hard') && !(key === 'state' && value === 'open'))),
             {
-                only: ['records', 'issueFilters', 'rules'],
+                only: ['records', 'issueFilters', 'rules', 'deletedOpen'],
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
@@ -75,7 +82,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             },
         );
     };
-    const refresh = () => router.reload({ only: ['records', 'rules', 'admin', 'shell'] });
+    const refresh = () => router.reload({ only: ['records', 'rules', 'deletedOpen', 'admin', 'shell'] });
 
     /** Sends a resolution and turns its answer into the dialog's outcome and the page's message. */
     const send = async (method: 'POST', url: string, body: Record<string, unknown>, describe: (data: Resolution | Resolution[]) => Outcome): Promise<ConfirmOutcome> => {
@@ -116,6 +123,53 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             confirm: t('admin.issues.dialogs.correct_confirm'),
             danger: false,
             send: (reason) => send('POST', `/api/quarantine/${row.id}/resolve`, { action: 'correct', corrections, reason }, (data) => describeOne(data as Resolution)),
+        });
+
+    // A cross-source duplicate (§5.8): keep the accepted assessment (this record is rejected), or
+    // let this submission replace it.
+    const keepExisting = (row: DataIssueRow) =>
+        setPending({
+            title: t('admin.issues.dialogs.keep_existing_title'),
+            consequence: t('admin.issues.dialogs.keep_existing_consequence', { source: row.duplicate_of?.source?.name ?? t('admin.issues.table.source_unknown') }),
+            confirm: t('admin.issues.dialogs.keep_existing_confirm'),
+            danger: false,
+            send: (reason) => send('POST', `/api/quarantine/${row.id}/resolve`, { action: 'reject', reason }, (data) => ({ ...describeOne(data as Resolution), text: t('admin.issues.outcomes.rejected') })),
+        });
+
+    const chooseThis = (row: DataIssueRow) =>
+        setPending({
+            title: t('admin.issues.dialogs.use_this_title'),
+            consequence: t('admin.issues.dialogs.use_this_consequence', { source: row.duplicate_of?.source?.name ?? t('admin.issues.table.source_unknown') }),
+            confirm: t('admin.issues.dialogs.use_this_confirm'),
+            danger: false,
+            send: (reason) => send('POST', `/api/quarantine/${row.id}/resolve`, { action: 'replace', reason }, (data) => ({ text: t('admin.issues.outcomes.replaced'), rescore: (data as Resolution).rescore_round })),
+        });
+
+    // The Deleted at source tab (D-24).
+    const deletedRound = (row: DeletedAssessmentRow): RoundRef => ({ id: row.round.id, year: row.round.year, quarter: row.round.quarter });
+    const keepDeleted = (row: DeletedAssessmentRow) =>
+        setPending({
+            title: t('admin.issues.dialogs.keep_deletion_title'),
+            consequence: t('admin.issues.dialogs.keep_deletion_consequence', { source: row.source?.name ?? t('admin.issues.table.source_unknown'), facility: row.facility.name }),
+            confirm: t('admin.issues.dialogs.keep_deletion_confirm'),
+            danger: false,
+            send: (reason) => send('POST', `/api/submissions/${row.submission_id}/deletion-review`, { reason }, () => ({ text: t('admin.issues.outcomes.kept'), rescore: null })),
+        });
+    const withdraw = (row: DeletedAssessmentRow) =>
+        setPending({
+            title: t('admin.issues.dialogs.withdraw_title'),
+            consequence: t('admin.issues.dialogs.withdraw_consequence', { facility: row.facility.name, quarter: row.round.quarter, year: row.round.year }),
+            confirm: t('admin.issues.dialogs.withdraw_confirm'),
+            danger: true,
+            send: (reason) => send('POST', `/api/assessments/${row.assessment.id}/withdraw`, { reason }, () => ({ text: t('admin.issues.outcomes.withdrawn'), rescore: deletedRound(row) })),
+        });
+    const restore = (row: DeletedAssessmentRow) =>
+        setPending({
+            title: t('admin.issues.dialogs.restore_title'),
+            consequence: t('admin.issues.dialogs.restore_consequence', { facility: row.facility.name }),
+            confirm: t('admin.issues.dialogs.restore_confirm'),
+            danger: false,
+            send: (reason) => send('POST', `/api/assessments/${row.assessment.id}/restore`, { reason }, () => ({ text: t('admin.issues.outcomes.restored'), rescore: deletedRound(row) })),
         });
 
     const override = (row: FlaggedRow, code: string, name: string) =>
@@ -168,31 +222,38 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                 options={[
                     { value: 'hard', label: t('admin.issues.tabs.hard') },
                     { value: 'soft', label: t('admin.issues.tabs.soft') },
+                    { value: 'deleted', label: t('admin.issues.tabs.deleted', { count: formatCount(deletedOpen) }) },
                 ]}
                 value={filters.tab}
-                onChange={(tab) => visit({ tab, rule: null, page: 1 })}
+                onChange={(tab) => visit({ tab, rule: null, state: 'open', page: 1 })}
             />
 
-            <RuleSummary
-                rules={rules.filter((rule) => rule.severity === filters.tab)}
-                active={filters.rule}
-                onChoose={(rule) => visit({ rule, page: 1 })}
-            />
+            {filters.tab !== 'deleted' && (
+                <RuleSummary
+                    rules={rules.filter((rule) => rule.severity === filters.tab)}
+                    active={filters.rule}
+                    onChoose={(rule) => visit({ rule, page: 1 })}
+                />
+            )}
 
             <Panel labelledBy="issues-records-title">
-                <PanelHeader id="issues-records-title" title={t(filters.tab === 'hard' ? 'admin.issues.tabs.hard' : 'admin.issues.tabs.soft')} />
+                <PanelHeader
+                    id="issues-records-title"
+                    title={filters.tab === 'deleted' ? t('admin.issues.deleted.caption') : t(filters.tab === 'hard' ? 'admin.issues.tabs.hard' : 'admin.issues.tabs.soft')}
+                />
                 <div role="group" aria-label={t('admin.issues.filters.label')} className="flex flex-wrap items-end gap-3 px-5 pb-3">
-                    {filters.tab === 'hard' && (
+                    {filters.tab !== 'soft' && (
                         <Labelled id={ids.state} label={t('admin.issues.filters.state')}>
                             <select id={ids.state} className={select} value={filters.state} onChange={(event) => visit({ state: event.target.value as IssueState, page: 1 })}>
-                                {STATES.map((state) => (
+                                {(filters.tab === 'deleted' ? DELETED_STATES : STATES).map((state) => (
                                     <option key={state} value={state}>
-                                        {t(`admin.issues.filters.states.${state}`)}
+                                        {filters.tab === 'deleted' ? t(`admin.issues.deleted.states.${state}`) : t(`admin.issues.filters.states.${state}`)}
                                     </option>
                                 ))}
                             </select>
                         </Labelled>
                     )}
+                    {filters.tab !== 'deleted' && (
                     <Labelled id={ids.rule} label={t('admin.issues.filters.rule')}>
                         <select id={ids.rule} className={select} value={filters.rule ?? ''} onChange={(event) => visit({ rule: event.target.value || null, page: 1 })}>
                             <option value="">{t('admin.issues.filters.all_rules')}</option>
@@ -205,6 +266,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                 ))}
                         </select>
                     </Labelled>
+                    )}
                     <Labelled id={ids.lga} label={t('admin.issues.filters.lga')}>
                         <select id={ids.lga} className={select} value={filters.lga ?? ''} onChange={(event) => visit({ lga: event.target.value || null, page: 1 })}>
                             <option value="">{t('admin.issues.filters.all_lgas')}</option>
@@ -358,6 +420,16 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                                     <td className="px-3 py-2 whitespace-nowrap">{when(row.received_at)}</td>
                                     <td className="px-3 py-2">
                                         <div className="flex flex-col items-start gap-1.5">
+                                            {row.status === 'open' && row.duplicate_of !== null && row.failures.every((failure) => failure.code === 'DUPLICATE_ASSESSMENT') && (
+                                                <>
+                                                    <button type="button" className="btn btn-primary min-h-11" onClick={() => keepExisting(row)}>
+                                                        {t('admin.issues.actions.keep_existing')}
+                                                    </button>
+                                                    <button type="button" className={button} onClick={() => chooseThis(row)}>
+                                                        {t('admin.issues.actions.use_this')}
+                                                    </button>
+                                                </>
+                                            )}
                                             {row.status === 'open' ? (
                                                 <>
                                                     <button type="button" className={button} aria-expanded={correcting === row.id} onClick={() => setCorrecting(correcting === row.id ? null : row.id)}>
@@ -393,6 +465,14 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
                             </Fragment>
                         ))}
                     </AdminTable>
+                ) : filters.tab === 'deleted' ? (
+                    <DeletedAtSourceTable
+                        records={records as Paginated<DeletedAssessmentRow>}
+                        onKeep={keepDeleted}
+                        onWithdraw={withdraw}
+                        onRestore={restore}
+                        onPage={(page) => visit({ page })}
+                    />
                 ) : (
                     <AdminTable
                         caption={t('admin.issues.table.soft_caption')}

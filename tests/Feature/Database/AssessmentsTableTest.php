@@ -27,7 +27,7 @@ it('rejects a second assessment of one facility in one round', function (): void
 
     expectUniqueViolation(
         fn () => Rows::assessment(['round_id' => $roundId, 'facility_id' => $facilityId]),
-        'assessments_round_id_facility_id_unique',
+        'assessments_round_facility_live_unique', // one live assessment: a withdrawn one (D-24) does not count
     );
 });
 
@@ -54,4 +54,15 @@ it('rejects an unknown dimension on item responses', function (): void {
 it('indexes item responses by assessment, dimension and month slot', function (): void {
     expect(indexDefinition('item_responses_assessment_id_dimension_month_slot_index'))
         ->toContain('(assessment_id, dimension, month_slot)');
+});
+
+it('allows a withdrawn assessment beside a live one for the same facility and round, and no unknown status', function (): void {
+    $roundId = Rows::round();
+    $facilityId = Rows::facility();
+    Rows::assessment(['round_id' => $roundId, 'facility_id' => $facilityId, 'status' => 'withdrawn']);
+    Rows::assessment(['round_id' => $roundId, 'facility_id' => $facilityId]);
+
+    expect(DB::table('assessments')->where(['round_id' => $roundId, 'facility_id' => $facilityId])->count())->toBe(2);
+    expectUniqueViolation(fn () => Rows::assessment(['round_id' => $roundId, 'facility_id' => $facilityId, 'status' => 'flagged']), 'assessments_round_facility_live_unique');
+    expectCheckViolation(fn () => Rows::assessment(['status' => 'deleted']), 'assessments_status_valid');
 });

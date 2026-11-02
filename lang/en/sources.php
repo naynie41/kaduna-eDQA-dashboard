@@ -87,4 +87,15 @@ return [
             'already_reviewed' => 'This deletion has already been reviewed.',
         ],
     ],
+
+    // Withdrawing and restoring an assessment deleted at source (D-24).
+    'withdrawal' => [
+        'errors' => [
+            'round_closed' => 'Round :round is closed, so its figures are fixed. Reopen the round on the Rounds page (with a reason) first.',
+            'already_withdrawn' => 'This assessment has already been withdrawn.',
+            'not_deleted_at_source' => 'Its submission is still at its source: only an assessment deleted at source can be withdrawn here.',
+            'not_withdrawn' => 'This assessment is not withdrawn.',
+            'round_taken' => 'The facility has been assessed again in :round since, and only one assessment can count: this one cannot be restored.',
+        ],
+    ],
 ];

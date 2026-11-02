@@ -53,6 +53,12 @@ final class CorrectAndReprocess
         private readonly ReadSubmission $read,
     ) {}
 
+    /** The record's submission as it stands for the pipeline: the stored snapshot with its corrections. */
+    public function parsedFor(QuarantinedRecord $record): ParsedSubmission
+    {
+        return self::rebuild($this->read->fromStored($record->submission)->toArray(), $record->corrections);
+    }
+
     /** @param  array<string, mixed>  $corrections */
     public function execute(QuarantinedRecord $record, array $corrections, User $actor, string $reason): ProcessOutcome
     {

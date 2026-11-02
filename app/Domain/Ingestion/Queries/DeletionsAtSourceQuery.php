@@ -9,6 +9,9 @@ use App\Domain\Ingestion\SourceLinks;
 use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use App\Models\User;
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The Data sources page's "Deletions at source" (ARCHITECTURE.md §5.3, §9.3, D-62): submissions a
@@ -72,5 +75,62 @@ final class DeletionsAtSourceQuery
         });
 
         return ['rows' => array_values($rows->all()), 'total' => $total];
+    }
+
+    /**
+     * The Data issues page's Deleted at source tab (D-24, Phase 5 step 2): each assessment whose
+     * submission its source no longer returns, newest deletion first, 50 a page. Open while the
+     * deletion is unreviewed; any other status lists the reviewed ones (kept or withdrawn).
+     *
+     * @param  array{state: string, source_id: ?int, round: ?int, lga: ?string}  $filters
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
+    public function assessedPage(array $filters): LengthAwarePaginator
+    {
+        $page = DB::table('submissions as s')
+            ->join('assessments as a', 'a.submission_id', '=', 's.id')
+            ->join('facilities as f', 'f.id', '=', 'a.facility_id')
+            ->join('lgas as l', 'l.id', '=', 'f.lga_id')
+            ->join('rounds as r', 'r.id', '=', 'a.round_id')
+            ->leftJoin('users as u', 'u.id', '=', 's.deletion_reviewed_by')
+            ->whereNotNull('s.deleted_at_source')
+            ->when($filters['state'] === 'open', fn ($q) => $q->whereNull('s.deletion_reviewed_at'), fn ($q) => $q->whereNotNull('s.deletion_reviewed_at'))
+            ->when($filters['source_id'] !== null, fn ($q) => $q->where('s.source_id', $filters['source_id']))
+            ->when($filters['round'] !== null, fn ($q) => $q->where('a.round_id', $filters['round']))
+            ->when($filters['lga'] !== null, fn ($q) => $q->where('l.code', $filters['lga']))
+            ->orderByDesc('s.deleted_at_source')->orderByDesc('s.id')
+            ->select([
+                's.id as submission_id', 's.source_id', 's.instance_id', 's.external_id', 's.deleted_at_source', 's.deletion_reviewed_at', 'u.name as reviewer',
+                'a.id as assessment_id', 'a.status as assessment_status', 'f.id as facility_id', 'f.code as facility_code', 'f.name as facility_name',
+                'l.name as lga', 'r.id as round_id', 'r.year', 'r.quarter', 'r.status as round_status',
+            ])
+            ->paginate(self::LIMIT);
+
+        /** @var LengthAwarePaginator<int, array<string, mixed>> $rows */
+        $rows = $page->through(fn (object $row): array => $this->assessedRow($row));
+
+        return $rows;
+    }
+
+    /** @return array<string, mixed> one row of the Deleted at source tab */
+    private function assessedRow(object $row): array
+    {
+        $key = $this->sources->keyOf((int) $row->source_id);
+
+        return [
+            'submission_id' => (int) $row->submission_id,
+            'source' => $key === null ? null : ['key' => $key, 'name' => $this->sources->name($key)],
+            'instance_id' => (string) $row->instance_id,
+            'source_url' => $key === null ? null : $this->links->submission($key, is_string($row->external_id) ? $row->external_id : null),
+            'deleted_at' => CarbonImmutable::parse((string) $row->deleted_at_source)->toIso8601String(),
+            'assessment' => ['id' => (int) $row->assessment_id, 'status' => (string) $row->assessment_status],
+            'facility' => ['id' => (int) $row->facility_id, 'code' => (string) $row->facility_code, 'name' => (string) $row->facility_name],
+            'lga' => (string) $row->lga,
+            'round' => ['id' => (int) $row->round_id, 'year' => (int) $row->year, 'quarter' => (int) $row->quarter, 'open' => $row->round_status === 'open'],
+            'reviewed' => $row->deletion_reviewed_at === null ? null : [
+                'at' => CarbonImmutable::parse((string) $row->deletion_reviewed_at)->toIso8601String(),
+                'by' => is_string($row->reviewer) ? $row->reviewer : null,
+            ],
+        ];
     }
 }

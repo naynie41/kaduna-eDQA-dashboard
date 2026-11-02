@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AdminSourcesController;
+use App\Http\Controllers\Assessments\AssessmentStatusController;
 use App\Http\Controllers\Assessments\CorrectAssessmentController;
 use App\Http\Controllers\Attachments\ShowAttachmentController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
@@ -117,6 +118,8 @@ Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function 
         Route::post('quarantine/bulk-resolve', BulkResolveQuarantineController::class)->name('quarantine.bulk-resolve');
         Route::post('quarantine/{record}/resolve', ResolveQuarantineController::class)->whereNumber('record')->name('quarantine.resolve');
         Route::post('submissions/{submission}/deletion-review', ReviewDeletionController::class)->whereNumber('submission')->name('submissions.deletion-review');
+        Route::post('assessments/{assessment}/withdraw', [AssessmentStatusController::class, 'withdraw'])->whereNumber('assessment')->name('assessments.withdraw');
+        Route::post('assessments/{assessment}/restore', [AssessmentStatusController::class, 'restore'])->whereNumber('assessment')->name('assessments.restore');
         Route::post('assessments/{assessment}/corrections', CorrectAssessmentController::class)->whereNumber('assessment')->name('assessments.corrections.store');
         Route::post('assessments/{assessment}/flags/{code}/override', OverrideSoftFlagController::class)
             ->whereNumber('assessment')->name('assessments.flags.override');

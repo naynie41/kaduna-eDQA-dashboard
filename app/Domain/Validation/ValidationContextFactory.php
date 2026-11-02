@@ -159,6 +159,7 @@ final class ValidationContextFactory
             ->join('submissions', 'submissions.id', '=', 'assessments.submission_id')
             ->leftJoin('submission_sources', 'submission_sources.id', '=', 'submissions.source_id')
             ->whereIn('assessments.facility_id', $facilityIds)
+            ->where('assessments.status', '!=', 'withdrawn') // a withdrawn visit may be submitted again (D-24)
             ->get(['assessments.round_id', 'assessments.facility_id', 'submissions.instance_id', 'submission_sources.key as source']);
 
         foreach ($rows as $row) {
@@ -217,7 +218,7 @@ final class ValidationContextFactory
         $rows = DB::select(<<<'SQL'
             SELECT DISTINCT assessor_name, device_id, (started_at AT TIME ZONE ?)::date::text AS day, facility_id
             FROM assessments
-            WHERE (started_at AT TIME ZONE ?)::date = ANY(?::date[])
+            WHERE (started_at AT TIME ZONE ?)::date = ANY(?::date[]) AND status <> 'withdrawn'
             SQL, [config('app.timezone'), config('app.timezone'), '{'.implode(',', array_keys($dates)).'}']);
 
         $days = [];

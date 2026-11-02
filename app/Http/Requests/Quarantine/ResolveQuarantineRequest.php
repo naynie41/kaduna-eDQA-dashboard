@@ -25,7 +25,9 @@ final class ResolveQuarantineRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'action' => ['required', Rule::in(BulkResolveQuarantine::ACTIONS)],
+            // One record: correct, reject, or (a cross-source duplicate, §5.8) replace the accepted
+            // assessment with this submission. Bulk stays correct or reject.
+            'action' => ['required', Rule::in([...BulkResolveQuarantine::ACTIONS, 'replace'])],
             'corrections' => ['required_if:action,correct', 'array'],
             'reason' => ['required', 'string', 'min:'.Reason::MIN_LENGTH],
         ];

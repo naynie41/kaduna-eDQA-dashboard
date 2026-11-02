@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Quarantine;
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Ingestion\Exceptions\SourceRefused;
+use App\Domain\Ingestion\Queries\DeletionsAtSourceQuery;
 use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Reporting\Aggregators\SoftFlagAggregator;
 use App\Domain\Reporting\Queries\FlaggedAssessmentsQuery;
@@ -16,6 +17,7 @@ use App\Domain\Validation\Enums\Severity;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use App\Domain\Validation\Queries\QuarantineQuery;
 use App\Domain\Validation\RuleCatalogue;
+use App\Domain\Validation\Support\DuplicateComparison;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\DataIssuesRequest;
 use App\Http\Resources\Admin\FlaggedAssessmentResource;
@@ -34,7 +36,7 @@ use Inertia\Response;
  */
 final class DataIssuesPageController extends Controller
 {
-    public function __invoke(DataIssuesRequest $request, RuleCatalogue $catalogue, QuarantineQuery $quarantine, SoftFlagAggregator $soft, FlaggedAssessmentsQuery $flagged, SourceRegistry $sources): Response
+    public function __invoke(DataIssuesRequest $request, RuleCatalogue $catalogue, QuarantineQuery $quarantine, SoftFlagAggregator $soft, FlaggedAssessmentsQuery $flagged, SourceRegistry $sources, DeletionsAtSourceQuery $deletions): Response
     {
         $filters = $request->filters();
         $query = [...$filters, 'source_id' => self::sourceId($sources, $filters['source'])];
@@ -54,9 +56,12 @@ final class DataIssuesPageController extends Controller
                     'open' => $rule['severity'] === Severity::Soft ? ($softCounts[$rule['code']] ?? 0) : ($hard[$rule['code']] ?? 0),
                 ], $catalogue->all());
             },
-            'records' => fn () => $filters['tab'] === 'soft'
-                ? $flagged->page($softCodes, $query)->through(fn (Assessment $a): array => (new FlaggedAssessmentResource($a, $softCodes))->resolve($request))
-                : self::hardPage($quarantine, $query, $request),
+            'records' => fn () => match ($filters['tab']) {
+                'soft' => $flagged->page($softCodes, $query)->through(fn (Assessment $a): array => (new FlaggedAssessmentResource($a, $softCodes))->resolve($request)),
+                'deleted' => $deletions->assessedPage(['state' => $filters['state'], 'source_id' => $query['source_id'], 'round' => $filters['round'], 'lga' => $filters['lga']]),
+                default => self::hardPage($quarantine, $query, $request),
+            },
+            'deletedOpen' => fn (): int => $quarantine->unreviewedDeletedAssessments(),
             'lgas' => fn (): array => Lga::query()->orderBy('name')->get(['code', 'name'])->map(fn (Lga $l): array => ['code' => $l->code, 'name' => $l->name])->all(),
             'rounds' => fn (): array => Round::query()->orderByDesc('year')->orderByDesc('quarter')->get(['id', 'year', 'quarter', 'status'])
                 ->map(fn (Round $r): array => ['id' => $r->id, 'year' => $r->year, 'quarter' => $r->quarter, 'status' => $r->status->value])->all(),
@@ -74,8 +79,19 @@ final class DataIssuesPageController extends Controller
         $page = $quarantine->adminPage($filters);
         $names = $quarantine->facilityNames(array_map(fn (QuarantinedRecord $r): ?string => $r->facility_ref, $page->items()));
         $originals = $quarantine->duplicateOriginals(array_values($page->items()));
+        // Each duplicate's two sides, scored like for like (one query for the accepted ones).
+        $comparison = app(DuplicateComparison::class);
+        $overalls = $comparison->assessed(array_values(array_unique(array_column($originals, 'assessment_id'))));
 
-        return $page->through(fn (QuarantinedRecord $record): array => (new DataIssueRowResource($record, $names, $originals[$record->id] ?? null))->resolve($request));
+        return $page->through(function (QuarantinedRecord $record) use ($names, $originals, $overalls, $comparison, $request): array {
+            $original = $originals[$record->id] ?? null;
+            if ($original !== null) {
+                $original['overall'] = $overalls[$original['assessment_id']] ?? null;
+            }
+            $wouldScore = $original === null ? null : $comparison->submission(is_array($record->parsed) ? $record->parsed : []);
+
+            return (new DataIssueRowResource($record, $names, $original, $wouldScore))->resolve($request);
+        });
     }
 
     /** The filter's source row id; -1 (matches nothing) for a configured source not registered yet. */

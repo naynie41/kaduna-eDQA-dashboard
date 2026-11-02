@@ -6,6 +6,7 @@ namespace App\Http\Resources\Quarantine;
 
 use App\Domain\Ingestion\SourceLinks;
 use App\Domain\Ingestion\SourceRegistry;
+use App\Domain\Scoring\DTOs\ScoreValue;
 use App\Domain\Validation\Actions\CorrectAndReprocess;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use Illuminate\Http\Request;
@@ -27,9 +28,10 @@ final class DataIssueRowResource extends JsonResource
 {
     /**
      * @param  array<string, string>  $facilityNames  lower-cased ref => name (QuarantineQuery::facilityNames)
-     * @param  array{assessment_id: int, facility_id: int, source_id: int, instance_id: string, external_id: ?string}|null  $original  QuarantineQuery::duplicateOriginals
+     * @param  array{assessment_id: int, facility_id: int, source_id: int, instance_id: string, external_id: ?string, submitted_at: ?string, assessor: ?string, overall?: ?ScoreValue}|null  $original  QuarantineQuery::duplicateOriginals, with its overall
+     * @param  ScoreValue|null  $wouldScore  the overall this submission would score (DuplicateComparison), for a duplicate
      */
-    public function __construct(QuarantinedRecord $record, private readonly array $facilityNames = [], private readonly ?array $original = null)
+    public function __construct(QuarantinedRecord $record, private readonly array $facilityNames = [], private readonly ?array $original = null, private readonly ?ScoreValue $wouldScore = null)
     {
         parent::__construct($record);
     }
@@ -49,7 +51,7 @@ final class DataIssueRowResource extends JsonResource
         ];
     }
 
-    /** @return array{assessment_id: int, facility_id: int, source: ?array{key: string, name: string}, instance_id: string, url: ?string}|null */
+    /** @return array{assessment_id: int, facility_id: int, source: ?array{key: string, name: string}, instance_id: string, url: ?string, submitted_at: ?string, assessor: ?string, overall: ?ScoreValue, this: array{submitted_at: ?string, assessor: ?string, overall: ?ScoreValue}}|null */
     private function duplicateOf(): ?array
     {
         if ($this->original === null) {
@@ -64,6 +66,16 @@ final class DataIssueRowResource extends JsonResource
             'source' => $key === null ? null : ['key' => $key, 'name' => $sources->name($key)],
             'instance_id' => $this->original['instance_id'],
             'url' => $key === null ? null : app(SourceLinks::class)->submission($key, $this->original['external_id']),
+            // Side by side with this submission (§5.8): when each was submitted, who assessed, and
+            // the overall each scores under the current rule version.
+            'submitted_at' => $this->original['submitted_at'],
+            'assessor' => $this->original['assessor'],
+            'overall' => $this->original['overall'] ?? null,
+            'this' => [
+                'submitted_at' => $this->submission?->submitted_at?->toIso8601String(),
+                'assessor' => is_array($this->parsed) && is_string($this->parsed['assessor_name'] ?? null) ? $this->parsed['assessor_name'] : null,
+                'overall' => $this->wouldScore,
+            ],
         ];
     }
 

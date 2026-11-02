@@ -310,14 +310,52 @@ it('shows both sides of a DUPLICATE_ASSESSMENT: the accepted one from its source
         ->where('records.data.0.id', $record->id)
         ->where('records.data.0.source', ['key' => 'odk', 'name' => 'ODK Central'])
         ->where('records.data.0.failures.0.detail', fn (string $detail): bool => str_contains($detail, 'from KoboToolbox') && str_contains($detail, 'this one from ODK Central'))
-        ->where('records.data.0.duplicate_of', [
-            'assessment_id' => $accepted->id,
-            'facility_id' => $this->facility->id,
-            'source' => ['key' => 'kobo', 'name' => 'KoboToolbox'],
-            'instance_id' => 'uuid:kobo-first',
-            'url' => 'https://kf.example.org/api/v2/assets/aKdDqa2026/data/1207/',
-        ]));
+        ->where('records.data.0.duplicate_of.assessment_id', $accepted->id)
+        ->where('records.data.0.duplicate_of.facility_id', $this->facility->id)
+        ->where('records.data.0.duplicate_of.source', ['key' => 'kobo', 'name' => 'KoboToolbox'])
+        ->where('records.data.0.duplicate_of.instance_id', 'uuid:kobo-first')
+        ->where('records.data.0.duplicate_of.url', 'https://kf.example.org/api/v2/assets/aKdDqa2026/data/1207/')
+        // Side by side (§5.8): when each was submitted, who assessed, and the overall each scores.
+        ->where('records.data.0.duplicate_of.submitted_at', $first->submitted_at->toIso8601String())
+        ->where('records.data.0.duplicate_of.assessor', $accepted->assessor_name)
+        ->has('records.data.0.duplicate_of.overall.display')
+        ->where('records.data.0.duplicate_of.this.assessor', 'Hauwa Ibrahim')
+        ->where('records.data.0.duplicate_of.this.submitted_at', fn (?string $at): bool => $at !== null)
+        // This submission's items score 75 in every slot (ParsedSubmissionBuilder).
+        ->where('records.data.0.duplicate_of.this.overall.display', '75.0'));
 
     // Any other record repeats nothing.
     $this->actingAs($this->admin)->get('/admin/data-issues?rule=LGA_UNKNOWN')->assertInertia(fn (Assert $page) => $page->where('records.data.0.duplicate_of', null));
+});
+
+// ---- The Deleted at source tab (D-24)
+
+it('lists each assessment deleted at source on its own tab, open while unreviewed, with what can be done', function (): void {
+    $gone = Submission::factory()->accepted()->create(['source_id' => Rows::sourceId('kobo'), 'instance_id' => 'uuid:gone-1', 'deleted_at_source' => now()->subDay()]);
+    $assessment = Assessment::factory()->create(['round_id' => $this->round->id, 'facility_id' => $this->facility->id, 'submission_id' => $gone->id]);
+    $reviewed = Submission::factory()->accepted()->create(['instance_id' => 'uuid:gone-2', 'deleted_at_source' => now()->subDays(2), 'deletion_reviewed_at' => now(), 'deletion_reviewed_by' => $this->admin->id]);
+    $withdrawnFacility = Facility::factory()->inWard(Ward::factory()->create(['lga_id' => $this->zaria->id]))->create();
+    $withdrawn = Assessment::factory()->create(['round_id' => $this->round->id, 'facility_id' => $withdrawnFacility->id, 'submission_id' => $reviewed->id, 'status' => 'withdrawn']);
+    Submission::factory()->accepted()->create(['deleted_at_source' => now()]); // deleted, but no assessment was built from it
+
+    $this->actingAs($this->admin)->get('/admin/data-issues?tab=deleted')->assertInertia(fn (Assert $page) => $page
+        ->where('issueFilters.tab', 'deleted')
+        ->where('deletedOpen', 1)
+        ->count('records.data', 1)
+        ->where('records.data.0.submission_id', $gone->id)
+        ->where('records.data.0.instance_id', 'uuid:gone-1')
+        ->where('records.data.0.source', ['key' => 'kobo', 'name' => 'KoboToolbox'])
+        ->where('records.data.0.assessment', ['id' => $assessment->id, 'status' => 'accepted'])
+        ->where('records.data.0.facility.id', $this->facility->id)
+        ->where('records.data.0.round', ['id' => $this->round->id, 'year' => $this->round->year, 'quarter' => $this->round->quarter, 'open' => true])
+        ->where('records.data.0.reviewed', null));
+
+    // Reviewed ones, withdrawn or kept, are under the other statuses.
+    $this->actingAs($this->admin)->get('/admin/data-issues?tab=deleted&state=resolved')->assertInertia(fn (Assert $page) => $page
+        ->count('records.data', 1)
+        ->where('records.data.0.assessment', ['id' => $withdrawn->id, 'status' => 'withdrawn'])
+        ->where('records.data.0.reviewed.by', $this->admin->name));
+
+    // And by source.
+    $this->actingAs($this->admin)->get('/admin/data-issues?tab=deleted&source=odk')->assertInertia(fn (Assert $page) => $page->count('records.data', 0));
 });

@@ -841,6 +841,36 @@ Detail strings must be specific: `"availability_m1 derived score 347.66 exceeds 
 5. Every action writes an audit entry. Nothing is silently fixed.
 6. Resolving triggers a rescore of the affected round.
 
+**Built (Phase 5 step 2): Data issues completed.** Already in place from D-57/2C.7 and kept: the
+rule summary (14 + RULE_ERROR) with counts and "why", the URL filters (status, rule, source, LGA,
+round, hard/soft tab), the whitelisted inline correction, reject, override, bulk (single shared
+rule only), the record drawer (failures, parsed values, collapsed read-only payload, history) and
+the outcome with its rescore link.
+- **Cross-source duplicates** (§5.8). A DUPLICATE_ASSESSMENT row shows both submissions side by
+  side (source, instance ID, submitted at, assessor, and the overall each scores under the current
+  rule version, by `DuplicateComparison` through ScoreCalculator, never stored). Two actions, each
+  with a reason: **Keep the existing one** rejects the record; **Use this one instead**
+  (`ReplaceAssessmentFromSubmission`, action `replace` on `POST /api/quarantine/{record}/resolve`)
+  reprocesses the record as an edit of the accepted instance, so the pipeline replaces the same
+  assessment row's items and scores, marks the old submission superseded (the source follows by
+  trigger), and the round is rescored. Audited as `assessment_replaced` with both instance IDs.
+  Refused for anything but an open record held only as a duplicate, in a closed round (D-18), and
+  when the submission would now fail another rule.
+- **Deleted at source tab** (D-24): each assessment whose submission its source no longer returns
+  (`DeletionsAtSourceQuery::assessedPage`), open while unreviewed. **Keep** marks the deletion
+  reviewed; **Withdraw** (`WithdrawAssessment`, `POST /api/assessments/{id}/withdraw`) sets
+  `assessments.status = 'withdrawn'` and marks the deletion reviewed; **Restore** puts back
+  accepted or flagged (from its soft flags). Both reasoned, audited (`assessment_withdrawn`,
+  `assessment_restored`), refused in a closed round; restore is refused once the facility has a
+  live assessment in the round again. `AssessmentStatusChanged` flushes the round cache, refreshes
+  `round_aggregates` and queues the round rescore.
+- **Withdrawn counts nowhere.** Migration `add_withdrawn_assessments`: a CHECK on assessment
+  statuses (accepted, flagged, withdrawn; there was none) and the unique (round, facility) index made
+  partial (`WHERE status <> 'withdrawn'`), so a withdrawn facility can be assessed again; `down()`
+  refuses while a withdrawn row shares its facility and round with a live one. Every aggregator and
+  the view already read accepted and flagged only; the duplicate lookup, assessor-day counts and the
+  facility's prior overalls (SCORE_JUMP, facility history) now skip withdrawn too.
+
 ### The guarantee
 
 No aggregate — chart, scorecard, export — reads from `submissions` or `quarantined_records`.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Reporting\Listeners;
 
 use App\Domain\Assessment\Events\AssessmentScored;
+use App\Domain\Assessment\Events\AssessmentStatusChanged;
 use App\Domain\Reporting\RoundCache;
 use App\Domain\Scoring\Events\RuleVersionPublished;
 use App\Domain\Validation\Events\QuarantineResolved;
@@ -30,6 +31,11 @@ final class FlushRoundCache
         if ($event->roundId !== null) {
             $this->cache->flushRound($event->roundId);
         }
+    }
+
+    public function onStatusChanged(AssessmentStatusChanged $event): void
+    {
+        $this->cache->flushRound($event->roundId);
     }
 
     public function onPublished(RuleVersionPublished $event): void

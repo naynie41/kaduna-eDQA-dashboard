@@ -208,7 +208,7 @@ const translations = {
         },
         issues: {
             table: { source_unknown: 'Unknown source' },
-            duplicate: { label: 'Both sides of the duplicate', accepted: 'Already accepted', this: 'This submission', side: 'from :source,' },
+            duplicate: { label: 'Both sides of the duplicate', accepted: 'Already accepted', this: 'This submission', side: 'from :source,', source: 'Source', instance: 'Instance ID', submitted: 'Submitted', assessor: 'Assessor', overall: 'Overall it scores', unknown: 'Not known' },
             actions: { open_in_source: 'Open in :source', new_tab: '(opens in a new tab)' },
         },
     },
@@ -527,16 +527,40 @@ describe('CascadePanel', () => {
 describe('DuplicateSides', () => {
     const row = { instance_id: 'uuid:kobo-copy', source: { key: 'kobo', name: 'KoboToolbox' } } as DataIssueRow;
 
-    it('shows both sides of a duplicate, each with its source, and links the accepted one', async () => {
+    const score = (display: string) => ({ value: Number(display), display, headline: display, band: 'acceptable' as const, bandLabel: 'Acceptable' });
+
+    it('compares the two submissions side by side: source, instance, submitted, assessor and the overall each scores', async () => {
         const { container } = renderUi(
-            <DuplicateSides row={{ ...row, duplicate_of: { assessment_id: 1, facility_id: 2, source: { key: 'odk', name: 'ODK Central' }, instance_id: 'uuid:odk-first', url: 'https://central.example.org/#/x' } }} />,
+            <DuplicateSides
+                row={{
+                    ...row,
+                    duplicate_of: {
+                        assessment_id: 1,
+                        facility_id: 2,
+                        source: { key: 'odk', name: 'ODK Central' },
+                        instance_id: 'uuid:odk-first',
+                        url: 'https://central.example.org/#/x',
+                        submitted_at: '2026-10-14T09:00:00Z',
+                        assessor: 'Hauwa Ibrahim',
+                        overall: score('81.2'),
+                        this: { submitted_at: '2026-10-15T10:30:00Z', assessor: 'Musa Danjuma', overall: score('84.7') },
+                    },
+                }}
+            />,
             translations,
         );
 
-        const sides = screen.getByLabelText('Both sides of the duplicate');
-        expect(sides.textContent).toContain('Already acceptedfrom ODK Central, uuid:odk-first');
-        expect(sides.textContent).toContain('This submissionfrom KoboToolbox, uuid:kobo-copy');
-        expect(within(sides).getByRole('link', { name: 'Open in ODK Central (opens in a new tab)' }).getAttribute('href')).toBe('https://central.example.org/#/x');
+        const table = screen.getByRole('table', { name: 'Both sides of the duplicate' });
+        expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Already accepted', 'This submission']);
+        const line = (header: string) => within(table).getByRole('rowheader', { name: header }).parentElement?.textContent;
+        expect(line('Source')).toContain('ODK Central');
+        expect(line('Source')).toContain('KoboToolbox');
+        expect(line('Instance ID')).toBe('Instance IDuuid:odk-firstuuid:kobo-copy');
+        expect(line('Submitted')).toBe('Submitted14 Oct 2026, 10:00 WAT15 Oct 2026, 11:30 WAT');
+        expect(line('Assessor')).toBe('AssessorHauwa IbrahimMusa Danjuma');
+        expect(line('Overall it scores')).toContain('81.2');
+        expect(line('Overall it scores')).toContain('84.7');
+        expect(within(table).getByRole('link', { name: 'Open in ODK Central (opens in a new tab)' }).getAttribute('href')).toBe('https://central.example.org/#/x');
         expect(await axeCheck(container)).toHaveNoViolations();
     });
 

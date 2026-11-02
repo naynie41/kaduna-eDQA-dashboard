@@ -12,6 +12,9 @@ return [
     'errors' => [
         'reason_too_short' => 'Give a reason of at least 10 characters.',
         'already_resolved' => 'This record has already been resolved.',
+        'not_a_duplicate' => 'Only a record held as a duplicate of an accepted assessment, and for nothing else, can replace it.',
+        'round_closed' => 'Round :round is closed, so its assessments are fixed. Reopen the round on the Rounds page (with a reason) first.',
+        'still_failing' => 'This submission would still fail :rules, so it cannot replace the accepted assessment.',
         'field_not_correctable' => 'The field :field cannot be corrected. Only the LGA, ward, facility, start, end and round can.',
         'invalid_correction' => 'The correction for :field is not a valid value.',
         'mixed_rules' => 'Bulk resolution needs every record to fail the same rules.',

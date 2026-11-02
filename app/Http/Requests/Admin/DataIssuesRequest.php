@@ -27,7 +27,9 @@ final class DataIssuesRequest extends FormRequest
         $codes = array_map(fn (array $rule): string => $rule['code'], app(RuleCatalogue::class)->all());
 
         return [
-            'tab' => ['nullable', Rule::in(['hard', 'soft'])],
+            // hard: quarantined records; soft: flagged accepted assessments; deleted: assessments
+            // whose submission was deleted at source (D-24).
+            'tab' => ['nullable', Rule::in(['hard', 'soft', 'deleted'])],
             'state' => ['nullable', Rule::in(QuarantineQuery::STATES)],
             'rule' => ['nullable', Rule::in($codes)],
             'lga' => ['nullable', 'string', Rule::exists('lgas', 'code')],

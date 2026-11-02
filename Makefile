@@ -92,12 +92,18 @@ e2e-sources: ## Playwright against both mocks: Pull all end to end, the duplicat
 	@# --no-deps: run would otherwise recreate app (a dependency of web) without the override.
 	@# Second pass: the Kobo mock refuses the token (HTTP 401), one Kobo pull fails on it, the page is
 	@# read for the plain-language error, then the token is put back whatever the outcome.
+	@# Third pass: one accepted Kobo visit is taken off the mock, reconcile finds it deleted at source,
+	@# it is withdrawn on Data issues (D-24), then the visit is put back whatever the outcome.
 	$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_SOURCES=1 playwright tests/e2e/sources.spec.ts $(c); status=$$?; \
 		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php tests/e2e/support/kobo-mock-token.php refuse; \
 		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php artisan edqa:pull kobo > /dev/null 2>&1; \
 		$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_KOBO_AUTH_FAILED=1 playwright tests/e2e/sources.spec.ts -g "refusing the token" $(c); auth=$$?; \
 		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php tests/e2e/support/kobo-mock-token.php restore; \
-		$(COMPOSE) up -d --wait app worker; [ $$status -ne 0 ] && exit $$status; exit $$auth
+		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php tests/e2e/support/kobo-mock-delete.php delete; \
+		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php artisan edqa:reconcile kobo > /dev/null 2>&1; \
+		$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_KOBO_DELETED=1 playwright tests/e2e/sources.spec.ts -g "deleted at source" $(c); deleted=$$?; \
+		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php tests/e2e/support/kobo-mock-delete.php restore; \
+		$(COMPOSE) up -d --wait app worker; [ $$status -ne 0 ] && exit $$status; [ $$auth -ne 0 ] && exit $$auth; exit $$deleted
 
 e2e-issues: ## Playwright on the Data issues page with known broken records held through the real pipeline (tests/e2e/data-issues.spec.ts)
 	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction

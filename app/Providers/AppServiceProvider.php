@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Domain\Assessment\Events\AssessmentCorrected;
 use App\Domain\Assessment\Events\AssessmentScored;
+use App\Domain\Assessment\Events\AssessmentStatusChanged;
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Ingestion\Contracts\SubmissionSource;
 use App\Domain\Ingestion\Events\DeletionReviewed;
@@ -16,10 +17,12 @@ use App\Domain\Ingestion\Odk\SessionTokenCache;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Domain\Reporting\Listeners\FlushRoundCache;
 use App\Domain\Reporting\Listeners\RefreshAggregatesAfterScore;
+use App\Domain\Reporting\Listeners\RefreshAggregatesAfterStatusChange;
 use App\Domain\Reporting\RoundCache;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Events\RuleVersionPublished;
 use App\Domain\Scoring\Listeners\RescoreAfterAssessmentCorrected;
+use App\Domain\Scoring\Listeners\RescoreAfterStatusChange;
 use App\Domain\Scoring\Listeners\RescoreOpenRoundsAfterPublish;
 use App\Domain\Validation\Events\QuarantineResolved;
 use App\Domain\Validation\Events\SubmissionQuarantined;
@@ -79,6 +82,10 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(AssessmentScored::class, [FlushRoundCache::class, 'onScored']);
         Event::listen(QuarantineResolved::class, [FlushRoundCache::class, 'onResolved']);
         Event::listen(RuleVersionPublished::class, [FlushRoundCache::class, 'onPublished']);
+        // A withdrawn or restored assessment (D-24): the round's cache, view and scores follow.
+        Event::listen(AssessmentStatusChanged::class, [FlushRoundCache::class, 'onStatusChanged']);
+        Event::listen(AssessmentStatusChanged::class, RefreshAggregatesAfterStatusChange::class);
+        Event::listen(AssessmentStatusChanged::class, RescoreAfterStatusChange::class);
         Round::saved(fn () => app(RoundCache::class)->flushAll());
         Round::deleted(fn () => app(RoundCache::class)->flushAll());
         Lga::saved(fn () => ReportFilter::forgetLgaCodes());

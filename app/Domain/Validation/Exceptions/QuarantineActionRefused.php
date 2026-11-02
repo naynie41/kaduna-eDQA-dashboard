@@ -32,6 +32,24 @@ final class QuarantineActionRefused extends RuntimeException
         return new self('already_resolved');
     }
 
+    /** "Use this one instead" is only for a record whose one hard failure is DUPLICATE_ASSESSMENT. */
+    public static function notADuplicate(): self
+    {
+        return new self('not_a_duplicate');
+    }
+
+    /** D-18: a closed round's assessments are fixed. */
+    public static function roundClosed(string $round): self
+    {
+        return new self('round_closed', ['round' => $round]);
+    }
+
+    /** Reprocessed as the replacement, the submission still fails other rules. */
+    public static function stillFailing(string $rules): self
+    {
+        return new self('still_failing', ['rules' => $rules]);
+    }
+
     public static function fieldNotCorrectable(string $field): self
     {
         return new self('field_not_correctable', ['field' => $field]);

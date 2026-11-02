@@ -45,8 +45,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and what happens to the next pulls; the backfill panel shows every configured source's last run
   and checkpoint; the facility media file panel lists the steps on both platforms.
 
+- Data issues (Phase 5 step 2): a cross-source duplicate is compared side by side (source,
+  instance ID, submitted at, assessor, the overall each scores) and resolved with **Keep the
+  existing one** or **Use this one instead**, which replaces the accepted assessment from this
+  submission and rescores the round.
+- A third Data issues tab, **Deleted at source**: keep the assessment, or withdraw it so it counts
+  nowhere (and the facility can be assessed again in that round), and restore it later. Migration
+  `add_withdrawn_assessments` (assessment status CHECK, partial unique index).
+
 ### Fixed
 
+- A withdrawn visit no longer feeds the SCORE_JUMP baseline or the facility's history
+  (`FacilityRoundOverallsQuery` now reads accepted and flagged assessments only).
 - A question answered as several checks (the real Kobo form's consistency items, D-67) appeared
   three times in the facility drawer under one key, and a correction to it changed only its last
   check. It now shows once as "2 of 3", and is corrected by its count (0 to 3, or N/A): the

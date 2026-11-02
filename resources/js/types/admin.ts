@@ -1,3 +1,4 @@
+import type { ScoreValue } from '@/types/score';
 import type { SyncStatus } from '@/types/shell';
 
 /** One open round's counts so far: accepted and flagged assessments, open quarantine records. */
@@ -21,6 +22,20 @@ export type SourceEntry = {
     status: SyncStatus;
     /** This source's own counts in each open round. */
     open_rounds: OpenRoundCounts[];
+};
+
+/** The Deleted at source tab (D-24): an assessment whose submission its source no longer returns. */
+export type DeletedAssessmentRow = {
+    submission_id: number;
+    source: { key: string; name: string } | null;
+    instance_id: string;
+    source_url: string | null;
+    deleted_at: string;
+    assessment: { id: number; status: 'accepted' | 'flagged' | 'withdrawn' };
+    facility: { id: number; code: string; name: string };
+    lga: string;
+    round: { id: number; year: number; quarter: number; open: boolean };
+    reviewed: { at: string; by: string | null } | null;
 };
 
 /** A submission its source no longer returns (DeletionsAtSourceQuery): flagged for review, never applied (D-62). */
@@ -112,7 +127,8 @@ export type CascadeExport = {
 };
 
 /** The Data issues page (D-57). */
-export type IssueTab = 'hard' | 'soft';
+/** hard: quarantined records; soft: flagged accepted assessments; deleted: assessments deleted at source (D-24). */
+export type IssueTab = 'hard' | 'soft' | 'deleted';
 export type IssueState = 'open' | 'resolved' | 'rejected' | 'superseded';
 
 export type DataIssuesFilters = {
@@ -159,12 +175,18 @@ export type DataIssueRow = {
     source: { key: string; name: string } | null;
     source_url: string | null;
     /** DUPLICATE_ASSESSMENT: the accepted assessment it repeats, from whichever source (null for any other record, or once that assessment is gone). */
+    /** The accepted assessment this record repeats (§5.8), side by side with this submission. */
     duplicate_of: {
         assessment_id: number;
         facility_id: number;
         source: { key: string; name: string } | null;
         instance_id: string;
         url: string | null;
+        submitted_at?: string | null;
+        assessor?: string | null;
+        /** The overall each scores under the current rule version (never stored). */
+        overall?: ScoreValue | null;
+        this?: { submitted_at: string | null; assessor: string | null; overall: ScoreValue | null };
     } | null;
 };
 

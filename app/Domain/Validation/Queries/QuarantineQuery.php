@@ -6,6 +6,7 @@ namespace App\Domain\Validation\Queries;
 
 use App\Domain\Facility\Models\Lga;
 use App\Domain\Validation\Models\QuarantinedRecord;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
@@ -50,6 +51,13 @@ final class QuarantineQuery
     public function openCountCached(): int
     {
         return (int) Cache::remember(self::OPEN_COUNT_KEY, 60, fn (): int => $this->openCount());
+    }
+
+    /** The Deleted at source tab's count (D-24): assessments whose deletion at source is not reviewed yet. */
+    public function unreviewedDeletedAssessments(): int
+    {
+        return DB::table('submissions')->join('assessments', 'assessments.submission_id', '=', 'submissions.id')
+            ->whereNotNull('submissions.deleted_at_source')->whereNull('submissions.deletion_reviewed_at')->count();
     }
 
     /** The cache key of openIssueCountCached(). */
@@ -139,7 +147,7 @@ final class QuarantineQuery
     public function adminPage(array $filters): Paginator
     {
         return $this->filtered($filters)
-            ->with(['submission:id,source_id,external_id,instance_id,form_ref,received_at,status', 'round:id,year,quarter'])
+            ->with(['submission:id,source_id,external_id,instance_id,form_ref,submitted_at,received_at,status', 'round:id,year,quarter'])
             ->orderByDesc('id')
             ->paginate(self::ADMIN_PER_PAGE)
             ->withQueryString();
@@ -174,7 +182,7 @@ final class QuarantineQuery
      * original is gone (withdrawn, or the reference since corrected) are left out. One query.
      *
      * @param  list<QuarantinedRecord>  $records
-     * @return array<int, array{assessment_id: int, facility_id: int, source_id: int, instance_id: string, external_id: ?string}> record ID => original
+     * @return array<int, array{assessment_id: int, facility_id: int, source_id: int, instance_id: string, external_id: ?string, submitted_at: ?string, assessor: ?string}> record ID => original
      */
     public function duplicateOriginals(array $records): array
     {
@@ -196,7 +204,7 @@ final class QuarantineQuery
             ->whereIn('a.round_id', array_values(array_unique(array_column($wanted, 0))))
             ->whereIn(DB::raw('lower(f.code)'), array_values(array_unique(array_column($wanted, 1))))
             ->whereIn('a.status', ['accepted', 'flagged'])
-            ->get(['a.id', 'a.round_id', 'a.facility_id', 'f.code', 's.source_id', 's.instance_id', 's.external_id']);
+            ->get(['a.id', 'a.round_id', 'a.facility_id', 'a.assessor_name', 'f.code', 's.source_id', 's.instance_id', 's.external_id', 's.submitted_at']);
         foreach ($rows as $row) {
             $found[$row->round_id.'|'.mb_strtolower((string) $row->code)] = [
                 'assessment_id' => (int) $row->id,
@@ -204,6 +212,8 @@ final class QuarantineQuery
                 'source_id' => (int) $row->source_id,
                 'instance_id' => (string) $row->instance_id,
                 'external_id' => is_string($row->external_id) ? $row->external_id : null,
+                'submitted_at' => is_string($row->submitted_at) ? CarbonImmutable::parse($row->submitted_at)->toIso8601String() : null,
+                'assessor' => is_string($row->assessor_name) ? $row->assessor_name : null,
             ];
         }
 

@@ -112,7 +112,7 @@ test.describe('Data sources page, against both mocks', () => {
 
     test('the visit recorded on both tools is in Data issues, showing both sources', async ({ page }) => {
         test.setTimeout(360_000);
-        const sides = page.locator('dl[aria-label="Both sides of the duplicate"]');
+        const sides = page.getByRole('table', { name: 'Both sides of the duplicate' });
         const both = sides.filter({ hasText: 'ODK Central' }).filter({ hasText: 'KoboToolbox' }).first();
         // The phone project runs beside the desktop one, whose Pull all brings the duplicate in:
         // look again (a fresh page each time) until it has, rather than fail on the first look.
@@ -163,6 +163,79 @@ test.describe('Data sources page, against both mocks', () => {
 
     test('no serious or critical axe violations on Data issues, the duplicate shown', async ({ page }) => {
         await page.goto('/admin/data-issues?rule=DUPLICATE_ASSESSMENT');
+        await expect(page.getByRole('heading', { level: 1, name: 'Data issues' })).toBeVisible({ timeout: 60_000 });
+        await checkA11y(page);
+    });
+
+    // Last, and once (desktop): it resolves one of the duplicates the tests above look at.
+    test('resolves a cross-source duplicate with "Use this one instead", keyboard only', async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name !== 'desktop', 'Resolved once, from the desktop project');
+        test.setTimeout(360_000);
+        const comparison = page.getByRole('table', { name: 'Both sides of the duplicate' }).filter({ hasText: 'ODK Central' }).filter({ hasText: 'KoboToolbox' }).first();
+        await expect(async () => {
+            await page.goto('/admin/data-issues?rule=DUPLICATE_ASSESSMENT');
+            await expect(comparison).toBeVisible({ timeout: 5_000 });
+        }).toPass({ timeout: 300_000, intervals: [5_000, 10_000] });
+        // Both sides compared: who assessed, and the overall each scores.
+        await expect(comparison.getByRole('rowheader', { name: 'Overall it scores' })).toBeVisible();
+        const before = await page.getByRole('table', { name: 'Both sides of the duplicate' }).count();
+
+        await tabTo(page, page.getByRole('button', { name: 'Use this one instead' }).first());
+        await page.keyboard.press('Enter');
+        const dialog = page.getByRole('dialog', { name: 'Use this submission instead?' });
+        await expect(dialog).toBeVisible();
+        await page.keyboard.type('The Kobo copy is the one the supervisor checked');
+        await tabTo(page, dialog.getByRole('button', { name: 'Use this one instead' }));
+        await page.keyboard.press('Enter');
+
+        await expect(page.getByRole('status').filter({ hasText: 'This submission now counts in place of the earlier one.' })).toBeVisible();
+        await expect(page.getByRole('status').filter({ hasText: /A rescore of Q\d \d{4} is queued/ })).toBeVisible();
+        await expect(page.getByRole('table', { name: 'Both sides of the duplicate' })).toHaveCount(before - 1);
+    });
+});
+
+// `make e2e-sources`, third pass: one accepted KoboToolbox visit is taken off the Kobo mock
+// (tests/e2e/support/kobo-mock-delete.php) and `edqa:reconcile kobo` finds it deleted at source;
+// the page is read with E2E_KOBO_DELETED=1. The target puts the visit back afterwards.
+test.describe('Data issues, an assessment deleted at source', () => {
+    test.skip(process.env.E2E_KOBO_DELETED !== '1', 'Run with make e2e-sources');
+    test.describe.configure({ mode: 'serial' });
+
+    /** KoboToolbox's assessment count on Monitor, in the round the mocks were seeded for. */
+    async function koboCount(page: Page): Promise<number> {
+        const [year, quarter] = (process.env.E2E_ROUND ?? '').split('Q');
+        await page.goto(year && quarter ? `/dashboard/monitor?year=${year}&quarter=${quarter}` : '/dashboard/monitor');
+        const row = page.getByRole('region', { name: 'Assessments by source' }).getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'KoboToolbox', exact: true }) });
+        await expect(row).toHaveCount(1, { timeout: 60_000 });
+
+        return Number(((await row.getByRole('cell').first().textContent()) ?? '0').replace(/[^0-9]/g, ''));
+    }
+
+    test('withdraws it, keyboard only, and the dashboard count drops', async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name !== 'desktop', 'Withdrawn once, from the desktop project');
+        test.setTimeout(360_000);
+        const before = await koboCount(page);
+
+        await page.goto('/admin/data-issues?tab=deleted');
+        await expect(page.getByRole('heading', { level: 1, name: 'Data issues' })).toBeVisible({ timeout: 60_000 });
+        const tab = page.getByRole('group', { name: 'Kind of issue' }).getByRole('button', { name: /Deleted at source \(\d+\)/ });
+        await expect(tab).toHaveAttribute('aria-pressed', 'true');
+        const withdraw = page.getByRole('button', { name: /^Withdraw the assessment of / }).first();
+        await tabTo(page, withdraw);
+        await page.keyboard.press('Enter');
+        const dialog = page.getByRole('dialog', { name: 'Withdraw this assessment?' });
+        await expect(dialog).toBeVisible();
+        await page.keyboard.type('The LGA confirmed this visit never happened');
+        await tabTo(page, dialog.getByRole('button', { name: 'Withdraw assessment' }));
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('status').filter({ hasText: 'Withdrawn: the assessment no longer counts.' })).toBeVisible();
+
+        // The figures follow once the queued refresh has run.
+        await expect(async () => expect(await koboCount(page)).toBe(before - 1)).toPass({ timeout: 120_000, intervals: [3_000, 5_000] });
+    });
+
+    test('no serious or critical axe violations on the Deleted at source tab', async ({ page }) => {
+        await page.goto('/admin/data-issues?tab=deleted&state=resolved');
         await expect(page.getByRole('heading', { level: 1, name: 'Data issues' })).toBeVisible({ timeout: 60_000 });
         await checkA11y(page);
     });
