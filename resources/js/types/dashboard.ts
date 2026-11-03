@@ -47,6 +47,10 @@ export type TrendPoint = {
     overall: ScoreValue;
     public: ScoreValue;
     private: ScoreValue;
+    /** The quarter's three dimensions, for the Visuals quarterly view (D-75). */
+    availability: ScoreValue;
+    consistency: ScoreValue;
+    validity: ScoreValue;
 };
 
 export type Trend = {
@@ -161,6 +165,8 @@ export type HomeProps = {
     owners?: OwnerSplit;
     trend?: Trend;
     weakest?: Weakest;
+    /** The quarter in view month by month (D-75); empty when the view spans more than one quarter. */
+    months?: MonthSlotPoint[];
 };
 
 /** GET /api/facilities/{id} (FacilityDetailAggregator), snake_case as the JSON API serves it. */
@@ -300,6 +306,8 @@ export type MonitorProps = {
     coverage?: Coverage;
     windows?: AssessmentWindow[];
     sources?: SourceCount[];
+    /** All facilities, public and private together, narrowed by the Owner filter (D-75). */
+    overall?: { summary: StateSummary; dimensions: DimensionScores };
 };
 
 /** Visuals (§9.2.5): MonthSlotAggregator's points and takeaways, the owner view. */
@@ -331,7 +339,19 @@ export type VisualsProps = {
     /** locked: the global owner filter, which the view follows while it is set. */
     ownerView: { value: OwnerView; locked: "public" | "private" | null };
     monthSlots?: MonthSlots;
+    /** Every round's three dimensions and overall: the quarterly view (D-75). */
+    quarters?: TrendPoint[];
     lgas?: LgaRow[];
+};
+
+/** One group of bars and its table row in a ScoreGroupFigure: a month, a quarter. */
+export type ScoreGroupRow = {
+    key: number | string;
+    label: string;
+    availability: ScoreValue;
+    consistency: ScoreValue;
+    validity: ScoreValue;
+    overall: ScoreValue;
 };
 
 /** Implementation plan (§9.2.6), read-only: ImplementationPlanAggregator as it serialises. */

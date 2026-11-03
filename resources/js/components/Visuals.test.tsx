@@ -2,6 +2,8 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import MonthFigure from '@/components/MonthFigure';
+import OwnerSplit from '@/components/OwnerSplit';
+import ScoreGroupFigure from '@/components/ScoreGroupFigure';
 import SegmentedControl from '@/components/SegmentedControl';
 import { axeCheck, renderUi, testTranslations } from '@/test/render';
 import type { MonthSlotPoint } from '@/types/dashboard';
@@ -19,6 +21,7 @@ const translations = {
             quarter: 'Quarter',
             no_scores: 'No scores for this month in view.',
         },
+        home: { public: 'Public facilities', private: 'Private facilities', visited: ':count visited', overall_caption: 'overall quality score' },
     },
 };
 
@@ -92,5 +95,44 @@ describe('SegmentedControl, disabled', () => {
         expect(document.activeElement).toBe(overall);
         await userEvent.keyboard('{Enter}');
         expect(onChange).not.toHaveBeenCalled();
+    });
+});
+
+describe('ScoreGroupFigure (D-75)', () => {
+    const row = (key: number, label: string, overall: string) => ({ key, label, availability: score('75.0'), consistency: score('80.0'), validity: score('81.0'), overall: score(overall) });
+
+    it('shows each month of the quarter with its three dimensions and overall, as a table too', async () => {
+        const { container } = renderUi(
+            <ScoreGroupFigure title="Q2 2026, month by month" description="Each month of the quarter." rowHeader="Month" rows={[row(4, 'April 2026', '79.1'), row(5, 'May 2026', '78.7'), row(6, 'June 2026', '78.2')]} />,
+            translations,
+        );
+
+        expect(screen.getByRole('figure', { name: 'Q2 2026, month by month' })).toBeTruthy();
+        await userEvent.click(screen.getByRole('button', { name: 'Show as table' }));
+
+        const table = screen.getByRole('table', { name: 'Q2 2026, month by month' });
+        expect(within(table).getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Month', 'Availability', 'Consistency', 'Validity', 'Overall']);
+        expect(within(table).getAllByRole('rowheader').map((th) => th.textContent)).toEqual(['April 2026', 'May 2026', 'June 2026']);
+        expect(within(table).getAllByRole('row')[3]?.textContent).toContain('78.2');
+        expect(await axeCheck(container)).toHaveNoViolations();
+    });
+});
+
+describe('OwnerSplit with all facilities (Monitor, D-75)', () => {
+    const group = (facilities: number, overall: string) => ({ facilities, availability: score('75.0'), consistency: score('80.0'), validity: score('81.0'), overall: score(overall) });
+
+    it('puts all facilities first, beside public and private, each with a heading', async () => {
+        const { container } = renderUi(<OwnerSplit split={{ public: group(5, '78.6'), private: group(2, '79.0') }} all={{ title: 'All facilities', scores: group(7, '78.7') }} />, translations);
+
+        expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['All facilities', 'Public facilities', 'Private facilities']);
+        expect(screen.getByText('7 visited')).toBeTruthy();
+        expect(screen.getByText('78.7')).toBeTruthy();
+        expect(await axeCheck(container)).toHaveNoViolations();
+    });
+
+    it('stays two sides on Home, with no all-facilities side', () => {
+        renderUi(<OwnerSplit split={{ public: group(5, '78.6'), private: group(2, '79.0') }} />, translations);
+
+        expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Public facilities', 'Private facilities']);
     });
 });

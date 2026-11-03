@@ -37,6 +37,7 @@ const translations = {
             label: 'Filters', year: 'Year', quarter: 'Quarter', lga: 'LGA', level: 'Level', owner: 'Owner',
             all_years: 'All years', all_quarters: 'All quarters', all_lgas: 'All LGAs', all_levels: 'All levels', all_owners: 'Public and private',
             quarter_option: 'Q:quarter', quarter_needs_year: 'Choose a year to pick a quarter.', clear: 'Clear filters',
+            duration: 'Duration', duration_quarters: 'Quarters', duration_months: 'Months', month_option: ':month (Q:quarter)',
             cleared: 'Filters cleared.', announce: 'Showing :count facilities. Average :average.', announce_none: 'No facilities match these filters.',
         },
     },
@@ -117,7 +118,7 @@ describe('FilterBar', () => {
         levels: [{ value: 'primary', label: 'Primary' }],
         owners: [{ value: 'public', label: 'Public' }, { value: 'private', label: 'Private' }],
     };
-    const none: Filters = { year: null, quarter: null, lga: null, level: null, owner: null };
+    const none: Filters = { year: null, quarter: null, month: null, lga: null, level: null, owner: null };
 
     beforeEach(() => {
         routerGet.mockClear();
@@ -132,7 +133,7 @@ describe('FilterBar', () => {
         const { container } = renderUi(<FilterBar filters={none} options={options} path="/dashboard/home" />, translations);
 
         const form = screen.getByRole('search', { name: 'Filters' });
-        for (const label of ['Year', 'Quarter', 'LGA', 'Level', 'Owner']) {
+        for (const label of ['Year', 'Duration', 'LGA', 'Level', 'Owner']) {
             expect(within(form).getByLabelText(label).tagName).toBe('SELECT');
         }
         expect(await axeCheck(container)).toHaveNoViolations();
@@ -141,7 +142,53 @@ describe('FilterBar', () => {
     it('offers only the quarters that have a round in the chosen year, and needs a year first', () => {
         renderUi(<FilterBar filters={{ ...none, year: 2026 }} options={options} path="/dashboard/home" />, translations);
 
-        expect(within(screen.getByLabelText('Quarter')).getAllByRole('option').map((o) => o.textContent)).toEqual(['All quarters', 'Q1', 'Q2']);
+        const duration = screen.getByLabelText('Duration');
+        expect(within(duration).getByRole('group', { name: 'Quarters' }).textContent).toBe('Q1Q2');
+        expect(within(duration).getAllByRole('option')[0]?.textContent).toBe('All quarters');
+    });
+
+    it('offers every month of those quarters, under Months', () => {
+        renderUi(<FilterBar filters={{ ...none, year: 2026 }} options={options} path="/dashboard/home" />, translations);
+
+        const months = within(screen.getByLabelText('Duration')).getByRole('group', { name: 'Months' });
+        expect(within(months).getAllByRole('option').map((o) => o.textContent)).toEqual(['January (Q1)', 'February (Q1)', 'March (Q1)', 'April (Q2)', 'May (Q2)', 'June (Q2)']);
+    });
+
+    it('works before a year is chosen: it offers the latest year, and choosing sets that year', () => {
+        renderUi(<FilterBar filters={none} options={options} path="/dashboard/home" />, translations);
+
+        const duration = screen.getByLabelText('Duration') as HTMLSelectElement;
+        expect(duration.disabled).toBe(false);
+        expect(within(duration).getByRole('group', { name: 'Quarters' }).textContent).toBe('Q1Q2');
+
+        fireEvent.change(duration, { target: { value: 'm4' } });
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        expect(routerGet).toHaveBeenLastCalledWith('/dashboard/home', { year: '2026', month: '4' }, expect.anything());
+        expect((screen.getByLabelText('Year') as HTMLSelectElement).value).toBe('2026');
+    });
+
+    it('sends a month as the month alone, and a quarter as the quarter alone', () => {
+        renderUi(<FilterBar filters={{ ...none, year: 2026, quarter: 2 }} options={options} path="/dashboard/home" />, translations);
+
+        fireEvent.change(screen.getByLabelText('Duration'), { target: { value: 'm5' } });
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        expect(routerGet).toHaveBeenLastCalledWith('/dashboard/home', { year: '2026', month: '5' }, expect.anything());
+
+        fireEvent.change(screen.getByLabelText('Duration'), { target: { value: 'q1' } });
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        expect(routerGet).toHaveBeenLastCalledWith('/dashboard/home', { year: '2026', quarter: '1' }, expect.anything());
+    });
+
+    it('shows a month from the server as the month chosen, not its quarter', () => {
+        renderUi(<FilterBar filters={{ ...none, year: 2026, quarter: 2, month: 6 }} options={options} path="/dashboard/home" />, translations);
+
+        expect((screen.getByLabelText('Duration') as HTMLSelectElement).value).toBe('m6');
     });
 
     it('waits 300 ms, then reloads in place with the new query, keeping state, scroll and history', () => {
@@ -159,6 +206,17 @@ describe('FilterBar', () => {
         });
         expect(routerGet).toHaveBeenCalledTimes(1);
         expect(routerGet).toHaveBeenCalledWith('/dashboard/lga', { year: '2026', lga: 'ZAR' }, expect.objectContaining({ preserveState: true, preserveScroll: true, replace: true }));
+    });
+
+    it('drops a month the new year has no round for', () => {
+        renderUi(<FilterBar filters={{ ...none, year: 2026, quarter: 2, month: 5 }} options={options} path="/dashboard/home" />, translations);
+
+        fireEvent.change(screen.getByLabelText('Year'), { target: { value: '2025' } });
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+
+        expect(routerGet).toHaveBeenCalledWith('/dashboard/home', { year: '2025' }, expect.anything());
     });
 
     it('drops a quarter the new year has no round for', () => {

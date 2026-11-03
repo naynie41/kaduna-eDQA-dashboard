@@ -46,6 +46,8 @@ export type AdminShell = {
 export type Filters = {
     year: number | null;
     quarter: number | null;
+    /** One month, 1–12 (D-75); its quarter is set too. */
+    month: number | null;
     lga: string | null;
     level: string | null;
     owner: string | null;

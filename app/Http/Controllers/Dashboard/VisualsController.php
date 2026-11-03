@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Dashboard;
 use App\Domain\Facility\Enums\Ownership;
 use App\Domain\Reporting\Aggregators\LgaTableAggregator;
 use App\Domain\Reporting\Aggregators\MonthSlotAggregator;
+use App\Domain\Reporting\Aggregators\QuarterTrendAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ use Inertia\Response;
  */
 final class VisualsController extends Controller
 {
-    public function __invoke(Request $request, ReportFilter $filter, MonthSlotAggregator $months, LgaTableAggregator $lgas): Response
+    public function __invoke(Request $request, ReportFilter $filter, MonthSlotAggregator $months, LgaTableAggregator $lgas, QuarterTrendAggregator $quarters): Response
     {
         $asked = $request->query('owner_view');
         $view = $filter->owner ?? Ownership::tryFrom(is_string($asked) ? $asked : '');
@@ -33,6 +34,8 @@ final class VisualsController extends Controller
 
                 return ['points' => $points, 'takeaways' => $months->takeaways($points)];
             }),
+            // The quarterly view (D-75): each quarter's three dimensions and overall, every round.
+            'quarters' => Inertia::defer(fn () => $quarters->trend($viewFilter->withoutRound())),
             'lgas' => Inertia::defer(fn () => $lgas->rows($viewFilter)),
         ]);
     }

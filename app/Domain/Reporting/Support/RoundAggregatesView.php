@@ -38,10 +38,15 @@ final class RoundAggregatesView
         return (bool) DB::selectOne("SELECT ispopulated FROM pg_matviews WHERE schemaname = 'public' AND matviewname = 'round_aggregates'")?->ispopulated;
     }
 
-    /** @param  list<Round>  $rounds */
-    public function covers(array $rounds): bool
+    /**
+     * Whether the view answers: one round, and a whole quarter. The view holds quarters, so a
+     * month (D-75) is always worked out from the scores.
+     *
+     * @param  list<Round>  $rounds
+     */
+    public function covers(array $rounds, ?ReportFilter $filter = null): bool
     {
-        return count($rounds) === 1 && $this->usable();
+        return count($rounds) === 1 && $filter?->month === null && $this->usable();
     }
 
     public static function ownerType(ReportFilter $filter): string

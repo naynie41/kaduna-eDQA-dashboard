@@ -42,7 +42,7 @@ final class CoverageAggregator
 
         return $this->cache->remember(RoundSelection::ids($rounds), self::class.':'.$filter->cacheKey(), function () use ($rounds, $filter): Coverage {
             $rules = $this->sql->config($rounds);
-            [$perLga, $byLevel] = $this->view->covers($rounds) ? $this->fromView($rounds[0], $filter) : $this->fromSql($rounds, $filter);
+            [$perLga, $byLevel] = $this->view->covers($rounds, $filter) ? $this->fromView($rounds[0], $filter) : $this->fromSql($rounds, $filter);
             $stateMean = $perLga === [] ? 0.0 : (float) $perLga[0]->state_mean;
 
             return new Coverage(

@@ -39,7 +39,7 @@ final class WeakestLgasAggregator
 
         return $this->cache->remember(RoundSelection::ids($rounds), self::class.':'.$filter->cacheKey().":{$limit}", function () use ($rounds, $filter, $limit): array {
             $rules = $this->sql->config($rounds);
-            $rows = $this->view->covers($rounds) ? $this->fromView($rounds[0], $filter, $limit) : $this->fromSql($rounds, $filter, $limit);
+            $rows = $this->view->covers($rounds, $filter) ? $this->fromView($rounds[0], $filter, $limit) : $this->fromSql($rounds, $filter, $limit);
 
             return array_map(fn (object $row): LgaScore => new LgaScore(
                 lgaId: (int) $row->id,

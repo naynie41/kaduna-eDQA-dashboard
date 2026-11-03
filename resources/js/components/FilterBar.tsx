@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link, router } from '@inertiajs/react';
 import { useAnnounce } from '@/components/Announcer';
 import { formatCount } from '@/lib/format';
-import { useTranslate } from '@/lib/i18n';
+import { useTranslate, useTranslationList } from '@/lib/i18n';
 import type { FilterKey, FilterOptions, Filters, Summary } from '@/types/shell';
 
 export type FilterBarProps = {
@@ -14,16 +14,25 @@ export type FilterBarProps = {
 
 type Values = Record<FilterKey, string>;
 
-const KEYS: FilterKey[] = ['year', 'quarter', 'lga', 'level', 'owner'];
+const KEYS: FilterKey[] = ['year', 'quarter', 'month', 'lga', 'level', 'owner'];
 const DEBOUNCE_MS = 300;
 
 const toValues = (filters: Filters): Values => ({
     year: filters.year === null ? '' : String(filters.year),
-    quarter: filters.quarter === null ? '' : String(filters.quarter),
+    // A month stands for its quarter (D-75): one Duration in the URL, never both.
+    quarter: filters.quarter === null || filters.month !== null ? '' : String(filters.quarter),
+    month: filters.month === null ? '' : String(filters.month),
     lga: filters.lga ?? '',
     level: filters.level ?? '',
     owner: filters.owner ?? '',
 });
+
+/** The Duration select's value: "q2" for a quarter, "m5" for a month, "" for every quarter. */
+const durationOf = (values: Values): string => (values.month !== '' ? `m${values.month}` : values.quarter !== '' ? `q${values.quarter}` : '');
+
+/** The quarter the Duration falls in, "" when none is chosen. */
+const QUARTER_OF_MONTH: Record<string, string> = { 1: '1', 2: '1', 3: '1', 4: '2', 5: '2', 6: '2', 7: '3', 8: '3', 9: '3', 10: '4', 11: '4', 12: '4' };
+const quarterOf = (values: Values): string => (values.month !== '' ? (QUARTER_OF_MONTH[values.month] ?? '') : values.quarter);
 
 const toQuery = (values: Values): Record<string, string> => Object.fromEntries(KEYS.filter((key) => values[key] !== '').map((key) => [key, values[key]]));
 
@@ -32,7 +41,8 @@ function isSummary(value: unknown): value is Summary {
 }
 
 /**
- * The global filters (ARCHITECTURE.md §9.1): native selects with visible labels. A change waits
+ * The global filters (ARCHITECTURE.md §9.1): native selects with visible labels. Duration (D-75) is
+ * one select over a quarter or one month of a quarter with a round, so the view is never both. A change waits
  * 300 ms (arrow keys change a select once per press), then reloads the page's props in place:
  * the URL is replaced, scroll and focus stay where they are, and the announcer reads out how
  * many facilities and the average now in view. The options come from the server.
@@ -40,6 +50,7 @@ function isSummary(value: unknown): value is Summary {
 export default function FilterBar({ filters, options, path }: FilterBarProps) {
     const t = useTranslate();
     const announce = useAnnounce();
+    const monthNames = useTranslationList('common.months');
     const id = useId();
     const [values, setValues] = useState<Values>(() => toValues(filters));
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,7 +75,11 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
     );
 
     const years = [...new Set(options.rounds.map((round) => round.year))];
-    const quarters = options.rounds.filter((round) => String(round.year) === values.year).map((round) => round.quarter).sort();
+    // Duration is usable before a year is chosen: it then offers the latest year's quarters and
+    // months, and choosing one sets that year too (a quarter or a month needs a year).
+    const latestYear = [...years].sort((a, b) => b - a)[0];
+    const durationYear = values.year !== '' ? values.year : latestYear === undefined ? '' : String(latestYear);
+    const quarters = options.rounds.filter((round) => String(round.year) === durationYear).map((round) => round.quarter).sort();
 
     const visit = (next: Values) => {
         router.get(path, toQuery(next), {
@@ -87,8 +102,9 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
 
     const change = (key: FilterKey, value: string) => {
         const next = { ...values, [key]: value };
-        if (key === 'year' && !options.rounds.some((round) => String(round.year) === value && String(round.quarter) === next.quarter)) {
+        if (key === 'year' && !options.rounds.some((round) => String(round.year) === value && String(round.quarter) === quarterOf(next))) {
             next.quarter = '';
+            next.month = '';
         }
         setValues(next);
         if (timer.current !== null) {
@@ -98,7 +114,17 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
     };
 
     const anySet = KEYS.some((key) => values[key] !== '');
-    const quarterHint = `${id}-quarter-hint`;
+    const changeDuration = (value: string) => {
+        // "q2", "m5" or "": set the one and clear the other, then the usual debounced visit.
+        const kind = value.charAt(0);
+        const number = value.slice(1);
+        const next = { ...values, year: value === '' ? values.year : durationYear, quarter: kind === 'q' ? number : '', month: kind === 'm' ? number : '' };
+        setValues(next);
+        if (timer.current !== null) {
+            clearTimeout(timer.current);
+        }
+        timer.current = setTimeout(() => visit(next), DEBOUNCE_MS);
+    };
     const select = 'control w-full min-h-9 sm:w-auto sm:min-w-[128px]';
     const label = 'text-2xs font-medium text-ink-2';
 
@@ -118,29 +144,41 @@ export default function FilterBar({ filters, options, path }: FilterBarProps) {
                 </select>
             </div>
             <div className="flex min-w-0 flex-col gap-1">
-                <label htmlFor={`${id}-quarter`} className={label}>
-                    {t('dashboard.filters.quarter')}
+                <label htmlFor={`${id}-duration`} className={label}>
+                    {t('dashboard.filters.duration')}
                 </label>
                 <select
-                    id={`${id}-quarter`}
+                    id={`${id}-duration`}
                     className={select}
-                    value={values.quarter}
-                    disabled={values.year === ''}
-                    aria-describedby={values.year === '' ? quarterHint : undefined}
-                    onChange={(event) => change('quarter', event.target.value)}
+                    value={durationOf(values)}
+                    onChange={(event) => changeDuration(event.target.value)}
                 >
                     <option value="">{t('dashboard.filters.all_quarters')}</option>
-                    {quarters.map((quarter) => (
-                        <option key={quarter} value={String(quarter)}>
-                            {t('dashboard.filters.quarter_option', { quarter })}
-                        </option>
-                    ))}
+                    {quarters.length > 0 && (
+                        <optgroup label={t('dashboard.filters.duration_quarters')}>
+                            {quarters.map((quarter) => (
+                                <option key={quarter} value={`q${quarter}`}>
+                                    {t('dashboard.filters.quarter_option', { quarter })}
+                                </option>
+                            ))}
+                        </optgroup>
+                    )}
+                    {quarters.length > 0 && (
+                        <optgroup label={t('dashboard.filters.duration_months')}>
+                            {quarters.flatMap((quarter) =>
+                                [1, 2, 3].map((slot) => {
+                                    const month = (quarter - 1) * 3 + slot;
+
+                                    return (
+                                        <option key={month} value={`m${month}`}>
+                                            {t('dashboard.filters.month_option', { month: monthNames[month - 1] ?? String(month), quarter })}
+                                        </option>
+                                    );
+                                }),
+                            )}
+                        </optgroup>
+                    )}
                 </select>
-                {values.year === '' && (
-                    <span id={quarterHint} className="sr-only">
-                        {t('dashboard.filters.quarter_needs_year')}
-                    </span>
-                )}
             </div>
             <div className="flex min-w-0 flex-col gap-1">
                 <label htmlFor={`${id}-lga`} className={label}>

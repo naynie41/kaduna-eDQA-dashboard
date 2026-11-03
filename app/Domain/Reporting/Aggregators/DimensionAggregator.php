@@ -38,7 +38,7 @@ final class DimensionAggregator
 
         return $this->cache->remember(RoundSelection::ids($rounds), self::class.':'.$filter->cacheKey(), function () use ($rounds, $filter): DimensionScores {
             $rules = $this->sql->config($rounds);
-            $row = $this->view->covers($rounds) ? $this->fromView($rounds[0], $filter) : $this->fromSql($rounds, $filter);
+            $row = $this->view->covers($rounds, $filter) ? $this->fromView($rounds[0], $filter) : $this->fromSql($rounds, $filter);
 
             return self::map($row, $rules);
         });

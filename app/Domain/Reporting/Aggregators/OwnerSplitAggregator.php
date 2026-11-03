@@ -40,7 +40,7 @@ final class OwnerSplitAggregator
 
         return $this->cache->remember(RoundSelection::ids($rounds), self::class.':'.$filter->cacheKey(), function () use ($rounds, $filter): OwnerSplit {
             $rules = $this->sql->config($rounds);
-            $rows = collect($this->view->covers($rounds) ? $this->fromView($rounds[0], $filter) : $this->fromSql($rounds, $filter))->keyBy('ownership');
+            $rows = collect($this->view->covers($rounds, $filter) ? $this->fromView($rounds[0], $filter) : $this->fromSql($rounds, $filter))->keyBy('ownership');
 
             return new OwnerSplit(
                 public: self::group($rows->get(Ownership::Public->value), $rules),

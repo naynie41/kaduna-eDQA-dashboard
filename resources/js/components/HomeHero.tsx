@@ -7,6 +7,8 @@ import type { DimensionScores, StateSummary } from '@/types/dashboard';
 export type HomeHeroProps = {
     hero: StateSummary;
     dimensions: DimensionScores;
+    /** The month in view ("June 2026") when the Duration is one month (D-75), else null. */
+    month?: string | null;
 };
 
 const DIMENSIONS = ['availability', 'consistency', 'validity'] as const;
@@ -17,7 +19,7 @@ const DIMENSIONS = ['availability', 'consistency', 'validity'] as const;
  * dimensions and the overall as bars with the Strong mark, and a note naming the weakest. The
  * thresholds come from the rule version, never written in.
  */
-export default function HomeHero({ hero, dimensions }: HomeHeroProps) {
+export default function HomeHero({ hero, dimensions, month = null }: HomeHeroProps) {
     const t = useTranslate();
     const hasData = hero.facilitiesVisited > 0;
     // A threshold missing from the props (no rule version) reads as a dash, never NaN.
@@ -45,7 +47,11 @@ export default function HomeHero({ hero, dimensions }: HomeHeroProps) {
                     </dd>
                 </dl>
                 <p className="mt-3 mb-6 max-w-[32ch] text-sm leading-snug text-ink-2">
-                    {hasData ? t('dashboard.home.averaged_across', { count: formatCount(hero.facilitiesVisited) }) : t('dashboard.home.no_assessments')}
+                    {hasData
+                        ? month === null
+                            ? t('dashboard.home.averaged_across', { count: formatCount(hero.facilitiesVisited) })
+                            : t('dashboard.home.averaged_across_month', { count: formatCount(hero.facilitiesVisited), month })
+                        : t('dashboard.home.no_assessments')}
                 </p>
                 <dl className="-mx-6 mt-auto -mb-6 grid grid-cols-2 gap-px border-t border-rule bg-rule">
                     {minis.map(([label, value]) => (
@@ -60,7 +66,7 @@ export default function HomeHero({ hero, dimensions }: HomeHeroProps) {
                 <h2 id="home-dimensions" className="text-md tracking-[-0.015em]">
                     {t('dashboard.home.dimensions_title')}
                 </h2>
-                <p className="mt-1 max-w-[64ch] text-sm text-ink-2">{t('dashboard.home.dimensions_intro')}</p>
+                <p className="mt-1 max-w-[64ch] text-sm text-ink-2">{month === null ? t('dashboard.home.dimensions_intro') : t('dashboard.home.dimensions_intro_month', { month })}</p>
                 <ul className="mt-5 flex flex-col gap-4">
                     {DIMENSIONS.map((dimension) => (
                         <DimensionBar

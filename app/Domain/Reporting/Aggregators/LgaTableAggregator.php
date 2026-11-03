@@ -38,7 +38,7 @@ final class LgaTableAggregator
 
         return $this->cache->remember(RoundSelection::ids($rounds), self::class.':'.$filter->cacheKey(), function () use ($rounds, $filter): array {
             $rules = $this->sql->config($rounds);
-            $rows = $this->view->covers($rounds) ? $this->fromView($rounds[0], $filter) : $this->fromSql($rounds, $filter);
+            $rows = $this->view->covers($rounds, $filter) ? $this->fromView($rounds[0], $filter) : $this->fromSql($rounds, $filter);
 
             return array_map(fn (object $row): LgaRow => new LgaRow(
                 lgaId: (int) $row->id,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Dashboard;
 
 use App\Domain\Reporting\Aggregators\DimensionAggregator;
+use App\Domain\Reporting\Aggregators\MonthSlotAggregator;
 use App\Domain\Reporting\Aggregators\OwnerSplitAggregator;
 use App\Domain\Reporting\Aggregators\QuarterTrendAggregator;
 use App\Domain\Reporting\Aggregators\StateSummaryAggregator;
@@ -33,6 +34,7 @@ final class HomeController extends Controller
         QuarterTrendAggregator $trend,
         WeakestLgasAggregator $weakestLgas,
         WeakestWardsAggregator $weakestWards,
+        MonthSlotAggregator $months,
     ): Response {
         return Inertia::render('dashboard/home', [
             'hero' => $state->summary($filter),
@@ -46,6 +48,16 @@ final class HomeController extends Controller
                     'selected' => RoundSelection::ids($rounds->current($filter)),
                     'takeaway' => $trend->takeaway($points),
                 ];
+            }),
+            // The quarter in view, month by month (D-75): each month's three dimensions and
+            // overall. Empty when the view spans more than one quarter.
+            'months' => Inertia::defer(function () use ($months, $filter, $rounds): array {
+                $inView = RoundSelection::ids($rounds->current($filter));
+
+                return count($inView) !== 1 ? [] : array_values(array_filter(
+                    $months->series($filter),
+                    fn ($point): bool => $point->roundId === $inView[0],
+                ));
             }),
             'weakest' => Inertia::defer(fn (): array => $filter->lga === null
                 ? ['scope' => 'lgas', 'rows' => $weakestLgas->weakest($filter)]

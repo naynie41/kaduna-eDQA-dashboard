@@ -1,32 +1,39 @@
 import { Deferred, router, usePage } from '@inertiajs/react';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useAnnounce } from '@/components/Announcer';
 import MonthFigure from '@/components/MonthFigure';
 import Panel from '@/components/Panel';
 import PanelHeader from '@/components/PanelHeader';
 import RankedBars from '@/components/RankedBars';
+import ScoreGroupFigure from '@/components/ScoreGroupFigure';
 import ScoreTag from '@/components/ScoreTag';
 import SegmentedControl from '@/components/SegmentedControl';
 import Skeleton from '@/components/Skeleton';
 import { useTranslate } from '@/lib/i18n';
 import { sortRows } from '@/lib/sortRows';
-import type { LgaRow, MonthSlots, OwnerView, VisualsProps } from '@/types/dashboard';
+import type { LgaRow, MonthSlots, OwnerView, TrendPoint, VisualsProps } from '@/types/dashboard';
 
 const VIEWS: OwnerView[] = ['all', 'public', 'private'];
+const PERIODS = ['monthly', 'quarterly'] as const;
+type Period = (typeof PERIODS)[number];
 const SLOTS = [1, 2, 3] as const;
 const MEASURES = ['overall', 'availability', 'consistency', 'validity'] as const;
 
 /**
  * Visuals (ARCHITECTURE.md §9.2.5): an Overall / Public / Private view (?owner_view=, apart from
- * the global owner filter, and locked to it while that filter is set), the three month charts and
- * the four LGA rankings. Both blocks are deferred, so the page paints before the charts; changing
+ * the global owner filter, and locked to it while that filter is set), a Month / Quarter view (D-75):
+ * the three month charts, or every quarter and the quarter in view month by month, and the four
+ * LGA rankings. Both blocks are deferred, so the page paints before the charts; changing
  * the view reloads only them.
  */
-export default function Visuals({ ownerView, monthSlots, lgas }: VisualsProps) {
+export default function Visuals({ ownerView, monthSlots, quarters, lgas }: VisualsProps) {
     const t = useTranslate();
     const announce = useAnnounce();
-    const { url } = usePage();
+    const { url, props } = usePage();
     const lockedId = useId();
+    const [period, setPeriod] = useState<Period>('monthly');
+    const year = props.filters?.year ?? null;
+    const quarter = props.filters?.quarter ?? null;
     const [path, search = ''] = url.split('?');
     const locked = ownerView.locked !== null;
 
@@ -38,7 +45,7 @@ export default function Visuals({ ownerView, monthSlots, lgas }: VisualsProps) {
             query.set('owner_view', view);
         }
         router.get(path ?? url, Object.fromEntries(query), {
-            only: ['ownerView', 'monthSlots', 'lgas'],
+            only: ['ownerView', 'monthSlots', 'quarters', 'lgas'],
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -64,14 +71,43 @@ export default function Visuals({ ownerView, monthSlots, lgas }: VisualsProps) {
                         {t('dashboard.visuals.locked', { owner: t(`dashboard.visuals.views.${ownerView.locked}`) })}
                     </p>
                 )}
+                <SegmentedControl
+                    label={t('dashboard.visuals.period')}
+                    value={period}
+                    onChange={setPeriod}
+                    options={PERIODS.map((value) => ({ value, label: t(`dashboard.visuals.periods.${value}`) }))}
+                />
             </div>
 
-            <Panel labelledBy="visuals-months">
-                <PanelHeader id="visuals-months" title={t('dashboard.visuals.months_title')} description={t('dashboard.visuals.months_description')} />
-                <Deferred data="monthSlots" fallback={<Skeleton className="m-5 h-[300px]" />}>
-                    {monthSlots !== undefined && <MonthFigures monthSlots={monthSlots} />}
-                </Deferred>
-            </Panel>
+            {period === 'monthly' ? (
+                <Panel labelledBy="visuals-months">
+                    <PanelHeader id="visuals-months" title={t('dashboard.visuals.months_title')} description={t('dashboard.visuals.months_description')} />
+                    <Deferred data="monthSlots" fallback={<Skeleton className="m-5 h-[300px]" />}>
+                        {monthSlots !== undefined && <MonthFigures monthSlots={monthSlots} />}
+                    </Deferred>
+                </Panel>
+            ) : (
+                <>
+                    <Panel labelledBy="visuals-quarters">
+                        <h2 id="visuals-quarters" className="sr-only">
+                            {t('dashboard.visuals.quarters_title')}
+                        </h2>
+                        <Deferred data="quarters" fallback={<Skeleton className="m-5 h-[300px]" />}>
+                            {quarters !== undefined && <QuarterFigure quarters={quarters} />}
+                        </Deferred>
+                    </Panel>
+                    {year !== null && quarter !== null && (
+                        <Panel labelledBy="visuals-quarter-months">
+                            <h2 id="visuals-quarter-months" className="sr-only">
+                                {t('dashboard.visuals.quarter_months_title', { quarter, year })}
+                            </h2>
+                            <Deferred data="monthSlots" fallback={<Skeleton className="m-5 h-[300px]" />}>
+                                {monthSlots !== undefined && <QuarterMonths monthSlots={monthSlots} year={year} quarter={quarter} />}
+                            </Deferred>
+                        </Panel>
+                    )}
+                </>
+            )}
 
             <Panel labelledBy="visuals-ranks">
                 <PanelHeader id="visuals-ranks" title={ranksTitle} description={t('dashboard.visuals.ranks_description')} />
@@ -92,6 +128,34 @@ function MonthFigures({ monthSlots }: { monthSlots: MonthSlots }) {
                 </div>
             ))}
         </div>
+    );
+}
+
+function QuarterFigure({ quarters }: { quarters: TrendPoint[] }) {
+    const t = useTranslate();
+
+    return (
+        <ScoreGroupFigure
+            title={t('dashboard.visuals.quarters_title')}
+            description={quarters.length === 0 ? t('dashboard.visuals.no_quarters') : t('dashboard.visuals.quarters_description')}
+            rowHeader={t('dashboard.visuals.quarter')}
+            rows={quarters.map((point) => ({ ...point, key: point.roundId }))}
+        />
+    );
+}
+
+/** The selected quarter, one group per month: the month figures' points for that quarter only. */
+function QuarterMonths({ monthSlots, year, quarter }: { monthSlots: MonthSlots; year: number; quarter: number }) {
+    const t = useTranslate();
+    const months = monthSlots.points.filter((point) => point.year === year && point.quarter === quarter).sort((a, b) => a.slot - b.slot);
+
+    return (
+        <ScoreGroupFigure
+            title={t('dashboard.visuals.quarter_months_title', { quarter, year })}
+            description={t('dashboard.visuals.quarter_months_description')}
+            rowHeader={t('dashboard.visuals.month')}
+            rows={months.map((point) => ({ ...point, key: point.month }))}
+        />
     );
 }
 

@@ -1,27 +1,27 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { SERIES, SERIES_COLOUR } from '@/lib/series';
-import type { MonthSlotPoint } from '@/types/dashboard';
+import type { ScoreGroupRow } from '@/types/dashboard';
 
 export type MonthGroupChartProps = {
-    /** One month slot, a point per quarter in view, in time order. */
-    points: MonthSlotPoint[];
+    /** A group of bars per row (a quarter, a month), in time order. */
+    rows: ScoreGroupRow[];
     /** Names the chart for assistive technology; the numbers are in the Figure's table. */
     label: string;
 };
 
 /**
- * One Visuals month chart (Recharts, loaded lazily; all three charts share this chunk): a group of
- * four bars per quarter in view, on a fixed 0–100 axis. No tooltip: nothing is only in a tooltip.
+ * A grouped-score chart (Recharts, loaded lazily; every ScoreGroupFigure shares this chunk): a group of
+ * four bars per row, on a fixed 0–100 axis. No tooltip: nothing is only in a tooltip.
  * The SVG is one image to assistive technology (role="img"); the Figure's legend names the
  * series and its table holds the numbers.
  */
-export default function MonthGroupChart({ points, label }: MonthGroupChartProps) {
-    const data = points.map((point) => ({
-        label: point.chartLabel,
-        availability: point.availability.value,
-        consistency: point.consistency.value,
-        validity: point.validity.value,
-        overall: point.overall.value,
+export default function MonthGroupChart({ rows, label }: MonthGroupChartProps) {
+    const data = rows.map((row) => ({
+        label: row.label,
+        availability: row.availability.value,
+        consistency: row.consistency.value,
+        validity: row.validity.value,
+        overall: row.overall.value,
     }));
 
     return (

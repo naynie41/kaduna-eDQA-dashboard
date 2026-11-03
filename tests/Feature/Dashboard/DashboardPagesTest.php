@@ -19,11 +19,11 @@ beforeEach(function (): void {
 });
 
 const DASHBOARD_PAGES = [
-    'home' => ['owners', 'trend', 'weakest'],
+    'home' => ['owners', 'trend', 'weakest', 'months'],
     'facility' => ['facilities'],
     'lga' => ['lgas'],
-    'monitor' => ['owners', 'coverage', 'windows', 'sources'],
-    'visuals' => ['monthSlots', 'lgas'],
+    'monitor' => ['overall', 'owners', 'coverage', 'windows', 'sources'],
+    'visuals' => ['monthSlots', 'quarters', 'lgas'],
     'plan' => ['plan'],
 ];
 
@@ -37,7 +37,7 @@ it('renders each page with the shared context, its heavy blocks deferred', funct
         ->assertOk()
         ->assertInertia(function (Assert $inertia) use ($page, $deferred): void {
             $inertia->component("dashboard/{$page}")
-                ->where('filters', ['year' => null, 'quarter' => null, 'lga' => null, 'level' => null, 'owner' => null])
+                ->where('filters', ['year' => null, 'quarter' => null, 'month' => null, 'lga' => null, 'level' => null, 'owner' => null])
                 ->has('filterOptions.rounds', 2)
                 ->has('filterOptions.lgas', 26) // 23 seeded + the fixture's three test LGAs
                 ->has('filterOptions.levels', 3)
@@ -61,7 +61,7 @@ it('round-trips valid filters through the URL untouched', function (): void {
     $this->actingAs($this->admin)->get('/dashboard/lga?year=2026&quarter=2&lga=AAA&level=primary&owner=public')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('filters', ['year' => 2026, 'quarter' => 2, 'lga' => 'AAA', 'level' => 'primary', 'owner' => 'public'])
+            ->where('filters', ['year' => 2026, 'quarter' => 2, 'month' => null, 'lga' => 'AAA', 'level' => 'primary', 'owner' => 'public'])
             ->where('summary.facilities', 1)); // F1: AAA, public, primary
 });
 

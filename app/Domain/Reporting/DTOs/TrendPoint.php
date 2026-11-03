@@ -17,5 +17,8 @@ final readonly class TrendPoint
         public ScoreValue $overall,
         public ScoreValue $public,
         public ScoreValue $private,
+        public ScoreValue $availability,
+        public ScoreValue $consistency,
+        public ScoreValue $validity,
     ) {}
 }

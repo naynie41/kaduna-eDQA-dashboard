@@ -1,4 +1,4 @@
-import { Deferred } from '@inertiajs/react';
+import { Deferred, usePage } from '@inertiajs/react';
 import DataTable, { type DataTableColumn } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
 import OwnerSplit from '@/components/OwnerSplit';
@@ -9,25 +9,42 @@ import ScoreTag from '@/components/ScoreTag';
 import Skeleton from '@/components/Skeleton';
 import { formatCount, formatDate } from '@/lib/format';
 import { useTranslate, useTranslationList } from '@/lib/i18n';
-import type { AssessmentWindow, Coverage, MonitorProps, SourceCount } from '@/types/dashboard';
+import type { AssessmentWindow, Coverage, GroupScores, MonitorProps, SourceCount } from '@/types/dashboard';
 
 /**
- * Monitor (ARCHITECTURE.md §9.2.4): Public vs Private (the Home component), facilities visited per
+ * Monitor (ARCHITECTURE.md §9.2.4): the overall quality score of all facilities beside Public vs
+ * Private (the Home component; D-75), facilities visited per
  * local government against the state mean, coverage by level, each round's assessment window, and
  * the selection's assessments by source (ODK Central, KoboToolbox). Every block is deferred; the
  * title, filters and tabs come from AppShell.
  */
-export default function Monitor({ owners, coverage, windows, sources }: MonitorProps) {
+export default function Monitor({ owners, coverage, windows, sources, overall }: MonitorProps) {
     const t = useTranslate();
+    const owner = usePage().props.filters?.owner ?? null;
+    // All facilities in view, public and private together; the Owner filter narrows it to one.
+    const all: GroupScores | undefined =
+        overall === undefined
+            ? undefined
+            : {
+                  facilities: overall.summary.facilitiesVisited,
+                  availability: overall.dimensions.availability,
+                  consistency: overall.dimensions.consistency,
+                  validity: overall.dimensions.validity,
+                  overall: overall.summary.overall,
+              };
+    const allTitle = owner === 'public' || owner === 'private' ? t(`dashboard.monitor.overall_${owner}`) : t('dashboard.monitor.overall_all');
 
     return (
         <div className="flex flex-col">
-            <h2 id="monitor-owners" className="mb-3.5 flex items-center gap-4 text-md font-semibold tracking-[-0.015em] text-ink after:h-px after:flex-1 after:bg-rule-strong">
-                {t('dashboard.monitor.owners_title')}
+            <h2 id="monitor-owners" className="flex items-center gap-4 text-md font-semibold tracking-[-0.015em] text-ink after:h-px after:flex-1 after:bg-rule-strong">
+                {t('dashboard.monitor.overall_title')}
             </h2>
+            <p className="mt-1 mb-3.5 max-w-[72ch] text-sm text-ink-2">
+                {owner === 'public' || owner === 'private' ? t('dashboard.monitor.overall_description_owner', { owner: t(`dashboard.visuals.owners.${owner}`) }) : t('dashboard.monitor.overall_description')}
+            </p>
             <Panel labelledBy="monitor-owners" className="overflow-hidden">
-                <Deferred data="owners" fallback={<Skeleton className="h-[188px] w-full" />}>
-                    {owners !== undefined && <OwnerSplit split={owners} />}
+                <Deferred data={['owners', 'overall']} fallback={<Skeleton className="h-[188px] w-full" />}>
+                    {owners !== undefined && <OwnerSplit split={owners} {...(all !== undefined ? { all: { title: allTitle, scores: all } } : {})} />}
                 </Deferred>
             </Panel>
 

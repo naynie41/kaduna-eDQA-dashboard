@@ -37,6 +37,7 @@ final class QuarterTrendAggregator
     public function trend(ReportFilter $filter): array
     {
         Weighting::assertSupported();
+        $filter = $filter->withoutMonth(); // quality by quarter, whatever month is chosen (D-75)
         $rounds = $this->rounds->series($filter, withoutQuarter: true);
 
         return $this->cache->remember(RoundSelection::ids($rounds), self::class.':'.$filter->cacheKey(), function () use ($rounds, $filter): array {
@@ -54,6 +55,9 @@ final class QuarterTrendAggregator
                     overall: Scores::of($row?->overall, $rules),
                     public: Scores::of($row?->public, $rules),
                     private: Scores::of($row?->private, $rules),
+                    availability: Scores::of($row?->availability, $rules),
+                    consistency: Scores::of($row?->consistency, $rules),
+                    validity: Scores::of($row?->validity, $rules),
                 );
             }
 
@@ -103,12 +107,15 @@ final class QuarterTrendAggregator
         return collect(DB::select(<<<SQL
             SELECT round_id,
                 max(overall) FILTER (WHERE owner_type = ?) AS overall,
+                max(availability) FILTER (WHERE owner_type = ?) AS availability,
+                max(consistency) FILTER (WHERE owner_type = ?) AS consistency,
+                max(validity) FILTER (WHERE owner_type = ?) AS validity,
                 max(overall) FILTER (WHERE owner_type = 'public' AND ? IN ('all', 'public')) AS public,
                 max(overall) FILTER (WHERE owner_type = 'private' AND ? IN ('all', 'private')) AS private
             FROM round_aggregates
             WHERE round_id = ANY(?::bigint[]) AND scope_type = ? AND scope_id = {$scopeId} AND level = ?
             GROUP BY round_id
-            SQL, [$owner, $owner, $owner, '{'.implode(',', RoundSelection::ids($rounds)).'}', $scope, ...$scopeBindings, RoundAggregatesView::level($filter)]))->keyBy('round_id');
+            SQL, [$owner, $owner, $owner, $owner, $owner, $owner, '{'.implode(',', RoundSelection::ids($rounds)).'}', $scope, ...$scopeBindings, RoundAggregatesView::level($filter)]))->keyBy('round_id');
     }
 
     /**
@@ -122,6 +129,7 @@ final class QuarterTrendAggregator
         return collect(DB::select(<<<SQL
             {$cte}
             SELECT round_id, avg(overall) AS overall,
+                avg(availability) AS availability, avg(consistency) AS consistency, avg(validity) AS validity,
                 avg(overall) FILTER (WHERE ownership = 'public') AS public,
                 avg(overall) FILTER (WHERE ownership = 'private') AS private
             FROM facility_scores

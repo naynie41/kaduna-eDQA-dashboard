@@ -39,6 +39,7 @@ final class MonthSlotAggregator
     public function series(ReportFilter $filter): array
     {
         Weighting::assertSupported();
+        $filter = $filter->withoutMonth(); // every month of each quarter, whatever month is chosen
         $rounds = $this->rounds->series($filter);
 
         return $this->cache->remember(RoundSelection::ids($rounds), self::class.':'.$filter->cacheKey(), function () use ($rounds, $filter): array {

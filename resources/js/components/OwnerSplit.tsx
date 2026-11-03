@@ -6,31 +6,39 @@ export type OwnerSplitProps = {
     split: OwnerSplitScores;
     /** The heading id of the panel this sits in, for its own headings' level. */
     headingLevel?: 2 | 3;
+    /** Monitor (D-75): all facilities in view, public and private together, shown first. */
+    all?: { title: string; scores: GroupScores };
 };
 
 const DIMENSIONS = ['availability', 'consistency', 'validity'] as const;
 
-/** Public vs Private (Home §9.2.1, Monitor §9.2.4): each side's overall and its three dimensions. */
-export default function OwnerSplit({ split, headingLevel = 3 }: OwnerSplitProps) {
+/**
+ * Public vs Private (Home §9.2.1, Monitor §9.2.4): each side's overall and its three dimensions;
+ * on Monitor, all facilities first (D-75).
+ */
+export default function OwnerSplit({ split, headingLevel = 3, all }: OwnerSplitProps) {
+    const t = useTranslate();
+
     return (
-        <div className="grid gap-px bg-rule lg:grid-cols-2">
-            <Side owner="public" scores={split.public} headingLevel={headingLevel} />
-            <Side owner="private" scores={split.private} headingLevel={headingLevel} />
+        <div className={`grid gap-px bg-rule ${all === undefined ? 'lg:grid-cols-2' : 'md:grid-cols-3'}`}>
+            {all !== undefined && <Side owner="all" title={all.title} scores={all.scores} headingLevel={headingLevel} />}
+            <Side owner="public" title={t('dashboard.home.public')} scores={split.public} headingLevel={headingLevel} />
+            <Side owner="private" title={t('dashboard.home.private')} scores={split.private} headingLevel={headingLevel} />
         </div>
     );
 }
 
-type SideProps = { owner: 'public' | 'private'; scores: GroupScores; headingLevel: 2 | 3 };
+type SideProps = { owner: 'all' | 'public' | 'private'; title: string; scores: GroupScores; headingLevel: 2 | 3 };
 
-function Side({ owner, scores, headingLevel }: SideProps) {
+function Side({ owner, title, scores, headingLevel }: SideProps) {
     const t = useTranslate();
     const Heading = headingLevel === 2 ? 'h2' : 'h3';
-    const colour = owner === 'public' ? 'text-pub' : 'text-priv';
+    const colour = owner === 'all' ? 'text-ink' : owner === 'public' ? 'text-pub' : 'text-priv';
 
     return (
         <div className="bg-panel px-5 py-5">
             <div className="flex items-baseline gap-2.5">
-                <Heading className={`text-sm font-semibold ${colour}`}>{t(`dashboard.home.${owner}`)}</Heading>
+                <Heading className={`text-sm font-semibold ${colour}`}>{title}</Heading>
                 <span className="text-xs text-ink-2">{t('dashboard.home.visited', { count: formatCount(scores.facilities) })}</span>
             </div>
             <dl className="mt-2 flex flex-col-reverse">

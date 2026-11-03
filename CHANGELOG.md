@@ -9,6 +9,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Duration filter (D-75):** the Quarter filter is now Duration: all quarters, a quarter, or one
+  month of it. A month switches every page to that month's scores.
+- Home: the quarter in view month by month, each month's availability, consistency, validity and
+  overall, as a chart and a table.
+- Visuals: a Month / Quarter view. The quarterly view shows every round's three dimensions and
+  overall, and the selected quarter month by month.
+- Monitor: the overall quality score of all facilities, public and private together, beside the
+  Public and Private cards; the Owner filter narrows it.
 - The real KoboToolbox form is read as it is (D-65–D-74):
   - its 1,192 scored items come from item rules generated from the form's own score formulas:
     availability yes/no, consistency as k of 3 checks, and validity as a three-number match;

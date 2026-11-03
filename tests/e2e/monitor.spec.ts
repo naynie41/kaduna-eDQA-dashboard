@@ -7,7 +7,7 @@ test.describe('Monitor', () => {
         await expect(page.getByRole('heading', { level: 1, name: 'Monitor' })).toBeVisible();
         await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 60_000 }); // deferred blocks
 
-        await expect(page.getByRole('region', { name: 'Public and private facilities' })).toBeVisible();
+        await expect(page.getByRole('region', { name: 'Overall quality score' })).toBeVisible();
 
         const lgas = page.getByRole('list', { name: 'Facilities visited, by local government' });
         const rows = lgas.getByRole('listitem');

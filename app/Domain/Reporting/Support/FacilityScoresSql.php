@@ -21,6 +21,9 @@ use App\Domain\Scoring\RuleVersionForRound;
  *
  * A dimension is the mean of its non-null slots; overall is the mean of the three dimensions,
  * null when one is all N/A, and averages skip nulls, as in round_aggregates.
+ *
+ * A month in the filter (D-75) reads that month slot only: each dimension is its score in the
+ * month, and overall is the mean of the month's dimensions that have a score (the month's m{slot}).
  */
 final class FacilityScoresSql
 {
@@ -51,6 +54,10 @@ final class FacilityScoresSql
         $slotColumns = implode(",\n                    ", $perAssessment);
         $slotMeans = implode(",\n                    ", $perFacility);
         $round = $perRound ? 'x.round_id, ' : '';
+        // One month (D-75): that slot's scores only, and its overall is the slot's mean.
+        $slot = $filter->monthSlot();
+        $monthOnly = $slot === null ? '' : " AND s.month_slot = {$slot}";
+        $overall = $slot === null ? 'avg((x.availability + x.consistency + x.validity) / 3)' : "avg(x.m{$slot})";
 
         $sql = <<<SQL
             WITH round_versions (round_id, rule_version_id) AS ({$roundVersions}),
@@ -65,7 +72,7 @@ final class FacilityScoresSql
                     {$slotColumns}
                 FROM assessments a
                 JOIN round_versions rv ON rv.round_id = a.round_id
-                JOIN assessment_scores s ON s.assessment_id = a.id AND s.rule_version_id = rv.rule_version_id
+                JOIN assessment_scores s ON s.assessment_id = a.id AND s.rule_version_id = rv.rule_version_id{$monthOnly}
                 JOIN facilities f ON f.id = a.facility_id
                 WHERE a.status IN ('accepted', 'flagged'){$where}
                 GROUP BY a.id, a.facility_id, a.round_id, a.started_at
@@ -75,7 +82,7 @@ final class FacilityScoresSql
                     avg(x.availability) AS availability,
                     avg(x.consistency) AS consistency,
                     avg(x.validity) AS validity,
-                    avg((x.availability + x.consistency + x.validity) / 3) AS overall,
+                    {$overall} AS overall,
                     avg(x.m1) AS m1, avg(x.m2) AS m2, avg(x.m3) AS m3,
                     {$slotMeans},
                     count(*) AS assessments,
