@@ -11,8 +11,8 @@ use Illuminate\Contracts\Container\Container;
 
 /**
  * Every rule code the Data issues page names (ARCHITECTURE.md §6): the 14 rules of
- * edqa.validation.rules in run order, each with its severity, and RULE_ERROR (hard), the
- * pipeline's own failure when a rule cannot run. One list, so the summary, the filters and the
+ * edqa.validation.rules in run order, each with its severity, the soft flags raised by an event
+ * (EventFlags, Q-23), and RULE_ERROR (hard), the pipeline's own failure when a rule cannot run. One list, so the summary, the filters and the
  * soft-flag override agree.
  */
 final class RuleCatalogue
@@ -32,6 +32,9 @@ final class RuleCatalogue
             if ($rule instanceof ValidationRule) {
                 $codes[] = ['code' => $code, 'severity' => $rule->severity()];
             }
+        }
+        foreach (EventFlags::ALL as $code) {
+            $codes[] = ['code' => $code, 'severity' => Severity::Soft];
         }
         $codes[] = ['code' => ValidationPipeline::RULE_ERROR, 'severity' => Severity::Hard];
 

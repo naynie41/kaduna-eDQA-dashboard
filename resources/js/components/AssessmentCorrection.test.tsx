@@ -77,7 +77,7 @@ const translations = {
 const detail = (open = true): FacilityDetail => ({
     facility: { id: 5, code: 'KD-F1', name: 'Facility F1', lga: 'Alpha', ward: 'Ward F1', level: 'primary', level_label: 'Primary', ownership: 'public', ownership_label: 'Public', active: true },
     round: { id: 2, label: 'Q2 2026', year: 2026, quarter: 2, open },
-    assessment: { id: 9, assessed_on: '2026-04-14', assessor: 'Assessor', status: 'accepted', started_at: '2026-04-14T09:00:00+01:00', ended_at: '2026-04-14T09:45:00+01:00' },
+    assessment: { id: 9, assessed_on: '2026-04-14', assessor: 'Assessor', status: 'accepted', started_at: '2026-04-14T09:00:00+01:00', ended_at: '2026-04-14T09:45:00+01:00', corrected: null },
     scores: { availability: score('75.0'), consistency: score('75.0'), validity: score('75.0'), overall: score('75.0') },
     items: [
         {

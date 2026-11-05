@@ -15,6 +15,7 @@ use App\Domain\Round\Models\Round;
 use App\Domain\Round\Support\RoundWindowCheck;
 use App\Domain\Scoring\Actions\RescoreAssessments;
 use App\Domain\Scoring\RuleVersionForRound;
+use App\Domain\Validation\EventFlags;
 use App\Domain\Validation\Support\Reason;
 use App\Models\User;
 use App\Support\Audit\AuditLog;
@@ -208,7 +209,7 @@ final class CorrectAssessment
                 $kept[] = $code;
             }
         }
-        $order = array_flip(array_keys($this->rules));
+        $order = array_flip([...array_keys($this->rules), ...EventFlags::ALL]);
         usort($kept, fn (string $a, string $b): int => ($order[$a] ?? PHP_INT_MAX) <=> ($order[$b] ?? PHP_INT_MAX));
 
         $soft = array_values(array_filter($kept, fn (string $f): bool => isset($order[$f])));

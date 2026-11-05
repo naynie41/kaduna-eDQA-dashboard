@@ -345,3 +345,91 @@ it('refuses a result that does not fit the item: pass for a checked question, a 
     'too many' => ['consist_m2_q21', '4'],
     'count for a single item' => ['avail_m2_reporting_rate', '2'],
 ]);
+
+it('refuses a withdrawn assessment, and changes nothing', function (): void {
+    $assessment = acceptedAssessment($this->facility, $this->round);
+    $assessment->update(['status' => 'withdrawn']);
+
+    correct($this, $assessment, ['items' => ['avail_m2_reporting_rate' => 'pass']])
+        ->assertStatus(409)->assertJsonPath('code', 'not_accepted');
+
+    expect(storedScores($assessment, $this->version->id)['availability:2'])->toBe(75.0);
+});
+
+// ---- A source edit after a portal correction (Q-23: for now the source edit wins)
+
+/** The facility's assessment edited at source: a new submission superseding the given instance, as received. */
+function editedAtSource(Facility $facility, Round $round, string $instanceId): Assessment
+{
+    $parsed = ParsedSubmissionBuilder::new()->forFacility($facility)->inRound($round)->withInstanceId("{$instanceId}-edit")->withDeprecatedId($instanceId)->build();
+    app(ProcessParsedBatch::class)->execute([[submissionRow($parsed), $parsed]]);
+
+    return Assessment::query()->where('facility_id', $facility->id)->where('round_id', $round->id)->sole();
+}
+
+it('lets a later source edit win over a portal correction, keeps the correction in the audit log, and flags it for Data issues', function (): void {
+    $assessment = acceptedAssessment($this->facility, $this->round, ParsedSubmissionBuilder::new()->withInstanceId('uuid:visit-1'));
+    correct($this, $assessment, ['items' => ['avail_m2_reporting_rate' => 'pass']])->assertOk();
+    expect(storedScores($assessment, $this->version->id)['availability:2'])->toBe(100.0);
+
+    $edited = editedAtSource($this->facility, $this->round, 'uuid:visit-1');
+
+    // The source's answers and scores, recomputed from them.
+    expect($edited->id)->toBe($assessment->id)
+        ->and(ItemResponse::query()->where('assessment_id', $assessment->id)->where('item_code', 'reporting_rate')->where('month_slot', 2)->value('value'))->toBe('fail')
+        ->and(storedScores($assessment, $this->version->id)['availability:2'])->toBe(75.0)
+        // Flagged for an administrator.
+        ->and($edited->flags)->toContain('SOURCE_EDIT_OVER_CORRECTION')
+        ->and($edited->status)->toBe('flagged');
+
+    // The correction stays in the audit log, and the overwrite is audited on the assessment.
+    expect(Activity::query()->where('event', 'corrected')->where('properties->assessment_id', $assessment->id)->count())->toBe(1);
+    $overwrite = Activity::query()->where('event', 'source_edit_over_correction')->where('subject_id', $assessment->id)->sole();
+    expect($overwrite->properties['instance_id'])->toBe('uuid:visit-1-edit')
+        ->and($overwrite->properties['corrections'])->toBe(1);
+
+    // It is listed on the Soft tab of Data issues under its own code.
+    $this->actingAs($this->admin)->get('/admin/data-issues?tab=soft&rule=SOURCE_EDIT_OVER_CORRECTION')->assertOk()
+        ->assertInertia(fn ($page) => $page->has('records.data', 1)->where('records.data.0.id', $assessment->id)
+            ->where('rules', fn ($rules): bool => collect($rules)->contains(fn (array $r): bool => $r['code'] === 'SOURCE_EDIT_OVER_CORRECTION' && $r['severity'] === 'soft' && $r['open'] === 1)));
+});
+
+it('raises no such flag when the edited assessment was never corrected in the portal', function (): void {
+    acceptedAssessment($this->facility, $this->round, ParsedSubmissionBuilder::new()->withInstanceId('uuid:visit-2'));
+
+    $edited = editedAtSource($this->facility, $this->round, 'uuid:visit-2');
+
+    expect($edited->flags)->not->toContain('SOURCE_EDIT_OVER_CORRECTION')
+        ->and(Activity::query()->where('event', 'source_edit_over_correction')->count())->toBe(0);
+});
+
+it('lets an administrator clear the flag with a reason, and does not raise it again for that correction', function (): void {
+    $assessment = acceptedAssessment($this->facility, $this->round, ParsedSubmissionBuilder::new()->withInstanceId('uuid:visit-3'));
+    correct($this, $assessment, ['items' => ['avail_m2_reporting_rate' => 'pass']])->assertOk();
+    editedAtSource($this->facility, $this->round, 'uuid:visit-3');
+
+    $this->actingAs($this->admin)->postJson("/api/assessments/{$assessment->id}/flags/SOURCE_EDIT_OVER_CORRECTION/override", ['reason' => 'The source edit is the right answer'])->assertOk();
+    expect($assessment->refresh()->flags)->not->toContain('SOURCE_EDIT_OVER_CORRECTION');
+
+    // A second edit at source, with no new correction since the override: nothing new to see.
+    $again = editedAtSource($this->facility, $this->round, 'uuid:visit-3-edit');
+    expect($again->flags)->not->toContain('SOURCE_EDIT_OVER_CORRECTION');
+});
+
+it('tells the drawer the assessment was corrected in the portal, until a source edit replaces it', function (): void {
+    $assessment = acceptedAssessment($this->facility, $this->round, ParsedSubmissionBuilder::new()->withInstanceId('uuid:visit-4'));
+    $drawer = fn () => $this->actingAs($this->admin)->getJson("/api/facilities/{$this->facility->id}?round={$this->round->id}")->assertOk();
+
+    $drawer()->assertJsonPath('data.assessment.corrected', null);
+
+    correct($this, $assessment, ['items' => ['avail_m2_reporting_rate' => 'pass']])->assertOk();
+    $drawer()->assertJsonPath('data.assessment.corrected.by', 'Amina Bello')
+        ->assertJsonPath('data.source.name', 'ODK Central');
+
+    editedAtSource($this->facility, $this->round, 'uuid:visit-4');
+    $after = $drawer()->assertJsonPath('data.assessment.corrected', null);
+
+    // The correction still shows in the drawer's audit trail, named by its item.
+    expect(collect($after->json('data.activity'))->firstWhere('event', 'corrected'))->toMatchArray(['subject' => 'item', 'item_code' => 'avail_m2_reporting_rate'])
+        ->and(collect($after->json('data.flags'))->pluck('code'))->toContain('SOURCE_EDIT_OVER_CORRECTION');
+});

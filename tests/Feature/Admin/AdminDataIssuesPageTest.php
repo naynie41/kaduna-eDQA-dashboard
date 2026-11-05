@@ -73,9 +73,10 @@ it('lists every rule with severity, name, why and open count, and the open hard 
         ->component('admin/data-issues')
         ->missing('filters')
         ->where('issueFilters', ['tab' => 'hard', 'state' => 'open', 'rule' => null, 'lga' => null, 'round' => null, 'source' => null])
-        ->has('rules', 15)
+        ->has('rules', 16)
         ->where('rules.0.code', 'UNKNOWN_FORM_VERSION')
-        ->where('rules.14.code', 'RULE_ERROR')
+        ->where('rules.14.code', 'SOURCE_EDIT_OVER_CORRECTION')
+        ->where('rules.15.code', 'RULE_ERROR')
         ->where('rules', fn ($rules): bool => collect($rules)->firstWhere('code', 'LGA_UNKNOWN')['open'] === 2
             && collect($rules)->firstWhere('code', 'LGA_UNKNOWN')['severity'] === 'hard'
             && collect($rules)->firstWhere('code', 'LGA_UNKNOWN')['why'] === __('validation_rules.LGA_UNKNOWN.why')

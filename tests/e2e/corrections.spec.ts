@@ -94,6 +94,8 @@ test.describe('Correcting an assessment from the drawer', () => {
         await expect(entry).toBeVisible();
         // The old side is the stored value, which may be the form's raw choice (yes / no).
         await expect(entry).toContainText(`→ ${after}`);
+        // The source still shows the old answer (Q-23): the drawer says the portal differs from it.
+        await expect(drawer.getByText(/^Corrected in the portal by .+ It differs from .+, which still shows the original answers\.$/)).toBeVisible();
         await checkA11y(page);
 
         await page.keyboard.press('Escape');

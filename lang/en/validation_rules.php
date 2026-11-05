@@ -125,6 +125,13 @@ return [
         'detail' => 'visit lasted :minutes minutes (minimum :minimum)',
     ],
 
+    // Raised by an event, not a rule (EventFlags, Q-23).
+    'SOURCE_EDIT_OVER_CORRECTION' => [
+        'name' => 'Source edit replaced a portal correction',
+        'why' => 'The submission was edited at its source after an administrator corrected it in the portal. The source edit now stands; the correction is kept in the audit log. Check which answers are right, and correct again if needed.',
+        'detail' => 'edited at source after :count portal correction(s)',
+    ],
+
     'ASSESSOR_VOLUME' => [
         'name' => 'Many visits in one day',
         'why' => 'One assessor visiting more than :maximum facilities in a day needs a supervisor\'s attention.',

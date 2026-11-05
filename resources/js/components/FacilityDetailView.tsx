@@ -35,6 +35,14 @@ export default function FacilityDetailView({ detail, onCorrected }: FacilityDeta
                           ? t('dashboard.drawer.not_assessed', { round: round.label })
                           : t('dashboard.drawer.never_assessed')}
                 </p>
+                {assessment?.corrected != null && (
+                    // Q-23: the stored source payload is never changed, so the source shows the old answers.
+                    <p className="notice notice-info mb-3 text-sm">
+                        {assessment.corrected.by === null
+                            ? t('dashboard.drawer.corrected_note_system', { date: dateTime(assessment.corrected.at), source: detail.source.name ?? t('dashboard.drawer.its_source') })
+                            : t('dashboard.drawer.corrected_note', { by: assessment.corrected.by, date: dateTime(assessment.corrected.at), source: detail.source.name ?? t('dashboard.drawer.its_source') })}
+                    </p>
+                )}
                 <dl className="grid grid-cols-2 gap-2 rail:grid-cols-4">
                     {[...DIMENSIONS, 'overall' as const].map((key) => (
                         <div key={key} className="rounded-md border border-rule bg-panel px-3 py-2">

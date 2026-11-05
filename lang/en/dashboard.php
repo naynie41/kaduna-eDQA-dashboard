@@ -340,6 +340,7 @@ return [
             'deleted' => 'Deleted',
             'flag_overridden' => 'Flag overridden',
             'corrected' => 'Corrected',
+            'source_edit_over_correction' => 'Edited at source over a correction',
         ],
         // "Correct this assessment" (D-58): item results and visit times; scores are recomputed.
         'correct' => [
@@ -367,6 +368,9 @@ return [
         ],
         'on_assessment' => 'Assessment',
         'on_item' => 'Item :code',
+        'corrected_note' => 'Corrected in the portal by :by, :date. It differs from :source, which still shows the original answers.',
+        'corrected_note_system' => 'Corrected in the portal, :date. It differs from :source, which still shows the original answers.',
+        'its_source' => 'its source',
         'change' => ':field: :old → :new',
         'empty_value' => '(none)',
         'source_title' => 'Source submission',

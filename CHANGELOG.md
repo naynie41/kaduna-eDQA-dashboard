@@ -9,6 +9,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Source edit over a portal correction (Q-23, default):** when a corrected assessment is edited
+  at its source, the source edit wins, the correction stays in the audit log, and the assessment
+  is flagged `SOURCE_EDIT_OVER_CORRECTION` on the Soft tab of Data issues.
+- The facility drawer says when an assessment was corrected in the portal and that it differs
+  from its source, which still shows the original answers.
+- Corrections are refused for a withdrawn assessment (test added; the rule was already there).
 - **Duration filter (D-75):** the Quarter filter is now Duration: all quarters, a quarter, or one
   month of it. A month switches every page to that month's scores.
 - Home: the quarter in view month by month, each month's availability, consistency, validity and

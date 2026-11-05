@@ -197,6 +197,8 @@ export type FacilityDetail = {
         status: string;
         started_at: string;
         ended_at: string;
+        /** The latest portal correction the source has not replaced since (Q-23). */
+        corrected: { at: string; by: string | null } | null;
     } | null;
     scores: {
         availability: ScoreValue;

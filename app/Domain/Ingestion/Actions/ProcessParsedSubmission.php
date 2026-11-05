@@ -18,11 +18,13 @@ use App\Domain\Scoring\RuleVersionForRound;
 use App\Domain\Scoring\ScoreCalculator;
 use App\Domain\Validation\DTOs\RuleFailure;
 use App\Domain\Validation\DTOs\ValidationResult;
+use App\Domain\Validation\EventFlags;
 use App\Domain\Validation\Events\SubmissionQuarantined;
 use App\Domain\Validation\Exceptions\SubmissionNotResolvable;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use App\Domain\Validation\ValidationContext;
 use App\Domain\Validation\ValidationPipeline;
+use App\Support\Audit\AuditLog;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -33,8 +35,10 @@ use Illuminate\Support\Facades\DB;
  *   failure), submission quarantined. No assessment, items or scores.
  * - otherwise → assessment, item responses and nine scores (ScoreCalculator, current published
  *   rule version), soft flags and all-N/A notes in assessments.flags, submission accepted or
- *   flagged. An ODK edit (deprecatedID = an accepted submission) updates that assessment in
- *   place, audited, and supersedes the original.
+ *   flagged. An edit at source (deprecatedID = an accepted submission) updates that assessment
+ *   in place, audited, and supersedes the original. If an administrator corrected the assessment
+ *   in the portal since (Q-23, default for now), the source edit still wins: the correction stays
+ *   in the audit log, and the assessment is flagged SOURCE_EDIT_OVER_CORRECTION for Data issues.
  *
  * A submission that is not a facility assessment (D-74: a community visit, DDU at LGA level) is
  * marked out_of_scope and goes no further: no validation, no quarantine, no assessment.
@@ -144,12 +148,27 @@ final class ProcessParsedSubmission
             'flags' => [...array_values(array_unique($softCodes)), ...$card->exclusions],
         ];
 
-        return DB::transaction(function () use ($submission, $parsed, $card, $attributes, $ruleVersionId, $round, $status, $result): ProcessOutcome {
+        return DB::transaction(function () use ($submission, $parsed, $card, $attributes, $ruleVersionId, $round, $status, $result, $softCodes): ProcessOutcome {
             $previous = $this->supersededSubmission($parsed);
             $assessment = $previous?->assessment;
 
+            // Q-23: the source edit wins over portal corrections made since the flag was last cleared.
+            $corrections = $assessment === null ? 0 : $this->correctionsToReview($assessment);
+            if ($corrections > 0) {
+                $status = SubmissionStatus::Flagged;
+                $attributes['status'] = $status->value;
+                $attributes['flags'] = [...array_values(array_unique($softCodes)), EventFlags::SOURCE_EDIT_OVER_CORRECTION, ...$card->exclusions];
+            }
+
             if ($assessment !== null) {
                 $assessment->update($attributes);
+                if ($corrections > 0) {
+                    AuditLog::record($assessment, null, 'source_edit_over_correction',
+                        old: [],
+                        new: ['flags' => $attributes['flags'], 'status' => $attributes['status']],
+                        extra: ['instance_id' => $parsed->instanceId, 'replaced_instance_id' => $previous->instance_id, 'corrections' => $corrections],
+                    );
+                }
                 DB::table('item_responses')->where('assessment_id', $assessment->id)->delete();
             } else {
                 $assessment = Assessment::query()->create($attributes);
@@ -165,6 +184,26 @@ final class ProcessParsedSubmission
 
             return new ProcessOutcome($status, $result, assessmentId: $assessment->id, supersededSubmissionId: $previous?->id);
         });
+    }
+
+    /**
+     * Portal corrections of the assessment (its times, or its items, which carry assessment_id)
+     * since SOURCE_EDIT_OVER_CORRECTION was last overridden on it: what the source edit replaces
+     * that nobody has looked at yet.
+     */
+    private function correctionsToReview(Assessment $assessment): int
+    {
+        $type = $assessment->getMorphClass();
+        $since = (int) DB::table('activity_log')
+            ->where('subject_type', $type)->where('subject_id', $assessment->id)->where('event', 'flag_overridden')
+            ->whereRaw("properties->>'code' = ?", [EventFlags::SOURCE_EDIT_OVER_CORRECTION])
+            ->max('id');
+
+        return DB::table('activity_log')
+            ->where('event', 'corrected')->where('id', '>', $since)
+            ->where(fn ($q) => $q->where(fn ($a) => $a->where('subject_type', $type)->where('subject_id', $assessment->id))
+                ->orWhereRaw("(properties->>'assessment_id')::bigint = ?", [$assessment->id]))
+            ->count();
     }
 
     /** The accepted submission this one edits (ODK deprecatedID), with its assessment. */

@@ -7,6 +7,7 @@ namespace App\Domain\Validation\Actions;
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\Enums\Severity;
+use App\Domain\Validation\EventFlags;
 use App\Domain\Validation\Exceptions\QuarantineActionRefused;
 use App\Domain\Validation\Support\Reason;
 use App\Models\User;
@@ -74,6 +75,6 @@ final class OverrideSoftFlag
             }
         }
 
-        return $codes;
+        return [...$codes, ...EventFlags::ALL];
     }
 }

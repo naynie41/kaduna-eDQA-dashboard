@@ -51,6 +51,9 @@ const translations = {
             events: { updated: 'Updated', flag_overridden: 'Flag overridden' },
             on_assessment: 'Assessment',
             on_item: 'Item :code',
+            corrected_note: 'Corrected in the portal by :by, :date. It differs from :source, which still shows the original answers.',
+            corrected_note_system: 'Corrected in the portal, :date. It differs from :source, which still shows the original answers.',
+            its_source: 'its source',
             change: ':field: :old → :new',
             empty_value: '(none)',
             details: 'Facility',
@@ -71,7 +74,7 @@ const translations = {
 const detail: FacilityDetail = {
     facility: { id: 5, code: 'KD-F1', name: 'Facility F1', lga: 'Alpha', ward: 'Ward F1', level: 'primary', level_label: 'Primary', ownership: 'public', ownership_label: 'Public', active: true },
     round: { id: 2, label: 'Q2 2026', year: 2026, quarter: 2, open: true },
-    assessment: { id: 9, assessed_on: '2026-04-10', assessor: 'Assessor', status: 'flagged', started_at: '2026-04-10T09:00:00+01:00', ended_at: '2026-04-10T09:45:00+01:00' },
+    assessment: { id: 9, assessed_on: '2026-04-10', assessor: 'Assessor', status: 'flagged', started_at: '2026-04-10T09:00:00+01:00', ended_at: '2026-04-10T09:45:00+01:00', corrected: null },
     scores: { availability: score('90.0', 'strong', 'Strong'), consistency: score('80.0'), validity: score('70.0', 'review', 'Review'), overall: score('80.0') },
     items: [
         {
@@ -180,6 +183,19 @@ describe('FacilityDetailView', () => {
         expect(screen.getByText('uuid:abc')).toBeTruthy();
         expect(screen.getByText('ODK Central is not connected yet, so there is no link.')).toBeTruthy();
         expect(screen.queryByRole('link', { name: /Open in ODK Central/ })).toBeNull();
+    });
+
+    it('says when the assessment was corrected in the portal, so nobody is surprised that the source differs', () => {
+        const { unmount } = renderUi(<FacilityDetailView detail={detail} />, translations);
+        expect(screen.queryByText(/Corrected in the portal/)).toBeNull();
+        unmount();
+
+        if (detail.assessment === null) {
+            throw new Error('The fixture has an assessment.');
+        }
+        const corrected = { ...detail, assessment: { ...detail.assessment, corrected: { at: '2026-05-02T10:15:00+01:00', by: 'Amina Bello' } } };
+        renderUi(<FacilityDetailView detail={corrected} />, translations);
+        expect(screen.getByText(/^Corrected in the portal by Amina Bello, 2 May 2026/).textContent).toContain('It differs from ODK Central, which still shows the original answers.');
     });
 
     it('links to ODK Central when configured, saying it opens a new tab', () => {
