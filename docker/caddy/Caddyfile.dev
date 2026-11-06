@@ -3,6 +3,11 @@
 {
     admin off
     auto_https off
+    # Pass a tunnel's X-Forwarded-* through (it reaches Caddy from the Docker host's private
+    # address), so pages opened over the tunnel link to the tunnel's host, not localhost.
+    servers {
+        trusted_proxies static private_ranges
+    }
 }
 
 http://:80 {

@@ -33,6 +33,15 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // Forwarded headers count only from a private-network peer (a tunnel or proxy on the host or
+        // Docker network). Behind FastCGI, REMOTE_ADDR is the real client, so an internet client
+        // cannot choose the host the app builds its URLs from.
+        $middleware->trustProxies(
+            at: ['127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '::1', 'fc00::/7'],
+            headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO,
+        );
+
         $middleware->alias(['two-factor.confirmed' => EnsureTwoFactorConfirmed::class]);
 
         // The source webhooks (/webhooks/{source}) are each verified their own way instead, ODK by
