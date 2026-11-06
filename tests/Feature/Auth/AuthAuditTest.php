@@ -5,7 +5,8 @@ declare(strict_types=1);
 use App\Models\User;
 use Spatie\Activitylog\Models\Activity;
 
-// SECURITY.md §4: login, logout, failed login and 2FA enable/disable are audited.
+// SECURITY.md §4: login, logout and failed login are audited (lockouts, unlocks, password changes
+// and new-device sign-ins in LockoutTest, PasswordPolicyTest and NewDeviceAlertTest).
 
 function authEntry(string $event): ?Activity
 {
@@ -13,9 +14,8 @@ function authEntry(string $event): ?Activity
 }
 
 it('records a login and a logout, with who, IP and user agent', function (): void {
-    $user = User::factory()->withTwoFactor()->create();
+    $user = User::factory()->create();
 
-    // withTwoFactor users finish login at the challenge; act as already authenticated instead.
     $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.4'])
         ->withHeader('User-Agent', 'AuditBrowser/1.0')
         ->actingAs($user)
@@ -44,15 +44,4 @@ it('records a failed login without the password', function (): void {
     expect($entry)->not->toBeNull()
         ->and($entry->properties['email'])->toBe('target@example.test')
         ->and(json_encode($entry->properties))->not->toContain('wrong-password-123');
-});
-
-it('records 2FA being enabled and disabled', function (): void {
-    $user = User::factory()->create();
-
-    confirmTwoFactor($user);
-    expect(authEntry('two-factor-enabled')?->causer?->is($user))->toBeTrue();
-
-    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()])
-        ->delete(route('two-factor.disable'));
-    expect(authEntry('two-factor-disabled')?->causer?->is($user))->toBeTrue();
 });

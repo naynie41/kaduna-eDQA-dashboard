@@ -220,8 +220,8 @@ describe('FacilityDetailView attachments', () => {
     const withAttachments: FacilityDetail = {
         ...detail,
         attachments: [
-            { id: 1, filename: 'register.jpg', mime: 'image/jpeg', size: 2048, status: 'fetched', reason: null, url: '/attachments/7/register.jpg' },
-            { id: 2, filename: 'trace.geojson', mime: 'application/geo+json', size: 120, status: 'fetched', reason: null, url: '/attachments/7/trace.geojson' },
+            { id: 1, filename: 'register.jpg', mime: 'image/jpeg', size: 2048, status: 'fetched', reason: null, url: '/admin/attachments/7/register.jpg' },
+            { id: 2, filename: 'trace.geojson', mime: 'application/geo+json', size: 120, status: 'fetched', reason: null, url: '/admin/attachments/7/trace.geojson' },
             { id: 3, filename: 'later.png', mime: null, size: null, status: 'pending', reason: null, url: null },
             { id: 4, filename: 'evil.jpg', mime: null, size: null, status: 'rejected', reason: 'type_not_allowed', url: null },
         ],
@@ -231,8 +231,8 @@ describe('FacilityDetailView attachments', () => {
         const { container } = renderUi(<FacilityDetailView detail={withAttachments} />, translations);
 
         const image = screen.getByRole('img', { name: 'Photo register.jpg from Facility F1, Q2 2026' });
-        expect(image.getAttribute('src')).toBe('/attachments/7/register.jpg');
-        expect(screen.getByRole('link', { name: 'Open register.jpg full size' }).getAttribute('href')).toBe('/attachments/7/register.jpg');
+        expect(image.getAttribute('src')).toBe('/admin/attachments/7/register.jpg');
+        expect(screen.getByRole('link', { name: 'Open register.jpg full size' }).getAttribute('href')).toBe('/admin/attachments/7/register.jpg');
         expect(await axeCheck(container)).toHaveNoViolations();
     });
 
@@ -240,7 +240,7 @@ describe('FacilityDetailView attachments', () => {
         renderUi(<FacilityDetailView detail={withAttachments} />, translations);
 
         const download = screen.getByRole('link', { name: 'Download trace.geojson' });
-        expect(download.getAttribute('href')).toBe('/attachments/7/trace.geojson');
+        expect(download.getAttribute('href')).toBe('/admin/attachments/7/trace.geojson');
         expect(download.hasAttribute('download')).toBe(true);
         expect(screen.getByText(/later\.png/).textContent).toBe('later.png · Not fetched from its source yet');
         expect(screen.getByText(/evil\.jpg/).textContent).toBe('evil.jpg · Refused, not stored: its file type is not allowed');

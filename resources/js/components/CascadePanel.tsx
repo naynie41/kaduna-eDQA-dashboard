@@ -23,7 +23,7 @@ export default function CascadePanel({ howUrl }: CascadePanelProps) {
     const [result, setResult] = useState<CascadeExport | null>(null);
 
     const regenerate = async () => {
-        const response = await action.run('POST', '/api/facility-list/export-cascade');
+        const response = await action.run('POST', '/admin/api/facility-list/export-cascade');
         if (response.ok) {
             setResult(response.data.data);
         }

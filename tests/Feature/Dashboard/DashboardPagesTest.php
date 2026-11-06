@@ -15,8 +15,11 @@ use Tests\Support\Rows;
 beforeEach(function (): void {
     $this->seed(LgaSeeder::class);
     $this->f = ReportingFixture::build();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
+
+/** Each page's public URL (ARCHITECTURE.md §9.0). */
+const PAGE_PATHS = ['home' => '/', 'facility' => '/facilities', 'lga' => '/lgas', 'monitor' => '/monitor', 'visuals' => '/visuals', 'plan' => '/plan'];
 
 const DASHBOARD_PAGES = [
     'home' => ['owners', 'trend', 'weakest', 'months'],
@@ -27,13 +30,14 @@ const DASHBOARD_PAGES = [
     'plan' => ['plan'],
 ];
 
-it('sends /dashboard and / to the home page, keeping the filters', function (string $from): void {
-    $this->actingAs($this->admin)->get("{$from}?year=2026&quarter=2")
-        ->assertRedirect('/dashboard/home?year=2026&quarter=2');
-})->with(['/dashboard', '/']);
+it('sends the old /dashboard to the home page for good, keeping the filters', function (): void {
+    $this->actingAs($this->admin)->get('/dashboard?year=2026&quarter=2')
+        ->assertStatus(301)
+        ->assertRedirect('/?year=2026&quarter=2');
+});
 
 it('renders each page with the shared context, its heavy blocks deferred', function (string $page, array $deferred): void {
-    $this->actingAs($this->admin)->get("/dashboard/{$page}")
+    $this->actingAs($this->admin)->get(PAGE_PATHS[$page])
         ->assertOk()
         ->assertInertia(function (Assert $inertia) use ($page, $deferred): void {
             $inertia->component("dashboard/{$page}")
@@ -58,7 +62,7 @@ it('renders each page with the shared context, its heavy blocks deferred', funct
 })->with(fn (): array => array_map(fn (string $page, array $props): array => [$page, $props], array_keys(DASHBOARD_PAGES), DASHBOARD_PAGES));
 
 it('round-trips valid filters through the URL untouched', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/lga?year=2026&quarter=2&lga=AAA&level=primary&owner=public')
+    $this->actingAs($this->admin)->get('/lgas?year=2026&quarter=2&lga=AAA&level=primary&owner=public')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('filters', ['year' => 2026, 'quarter' => 2, 'month' => null, 'lga' => 'AAA', 'level' => 'primary', 'owner' => 'public'])
@@ -66,7 +70,7 @@ it('round-trips valid filters through the URL untouched', function (): void {
 });
 
 it('drops invalid filters and redirects to the cleaned URL, keeping other parameters', function (string $query, string $clean): void {
-    $this->actingAs($this->admin)->get("/dashboard/facility?{$query}")->assertRedirect("/dashboard/facility{$clean}");
+    $this->actingAs($this->admin)->get("/facilities?{$query}")->assertRedirect("/facilities{$clean}");
 })->with([
     'unknown LGA' => ['year=2026&lga=ZZZ', '?year=2026'],
     'year with no round' => ['year=2031&owner=private', '?owner=private'],
@@ -77,13 +81,13 @@ it('drops invalid filters and redirects to the cleaned URL, keeping other parame
 ]);
 
 it('does not redirect for key order alone: Inertia reports URLs with the keys sorted', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/facility?owner=public&year=2026')
+    $this->actingAs($this->admin)->get('/facilities?owner=public&year=2026')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('filters.year', 2026)->where('filters.owner', 'public'));
 });
 
 it('lists only years and quarters that have rounds, the LGAs by name, and the enum labels', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/home')
+    $this->actingAs($this->admin)->get('/')
         ->assertInertia(fn (Assert $page) => $page
             ->where('filterOptions.rounds', [['year' => 2026, 'quarter' => 2], ['year' => 2026, 'quarter' => 1]])
             ->where('filterOptions.lgas.0', ['code' => 'AAA', 'name' => 'Alpha'])
@@ -92,7 +96,7 @@ it('lists only years and quarters that have rounds, the LGAs by name, and the en
 });
 
 it('shares the shell status with every signed-in page: assessments and each source\'s sync state', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/home')
+    $this->actingAs($this->admin)->get('/')
         ->assertInertia(fn (Assert $page) => $page
             ->where('shell.assessments', 8) // seven Q2 visits and one Q1
             ->where('shell.sources', fn ($sources): bool => collect($sources)->pluck('state', 'key')->all() === ['odk' => 'not_configured', 'kobo' => 'not_configured'])
@@ -124,7 +128,7 @@ it('opens Administration on the Data sources page', function (): void {
 });
 
 it('names the sources in Monitor\'s assessments by source, every configured one listed', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/monitor?year=2026&quarter=2')
+    $this->actingAs($this->admin)->get('/monitor?year=2026&quarter=2')
         ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reloaded) => $reloaded->where('sources', [
             ['key' => 'odk', 'name' => 'ODK Central', 'assessments' => 7],
             ['key' => 'kobo', 'name' => 'KoboToolbox', 'assessments' => 0],

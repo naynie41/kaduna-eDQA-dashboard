@@ -11,11 +11,11 @@ use Tests\Support\ReportingFixture;
 
 beforeEach(function (): void {
     $this->f = ReportingFixture::build();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 it('keeps a month in the filters, and switches the page to it', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/home?year=2026&month=6')
+    $this->actingAs($this->admin)->get('/?year=2026&month=6')
         ->assertInertia(fn (Assert $page) => $page
             ->where('filters.month', 6)
             ->where('filters.quarter', 2)
@@ -24,12 +24,12 @@ it('keeps a month in the filters, and switches the page to it', function (): voi
 });
 
 it('offers every month of every quarter with a round in the Duration list', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/home')
+    $this->actingAs($this->admin)->get('/')
         ->assertInertia(fn (Assert $page) => $page->where('filterOptions.rounds', fn ($rounds): bool => collect($rounds)->contains(fn ($r): bool => $r['year'] === 2026 && $r['quarter'] === 2)));
 });
 
 it('breaks the quarter in view down month by month on Home: each month\'s three dimensions and overall', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/home?year=2026&quarter=2')
+    $this->actingAs($this->admin)->get('/?year=2026&quarter=2')
         ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload
             ->has('months', 3)
             ->where('months.0.month', 4)
@@ -41,7 +41,7 @@ it('breaks the quarter in view down month by month on Home: each month\'s three 
 });
 
 it('gives Visuals each quarter\'s three dimensions and overall, for the quarterly view', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/visuals?year=2026&quarter=2')
+    $this->actingAs($this->admin)->get('/visuals?year=2026&quarter=2')
         ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload
             ->has('quarters', 2)
             ->where('quarters.1.label', 'Q2 2026')
@@ -50,7 +50,7 @@ it('gives Visuals each quarter\'s three dimensions and overall, for the quarterl
 });
 
 it('shows Monitor an overall for all facilities, public and private together, narrowed by the Owner filter', function (string $query, int $facilities, string $overall): void {
-    $this->actingAs($this->admin)->get("/dashboard/monitor?year=2026&quarter=2{$query}")
+    $this->actingAs($this->admin)->get("/monitor?year=2026&quarter=2{$query}")
         ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload
             ->where('overall.summary.facilitiesVisited', $facilities)
             ->where('overall.summary.overall.display', $overall)

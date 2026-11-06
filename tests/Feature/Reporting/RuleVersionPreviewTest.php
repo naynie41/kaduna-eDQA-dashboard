@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\DB;
 beforeEach(function (): void {
     $this->seed(ScoringRuleVersionSeeder::class);
     $this->v1 = ScoringRuleVersion::query()->where('version', 1)->sole();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
     $this->lga = Lga::factory()->create(['code' => 'CHK', 'name' => 'Chikun']);
     $this->ward = Ward::factory()->create(['lga_id' => $this->lga->id]);
     $this->open = Round::factory()->create(['year' => 2026, 'quarter' => 2]);

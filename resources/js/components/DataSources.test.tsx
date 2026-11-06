@@ -333,7 +333,7 @@ describe('SourcePanel', () => {
         await userEvent.setup().click(screen.getByRole('button', { name: 'Pull now KoboToolbox' }));
 
         await waitFor(() => expect(onPull).toHaveBeenCalledWith({ id: 41, attached: false }));
-        expect(fetch.mock.calls[0]?.[0]).toBe('/api/sources/kobo/pull');
+        expect(fetch.mock.calls[0]?.[0]).toBe('/admin/api/sources/kobo/pull');
     });
 
     it('follows the run it is given in a progress panel named by the source, the button disabled meanwhile', async () => {
@@ -441,7 +441,7 @@ describe('DeletionsPanel', () => {
         const rows = [deletion({}), deletion({ submission_id: 10, instance_id: 'uuid:del-2', facility: null, assessment: null, quarantined_record_id: 4, source_url: null })];
         const { container } = renderUi(<DeletionsPanel deletions={{ rows, total: 3 }} />, translations);
 
-        expect(screen.getByRole('link', { name: 'Open Kujama PHC' }).getAttribute('href')).toBe('/dashboard/facility?year=2026&quarter=4&facility=31');
+        expect(screen.getByRole('link', { name: 'Open Kujama PHC' }).getAttribute('href')).toBe('/facilities?year=2026&quarter=4&facility=31');
         expect(screen.getByRole('link', { name: 'Check in KoboToolbox (opens in a new tab)' }).getAttribute('href')).toBe('https://kf.example.org/api/v2/assets/aX/data/12/');
         expect(screen.getByRole('link', { name: 'Open Data issues' }).getAttribute('href')).toBe('/admin/data-issues?round=2');
         expect(screen.getAllByRole('link', { name: /^Check in/ })).toHaveLength(1);
@@ -468,7 +468,7 @@ describe('DeletionsPanel', () => {
 
         await waitFor(() => expect(onReviewed).toHaveBeenCalled());
         const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-        expect(url).toBe('/api/submissions/9/deletion-review');
+        expect(url).toBe('/admin/api/submissions/9/deletion-review');
         expect(JSON.parse(String(init.body))).toEqual({ reason: 'Confirmed with the LGA M&E officer' });
         expect(screen.queryByRole('dialog')).toBeNull();
     });
@@ -490,7 +490,7 @@ describe('BackfillPanel', () => {
                         { key: 'odk', name: 'ODK Central', run, checkpoint: { position: 1500, page: 3, page_size: 500 } },
                         { key: 'kobo', name: 'KoboToolbox', run: null, checkpoint: { position: 0, page: 0, page_size: 1000 } },
                     ],
-                    report: { file: 'backfill-report-20261015-090000.md', at: '2026-10-15T08:00:00Z', url: '/api/backfill-reports/backfill-report-20261015-090000.md?signature=x' },
+                    report: { file: 'backfill-report-20261015-090000.md', at: '2026-10-15T08:00:00Z', url: '/admin/api/backfill-reports/backfill-report-20261015-090000.md?signature=x' },
                 }}
             />,
             translations,
@@ -507,7 +507,7 @@ describe('BackfillPanel', () => {
 
 describe('CascadePanel', () => {
     it('regenerates the file, then says how to attach the same file on both platforms and redeploy', async () => {
-        stubFetch(() => ({ body: { data: { filename: 'kaduna-facilities.zip', lgas: 23, wards: 255, facilities: 2176, url: '/api/facility-list/cascade/kaduna-facilities.zip?signature=x', expires_at: '2026-10-15T09:00:00Z' } } }));
+        stubFetch(() => ({ body: { data: { filename: 'kaduna-facilities.zip', lgas: 23, wards: 255, facilities: 2176, url: '/admin/api/facility-list/cascade/kaduna-facilities.zip?signature=x', expires_at: '2026-10-15T09:00:00Z' } } }));
         const { container } = renderUi(<CascadePanel howUrl={null} />, translations);
         const user = userEvent.setup();
 

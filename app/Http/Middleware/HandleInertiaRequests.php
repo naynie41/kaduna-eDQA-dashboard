@@ -80,8 +80,8 @@ final class HandleInertiaRequests extends Middleware
     private function pageGroups(Request $request): array
     {
         return match (true) {
-            $request->routeIs('dev.*') => ['dev', 'enums'],
-            $request->routeIs('dashboard.*') => ['enums'],
+            $request->routeIs('admin.dev.*') => ['dev', 'enums'],
+            $request->routeIs('public.*') => ['enums'],
             $request->routeIs('admin.*') => ['admin', 'enums'],
             default => [],
         };

@@ -18,7 +18,7 @@ async function ready(page: Page, heading: string): Promise<void> {
 
 test.describe('Administration shell', () => {
     test('/admin opens the Data sources page, from the rail', async ({ page }) => {
-        await page.goto('/dashboard/home');
+        await page.goto('/');
         await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Administration' }).click();
 
         await ready(page, 'Data sources');

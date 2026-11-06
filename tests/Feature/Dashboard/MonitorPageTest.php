@@ -11,14 +11,14 @@ use Tests\Support\ReportingFixture;
 
 beforeEach(function (): void {
     $this->f = ReportingFixture::build();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 /** The deferred props after their load, for a query string. */
 function monitorFor(object $test, string $query = ''): array
 {
     $result = null;
-    $test->actingAs($test->admin)->get("/dashboard/monitor{$query}")
+    $test->actingAs($test->admin)->get("/monitor{$query}")
         ->assertOk()
         ->assertInertia(function (Assert $page) use (&$result): void {
             $page->component('dashboard/monitor')

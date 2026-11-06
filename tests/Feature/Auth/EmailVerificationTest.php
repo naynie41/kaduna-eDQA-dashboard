@@ -32,13 +32,12 @@ final class EmailVerificationTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_unverified_users_are_redirected_to_the_email_verification_prompt(): void
+    /** CLAUDE.md rule 3: the signed-in area needs only `auth` (accounts are created verified). */
+    public function test_the_signed_in_area_does_not_require_a_verified_email(): void
     {
         $user = User::factory()->unverified()->create();
 
-        $response = $this->actingAs($user)->get(route('home'));
-
-        $response->assertRedirect(route('verification.notice'));
+        $this->actingAs($user)->get('/')->assertOk();
     }
 
     public function test_email_can_be_verified()
@@ -58,7 +57,7 @@ final class EmailVerificationTest extends TestCase
         Event::assertDispatched(Verified::class);
 
         $this->assertTrue($user->fresh()->hasVerifiedEmail());
-        $response->assertRedirect(route('home', absolute: false).'?verified=1');
+        $response->assertRedirect('/admin'.'?verified=1');
     }
 
     public function test_email_is_not_verified_with_invalid_hash()
@@ -106,7 +105,7 @@ final class EmailVerificationTest extends TestCase
         $response = $this->actingAs($user)->get(route('verification.notice'));
 
         Event::assertNotDispatched(Verified::class);
-        $response->assertRedirect(route('home', absolute: false));
+        $response->assertRedirect('/admin');
     }
 
     public function test_already_verified_user_visiting_verification_link_is_redirected_without_firing_event_again(): void
@@ -122,7 +121,7 @@ final class EmailVerificationTest extends TestCase
         );
 
         $this->actingAs($user)->get($verificationUrl)
-            ->assertRedirect(route('home', absolute: false).'?verified=1');
+            ->assertRedirect('/admin'.'?verified=1');
 
         Event::assertNotDispatched(Verified::class);
         $this->assertTrue($user->fresh()->hasVerifiedEmail());

@@ -132,7 +132,7 @@ test.describe('Data sources page, against both mocks', () => {
         const panel = page.getByRole('region', { name: 'Assessments by source' });
         // As above: the desktop project's Pull all may still be bringing the assessments in.
         await expect(async () => {
-            await page.goto(year && quarter ? `/dashboard/monitor?year=${year}&quarter=${quarter}` : '/dashboard/monitor');
+            await page.goto(year && quarter ? `/monitor?year=${year}&quarter=${quarter}` : '/monitor');
             await expect(panel).toBeVisible({ timeout: 60_000 });
             for (const name of ['ODK Central', 'KoboToolbox']) {
                 const row = panel.getByRole('row').filter({ has: page.getByRole('rowheader', { name, exact: true }) });
@@ -147,7 +147,7 @@ test.describe('Data sources page, against both mocks', () => {
         await page.goto('/admin/sources'); // the signed-in session, for the API request
         // As above: wait for the desktop project's Pull all rather than fail on the first look.
         await expect(async () => {
-            const response = await page.request.get('/api/quarantine?rule=DUPLICATE_ASSESSMENT&status=open', { headers: { Accept: 'application/json' } });
+            const response = await page.request.get('/admin/api/quarantine?rule=DUPLICATE_ASSESSMENT&status=open', { headers: { Accept: 'application/json' } });
             expect(response.status()).toBe(200);
             const body = (await response.json()) as { data: { failures: { code: string; detail: string }[] }[] };
             const details = body.data.flatMap((record) => record.failures.filter((failure) => failure.code === 'DUPLICATE_ASSESSMENT').map((failure) => failure.detail));
@@ -204,7 +204,7 @@ test.describe('Data issues, an assessment deleted at source', () => {
     /** KoboToolbox's assessment count on Monitor, in the round the mocks were seeded for. */
     async function koboCount(page: Page): Promise<number> {
         const [year, quarter] = (process.env.E2E_ROUND ?? '').split('Q');
-        await page.goto(year && quarter ? `/dashboard/monitor?year=${year}&quarter=${quarter}` : '/dashboard/monitor');
+        await page.goto(year && quarter ? `/monitor?year=${year}&quarter=${quarter}` : '/monitor');
         const row = page.getByRole('region', { name: 'Assessments by source' }).getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'KoboToolbox', exact: true }) });
         await expect(row).toHaveCount(1, { timeout: 60_000 });
 

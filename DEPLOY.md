@@ -38,7 +38,7 @@ container images** built once per commit. Production is a single Docker host run
   Caddyfile) and **`compose.dev.yml`** for local development
 - CI: lint, static analysis, tests **inside the `ci` image**, image build, image scan, push to
   the registry
-- Application-level security (auth, 2FA, audit trail, CSP headers)
+- Application-level security (auth, audit trail, CSP headers)
 - The schedule definition (`routes/console.php`), daily digest, Pulse
 
 ### 1.3 Contract between the two
@@ -53,8 +53,8 @@ container images** built once per commit. Production is a single Docker host run
 | `SELECT refresh_round_aggregates()` — a `SECURITY DEFINER` function created by migration | The app role having `EXECUTE` on it |
 | `GET /up` health route (Laravel default) | Container healthchecks and external uptime checks |
 | Logs on stdout/stderr (`LOG_CHANNEL=stderr`) | Log driver, rotation, retention |
-| Heartbeat pings (ODK pull success, scheduler alive) using URLs from env | Heartbeat monitor accounts and alert routing |
-| Persistent files only under `storage/app` (`odk/`, `exports/`) | A named volume mounted there, included in backups |
+| Heartbeat pings (pull success **per source**, scheduler alive) using URLs from env | Heartbeat monitor accounts and alert routing |
+| Persistent files only under `storage/app` (`attachments/`, `exports/`) | A named volume mounted there, included in backups |
 | `pcntl` in the image so workers stop gracefully on SIGTERM | `stop_grace_period` ≥ the longest job timeout |
 
 Any change to this table needs a matching issue or PR in the other repo.
@@ -65,13 +65,13 @@ Any change to this table needs a matching issue or PR in the other repo.
 |---|---|
 | Laravel 12, PHP 8.3 | PHP-FPM 8.3 image with `pdo_pgsql`, `redis`, `intl`, `bcmath`, `gd`, `zip`, `opcache`, `pcntl` |
 | PostgreSQL ≥ 14 (16 used) | `postgres:16` container; materialised views, `REFRESH … CONCURRENTLY`, jsonb + GIN, CHECK constraints |
-| ODK Central is the only data source | Outbound HTTPS from `app`/`worker`/`scheduler` to the client's ODK Central host |
+| Two field-collection sources: ODK Central and KoboToolbox | Outbound HTTPS from `app`/`worker`/`scheduler` to the client's ODK Central host **and** KoboToolbox server (global, EU or self-hosted) |
 | Pull every 10 minutes | `scheduler` container must always be running; missed pulls are the #1 operational risk |
 | Queues `default`, `rescore`, `exports`, `low` | One worker service per queue group |
 | PDF round report via Browsershot | Chromium + Node in the **worker** image only (PDFs are rendered in queued jobs) |
-| ODK attachments + exports on disk | `app-files` named volume shared by app and workers |
+| Source attachments + exports on disk | `app-files` named volume shared by app and workers |
 | Users on 3G | Caddy with HTTP/2 + HTTP/3, gzip/zstd, precompressed Brotli assets, immutable caching |
-| 50 concurrent users; ~40k submissions; ~400k score rows | One 4 vCPU / 8 GB host is enough |
+| Public read-only dashboard (unknown traffic) + ≤ 3 administrators; ~40k submissions; ~400k score rows | One 4 vCPU / 8 GB host is enough because public figures (closed rounds) are cached and change only when a round closes; app rate-limits 120/min per IP; load-test 200 concurrent anonymous visitors |
 | 99% monthly availability | Single host acceptable with tested restore; rolling app restarts with Caddy retry |
 
 ---
@@ -84,6 +84,7 @@ Any change to this table needs a matching issue or PR in the other repo.
 flowchart LR
   U[Users on 3G] -->|443 TCP/UDP| WEB
   ODKC[ODK Central<br/>client-hosted] -. optional webhook .-> WEB
+  KOBO[KoboToolbox<br/>hosted or self-hosted] -. optional webhook .-> WEB
   subgraph HOST[Ubuntu 24.04 · Docker Engine · Compose v2]
     subgraph edge[network: edge]
       WEB[web<br/>Caddy + static assets]
@@ -108,6 +109,7 @@ flowchart LR
     V4[(caddy-data<br/>certs)]:::vol --- WEB
   end
   WD & SCH -->|HTTPS pull| ODKC
+  WD & SCH -->|HTTPS pull| KOBO
   CRON[host cron → backup container] --> OFF[(Off-site object storage)]
   MON[Uptime + heartbeat monitors] --> WEB
   classDef vol fill:#eee,stroke:#999
@@ -158,12 +160,12 @@ requires data residency — check that the provider allows Docker.
 |---|---|---|---|---|
 | Local | Developer machine, `compose.dev.yml` (app repo) | `dev` target, source bind-mounted | Seeded synthetic | n/a |
 | CI | GitHub Actions | `ci` target | Postgres 16 service, fixtures | Every PR |
-| Staging | `staging.edqa.<client-domain>` | `sha-*` tag | Staging ODK Central project | Automatic on merge to `main` |
-| Production | `edqa.<client-domain>` | `vX.Y.Z` tag (same digest as the tested `sha-*`) | Live ODK Central project | Tagged release + manual approval |
+| Staging | `staging.edqa.<client-domain>` | `sha-*` tag | Staging ODK Central project + staging Kobo asset | Automatic on merge to `main` |
+| Production | `edqa.<client-domain>` | `vX.Y.Z` tag (same digest as the tested `sha-*`) | Live ODK Central project + live Kobo asset | Tagged release + manual approval |
 
 Rules:
 - Production never runs an image that hasn't run on staging: **promote by digest**, never rebuild.
-- Staging never points at the production ODK project.
+- Staging never points at the production ODK project or production Kobo asset.
 - `APP_DEBUG=false` everywhere except local.
 
 ---
@@ -184,7 +186,7 @@ Containerisation needs a host where **you control the Docker Engine**.
 1. Provider allows Docker (no nested-virtualisation or kernel restrictions; OpenVZ/LXC VPS often
    don't).
 2. Kernel ≥ 5.15, cgroups v2, overlay2 storage driver.
-3. Outbound HTTPS from the host to ODK Central, GHCR (`ghcr.io`), the SMTP relay and the backup
+3. Outbound HTTPS from the host to ODK Central, the KoboToolbox server, GHCR (`ghcr.io`), the SMTP relay and the backup
    storage endpoint.
 4. Ports 80/443 (TCP + UDP 443 for HTTP/3) reachable from the internet.
 5. Domain/DNS owner identified; who pays for hosting.
@@ -344,7 +346,7 @@ COPY --from=app /var/www/html/public /srv/public
 ```
 
 `.dockerignore` excludes `.git`, `node_modules`, `vendor`, `storage/*` (except `.gitignore`
-placeholders), `.env*`, `tests/Fixtures/odk/private`, `discovery/`.
+placeholders), `.env*`, `tests/Fixtures/sources/*/private`, `discovery/`.
 
 ### 6.3 Entrypoint roles (`docker/entrypoint.sh`)
 
@@ -355,7 +357,7 @@ cd /var/www/html
 role="${1:-app}"; shift || true
 
 prepare() {
-  mkdir -p storage/framework/{cache,sessions,views} storage/logs storage/app/odk storage/app/exports bootstrap/cache
+  mkdir -p storage/framework/{cache,sessions,views} storage/logs storage/app/attachments storage/app/exports bootstrap/cache
   php artisan optimize --no-interaction >/dev/null     # env differs per environment → cache at start, never at build
 }
 
@@ -532,7 +534,7 @@ Notes:
   written by the deploy script.
 - The `app` role binds FPM on `0.0.0.0:9000` inside the `app` network; nothing publishes it.
 - `scheduler` must run as **one** container. Laravel's `onOneServer()` is not needed with one
-  scheduler, but keep `withoutOverlapping()` on the ODK pull.
+  scheduler, but keep `withoutOverlapping()` on each source's pull.
 - Horizontal scaling later: `docker compose up -d --scale app=2` works (Caddy load-balances via
   DNS); workers scale the same way. The scheduler never scales.
 
@@ -608,7 +610,7 @@ from the Docker subnet only; `reject` everything else.
   `maxmemory 512mb`, `maxmemory-policy noeviction` (queues must never be evicted; the cache is
   small and tagged by round).
 - Only on the `data` network; no published port.
-- Loss of Redis loses in-flight jobs and cache only; the ODK pull is idempotent and replays from
+- Loss of Redis loses in-flight jobs and cache only; each source's pull is idempotent and replays from
   its cursor.
 
 ---
@@ -643,6 +645,7 @@ from its own image, and proxies PHP to `app:9000` over FastCGI.
     @fonts path *.woff2
     header @fonts Cache-Control "public, max-age=31536000, immutable"
 
+    # noindex and robots.txt are set by the app (SECURITY.md §8)
     @blocked path /.env* /storage/* /vendor/* /.git/*
     respond @blocked 404
 
@@ -673,12 +676,12 @@ http://{$DOMAIN} {
 
 | Service | Queues | Tries | Timeout | Image | Notes |
 |---|---|---|---|---|---|
-| `worker-default` | `default` | 3 | 300 s | app | ODK pull, submission processing |
+| `worker-default` | `default` | 3 | 300 s | app | Pulls (ODK + Kobo), reconcile, submission processing |
 | `worker-rescore` | `rescore` | 1 | 900 s | app | One round in < 5 min target |
 | `worker-exports` | `exports`, `low` | 3 | 600 s | **worker** | CSV/Excel/PDF, attachment fetch |
 | `scheduler` | — | — | — | app | `schedule:work`; single instance |
 
-Scheduled by the app (reference): ODK pull every 10 min, debounced aggregate refresh, attachment
+Scheduled by the app (reference): a pull per enabled source every 10 min, nightly reconcile per source, debounced aggregate refresh, attachment
 fetch hourly, daily digest 07:00 WAT, `queue:prune-failed` weekly, scheduler heartbeat every
 5 min.
 
@@ -784,76 +787,47 @@ the app is broken:
 
 ### 15.2 `app.env` keys (Laravel)
 
-The key names are exactly those in the application's `.env.example`, which lists every key a
-server sets, with local-development values. Below are the server values. A key left out of
-`app.env` takes the default named here.
-
 ```
 APP_NAME="Kaduna eDQA"  APP_ENV=production  APP_DEBUG=false  APP_URL=https://edqa.<domain>
 APP_KEY=base64:...      APP_PREVIOUS_KEYS=  APP_TIMEZONE=Africa/Lagos
-APP_LOCALE=en  APP_FALLBACK_LOCALE=en  APP_FAKER_LOCALE=en_US  APP_MAINTENANCE_DRIVER=file
-BCRYPT_ROUNDS=12
 LOG_CHANNEL=stderr      LOG_LEVEL=warning   LOG_STDERR_FORMATTER=Monolog\Formatter\JsonFormatter
-LOG_DEPRECATIONS_CHANNEL=null
 
 DB_CONNECTION=pgsql  DB_HOST=postgres  DB_PORT=5432  DB_DATABASE=edqa
 DB_USERNAME=edqa_app DB_PASSWORD=...
 
-REDIS_CLIENT=phpredis  REDIS_HOST=redis  REDIS_PASSWORD=...  REDIS_PORT=6379  REDIS_DB=0  REDIS_CACHE_DB=1
+REDIS_HOST=redis  REDIS_PASSWORD=...  REDIS_DB=0  REDIS_CACHE_DB=1
 QUEUE_CONNECTION=redis  CACHE_STORE=redis
 SESSION_DRIVER=database  SESSION_LIFETIME=480  SESSION_ENCRYPT=true  SESSION_SECURE_COOKIE=true
-SESSION_PATH=/  SESSION_DOMAIN=null
-BROADCAST_CONNECTION=log  FILESYSTEM_DISK=local
 
-# ODK Central (Project Viewer account, read-only). Page size and throttle: a positive whole
-# number, else the default (500 a page, 5 s between backfill pages).
 ODK_CENTRAL_URL=https://odk.<client>  ODK_CENTRAL_EMAIL=...  ODK_CENTRAL_PASSWORD=...
-ODK_PROJECT_ID=  ODK_FORM_ID=  ODK_WEBHOOK_SECRET=  ODK_PULL_PAGE_SIZE=500  ODK_BACKFILL_THROTTLE=5
-ODK_ENABLED=                      # empty or true: pulled; false: switched off
+ODK_PROJECT_ID=  ODK_FORM_ID=  ODK_WEBHOOK_SECRET=  ODK_PULL_PAGE_SIZE=500  ODK_BACKFILL_THROTTLE=5  ODK_ENABLED=true
 
-# KoboToolbox (API token of a dedicated account that can only view the asset). Page size and
-# throttle as for ODK. The webhook token is optional: at least 32 random characters, else the
-# webhook is off (404).
-KOBO_BASE_URL=https://kf.kobotoolbox.org  KOBO_API_TOKEN=...  KOBO_ASSET_UID=...
-KOBO_PULL_PAGE_SIZE=500  KOBO_BACKFILL_THROTTLE=5  KOBO_WEBHOOK_TOKEN=
-KOBO_ENABLED=                     # empty or true: pulled; false: switched off
+KOBO_BASE_URL=https://kf.kobotoolbox.org   KOBO_API_TOKEN=...   KOBO_ASSET_UID=
+KOBO_WEBHOOK_TOKEN=  KOBO_PULL_PAGE_SIZE=500  KOBO_BACKFILL_THROTTLE=5  KOBO_ENABLED=true
 
 MAIL_MAILER=smtp  MAIL_HOST=  MAIL_PORT=587  MAIL_USERNAME=  MAIL_PASSWORD=  MAIL_FROM_ADDRESS=
-MAIL_FROM_NAME="${APP_NAME}"
 EDQA_DIGEST_RECIPIENTS=
 
 BROWSERSHOT_CHROME_PATH=/usr/bin/chromium  BROWSERSHOT_NODE_BINARY=/usr/bin/node
 HEARTBEAT_PULL_ODK_URL=  HEARTBEAT_PULL_KOBO_URL=  HEARTBEAT_SCHEDULER_URL=
-
-VITE_APP_NAME="${APP_NAME}"       # build-time only: read when the assets are built
 ```
-
-**Local only: never set on a server.** Each is refused outside `APP_ENV=local`:
-
-| Key | Local use | On a server |
-|---|---|---|
-| `ODK_ALLOW_INSECURE_LOCAL` | Allows an `http` `ODK_CENTRAL_URL`, for the mock ODK Central | Leave it out. If it is set, ODK Central counts as not configured and is not pulled |
-| `KOBO_ALLOW_INSECURE_LOCAL` | Allows an `http` `KOBO_BASE_URL`, for the mock KoboToolbox | Leave it out. If it is set, KoboToolbox counts as not configured and is not pulled |
-| `EDQA_REQUIRE_2FA` | `false` switches the two-factor sign-in requirement off for local development | Leave it out (or `true`). If it is `false`, **the app refuses to start**, with an error naming the key, and two-factor sign-in is never skipped there, whatever the config says (SECURITY.md §2) |
 
 `migrator.env` contains only `DB_USERNAME=edqa_migrator` and `DB_PASSWORD=...`, layered over
 `app.env` for the `migrate` service.
 
-The ODK service account must be a **Project Viewer** (read-only) on the one project. The
-KoboToolbox token must belong to a dedicated account that can view the one asset and nothing
-more, never the owner's token (SECURITY.md §6).
-
-The old heartbeat key `HEARTBEAT_ODK_PULL_URL` is still read for one release, as an alias of
-`HEARTBEAT_PULL_ODK_URL`. Rename it in `app.env`.
+The ODK service account must be a **Project Viewer** (read-only) on the one project. The Kobo
+token must belong to a **dedicated Kobo account** with view-only access to the one asset
+(Kobo tokens are account-wide).
 
 ### 15.3 Rotation
 
 | Secret | When | How |
 |---|---|---|
-| `APP_KEY` | Suspected compromise only | Move the old key to `APP_PREVIOUS_KEYS` (Fortify 2FA secrets are encrypted with it), set the new key, `docker compose up -d`. Everyone is logged out |
+| `APP_KEY` | Suspected compromise only | Move the old key to `APP_PREVIOUS_KEYS` (encrypted cache and session data depend on it), set the new key, `docker compose up -d`. Everyone is logged out |
 | DB passwords | Yearly / staff change | `ALTER ROLE … PASSWORD` via `docker compose exec postgres psql`, update vault, re-render env, `docker compose up -d` |
 | Redis password | Yearly | Update `redis.conf` + `app.env`, restart `redis` then PHP services |
 | ODK service password | Yearly / staff change | Client ODK admin resets; update vault; `up -d` |
+| Kobo API token | Yearly / staff change | Regenerate on the dedicated Kobo account (invalidates the old one); update vault; `up -d` |
 | GHCR host token | Yearly | New fine-grained token, `docker login` on host |
 | Deploy SSH key | Yearly / staff change | New key in GitHub secret + `authorized_keys` |
 
@@ -978,7 +952,7 @@ migration's `down()` is safe; restoring the pre-deploy backup is the last resort
 - `GET https://<domain>/up` → 200; `GET /login` → 200
 - TLS valid > 14 days; HSTS and CSP headers present
 - `docker compose ps --format json`: every service `running` and `healthy` where defined
-- `docker compose exec -T app php artisan edqa:odk-status` reports reachable
+- `docker compose exec -T app php artisan edqa:source:check --all` reports every enabled source reachable
 
 ---
 
@@ -989,10 +963,10 @@ migration's `down()` is safe; restoring the pre-deploy backup is the last resort
 | Item | How | Frequency | Retention |
 |---|---|---|---|
 | Postgres `edqa` | `pg_dump -Fc` from the `backup` container over the `data` network | Nightly 01:00 WAT + pre-deploy | 30 daily, 12 monthly |
-| `app-files` volume (ODK attachments, exports) | `tar` of the read-only mount | Nightly | 30 days |
+| `app-files` volume (source attachments, exports) | `tar` of the read-only mount | Nightly | 30 days |
 | Host config + env | Reproducible from `edqa-infra` + vault | — | Git |
 
-Not backed up: images (in GHCR, by digest), Redis (cache + in-flight jobs; the ODK pull replays).
+Not backed up: images (in GHCR, by digest), Redis (cache + in-flight jobs; each source's pull replays).
 **Never** back up by copying the `pgdata` volume while Postgres is running.
 
 ### 17.2 Backup image (`images/backup/Dockerfile`)
@@ -1005,8 +979,8 @@ set -euo pipefail
 STAMP=$(date -u +%F-%H%M)${TAG:+-$TAG}
 PGPASSWORD="$BACKUP_DB_PASSWORD" pg_dump -h postgres -U edqa_migrator -Fc edqa \
   | age -r "$AGE_RECIPIENT" | rclone rcat "offsite:edqa-backups/${EDQA_ENV}/db/edqa-$STAMP.dump.age"
-tar -czf - -C /files odk \
-  | age -r "$AGE_RECIPIENT" | rclone rcat "offsite:edqa-backups/${EDQA_ENV}/files/odk-$STAMP.tgz.age"
+tar -czf - -C /files attachments \
+  | age -r "$AGE_RECIPIENT" | rclone rcat "offsite:edqa-backups/${EDQA_ENV}/files/attachments-$STAMP.tgz.age"
 curl -fsS -m 10 "$HEARTBEAT_BACKUP_URL" >/dev/null
 ```
 - Encrypted with `age`; the **private key is not on the host** (password manager + a sealed
@@ -1024,7 +998,7 @@ docker compose run --rm -e AGE_IDENTITY_FILE=/keys/key.txt -v /root/age:/keys:ro
 #          run 'migrate' (applies grants), 'up -d --wait'
 ```
 **RPO 24 h** for admin actions (quarantine resolutions, plan edits). Submissions are
-re-pullable from ODK Central, so data received since the last backup is recoverable.
+re-pullable from ODK Central and KoboToolbox, so data received since the last backup is recoverable.
 **RTO 4 h**: a new host from Ansible, images from GHCR, data from off-site.
 
 ### 17.4 Restore drill
@@ -1041,7 +1015,9 @@ like an outage. A **full manual drill onto a fresh host** before go-live and onc
 |---|---|---|
 | Site up | External uptime monitor on `/up`, 1 min | 3 consecutive failures |
 | TLS expiry | Same | < 14 days |
-| **ODK pull heartbeat** | App pings after each successful pull | No ping for 40 min |
+| **Pull heartbeat — ODK** | App pings after each successful ODK pull | No ping for 40 min |
+| **Pull heartbeat — Kobo** | App pings after each successful Kobo pull | No ping for 40 min |
+| Reconcile heartbeat (per source) | App pings after the nightly sweep | No ping for 26 h |
 | Scheduler heartbeat | App pings every 5 min | No ping for 15 min |
 | Backup heartbeat | Backup container | No ping for 26 h |
 | Restore drill | Drill | No ping for 32 days |
@@ -1059,7 +1035,7 @@ Logs:
 - Optional log shipping: Grafana Alloy / Vector container → Loki or Better Stack.
   It must read logs through the Docker logging driver or journald, **never** by mounting the
   Docker socket.
-- Never log `.env` values, ODK tokens or `/login` request bodies.
+- Never log `.env` values, ODK session tokens, the Kobo API token or `/login` request bodies.
 
 Alert routing: email + one chat channel to the on-call developer; weekly summary to the client
 counterpart.
@@ -1103,7 +1079,7 @@ services:
     command: ["scheduler"]
     env_file: [.env]
     volumes: [".:/var/www/html"]
-    profiles: [scheduler]            # opt-in locally, so ODK isn't pulled every 10 minutes
+    profiles: [scheduler]            # opt-in locally, so sources aren't pulled every 10 minutes
   postgres:
     image: postgres:16-bookworm
     environment: { POSTGRES_PASSWORD: postgres }
@@ -1127,18 +1103,6 @@ volumes: { pgdata: {} }
   PDFs).
 - macOS/Windows: bind-mount performance is acceptable with VirtioFS (Docker Desktop) or
   OrbStack; on Windows keep the repo inside WSL2.
-- `vendor/` is a named volume (`vendor`) for every PHP service, like the Vite service's
-  `node_modules`: PHP reads tens of thousands of package files on every boot, and through Docker
-  Desktop's file sharing from a Windows folder that cost ~6 s per `artisan` call and ~8 s per
-  request (0.4 s and 0.25 s with the volume). `make up` runs `composer install` into it; use
-  `make composer c="…"` to change packages. The host's own `vendor/` (IDE, native tools) is
-  separate and not used by the containers. The dev ini also keeps OPcache's file cache in the
-  container (`opcache.file_cache=/tmp/opcache`), so CLI processes (artisan, each parallel Pest
-  worker) share compiled scripts instead of recompiling the framework each time.
-- Tailwind reads only `resources/js` and `resources/views` for class names
-  (`@import 'tailwindcss' source(none)` in `resources/css/app.css`). Its default scans the whole
-  project, which over the bind mount made each first CSS build ~40 s, long enough to time out
-  Playwright's sign-in; now ~8 s cold. The built CSS is byte-for-byte the same.
 - Laravel Sail was considered and rejected: it uses its own image, which would break parity with
   production.
 
@@ -1150,7 +1114,7 @@ volumes: { pgdata: {} }
 |---|---|---|
 | `deploy.md` | Planned release | Check pending migrations → run workflow → watch `--wait` → smoke tests → announce |
 | `rollback.md` | Smoke test fails / regression | `rollback.sh`; decide on migrations; incident note |
-| `odk-outage.md` | ODK heartbeat missed | Check the ODK pull page; `docker compose exec app curl -I $ODK_CENTRAL_URL`; check credentials and outbound network; the pull resumes from its cursor, no data lost |
+| `source-outage.md` | A source's pull heartbeat missed | Check the Data sources page for that source; `docker compose exec app php artisan edqa:source:check {odk|kobo}`; check credentials (Kobo: token revoked? account permissions?) and outbound network; the pull resumes from its cursor, no data lost. The other source keeps pulling |
 | `queue-stuck.md` | Jobs not processing | `docker compose ps`; `logs worker-*`; `exec app php artisan queue:failed`; `restart worker-default`; `queue:retry` |
 | `container-restarting.md` | Restart loop / OOM | `docker compose ps`, `docker inspect --format '{{.State.OOMKilled}}'`, raise limit or fix leak |
 | `disk-full.md` | Disk > 80% | `docker system df`; prune old images; check the `local` log driver limits; Postgres bloat |
@@ -1168,8 +1132,9 @@ volumes: { pgdata: {} }
 ### 21.1 Week one (Phase 0)
 - [ ] Provider confirmed to support Docker (KVM, not OpenVZ/LXC); region agreed; who pays
 - [ ] Domain/DNS owner; `A`/`AAAA` records for staging and production
-- [ ] Outbound HTTPS from the host to ODK Central, `ghcr.io`, SMTP, backup storage
+- [ ] Outbound HTTPS from the host to ODK Central, the KoboToolbox server, `ghcr.io`, SMTP, backup storage
 - [ ] ODK service account (Project Viewer) created by the client
+- [ ] Dedicated read-only Kobo account + API token created by the client
 - [ ] Off-site backup bucket created; `age` keypair generated, private key stored offline
 - [ ] Vault password holders named
 
@@ -1178,7 +1143,7 @@ volumes: { pgdata: {} }
 - [ ] Images build in CI, pass Trivy, push to GHCR
 - [ ] Deploy by digest works; `--wait` gates on health; rollback works
 - [ ] TLS, headers, `/up` green; HTTP/3 advertised
-- [ ] Workers and scheduler running; ODK staging pull succeeds
+- [ ] Workers and scheduler running; staging pulls succeed for ODK and Kobo
 - [ ] `nmap` from outside shows only 22/80/443
 - [ ] Heartbeats wired and alerting
 
@@ -1191,7 +1156,7 @@ volumes: { pgdata: {} }
 - [ ] PDF smoke test passes in `worker-exports`
 - [ ] Load test: 50 concurrent users, p95 < 1.5 s on dashboard pages
 - [ ] Runbooks walked through with the client counterpart; `docs/handover.md` delivered
-- [ ] ≤ 3 admin accounts, all with 2FA
+- [ ] ≤ 3 admin accounts, unique per person, strong passwords; IP allow-list decided
 
 ---
 
@@ -1215,5 +1180,7 @@ Put this in the infra repo's `CLAUDE.md`:
 - Postgres image major version changes only through `runbooks/postgres-major-upgrade.md`.
 - Any change to the §1.3 contract needs a matching issue in the app repo.
 - Update the relevant runbook in the same PR as the change.
+- Claude never commits, tags or pushes in this repo either; it stops with changes uncommitted
+  and suggests the message. The owner does all git writes.
 - Conventional Commits with scopes: `provision`, `docker`, `compose`, `postgres`, `redis`,
   `web`, `backup`, `monitoring`, `ci`, `runbook`, `docs`.

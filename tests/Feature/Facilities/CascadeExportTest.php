@@ -14,7 +14,7 @@ use Tests\Support\Rows;
 
 beforeEach(function (): void {
     Storage::fake('exports');
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 
     $chikun = Rows::lga(['code' => 'CHK', 'name' => 'Chikun']);
     $zaria = Rows::lga(['code' => 'ZAR', 'name' => 'Zaria']);
@@ -78,11 +78,11 @@ it('leaves out inactive facilities, and an LGA or ward left with none', function
 
 it('generates on request, audited, and answers with a signed link valid for 30 minutes', function (): void {
     $this->freezeSecond(); // the expiry is compared to the second
-    $response = $this->actingAs($this->admin)->postJson('/api/facility-list/export-cascade')->assertCreated();
+    $response = $this->actingAs($this->admin)->postJson('/admin/api/facility-list/export-cascade')->assertCreated();
 
     $data = $response->json('data');
     expect($data)->toMatchArray(['lgas' => 2, 'wards' => 3, 'facilities' => 4])
-        ->and($data['url'])->toContain('/api/facility-list/export-cascade/'.$data['filename'])->toContain('signature=')
+        ->and($data['url'])->toContain('/admin/api/facility-list/export-cascade/'.$data['filename'])->toContain('signature=')
         ->and(Storage::disk('exports')->exists('cascade/'.$data['filename']))->toBeTrue()
         ->and($data['expires_at'])->toBe(now()->addMinutes(30)->toIso8601String());
     $entry = Activity::query()->where('event', 'cascade_exported')->sole();
@@ -91,8 +91,8 @@ it('generates on request, audited, and answers with a signed link valid for 30 m
 });
 
 it('downloads only through the signed link, signed in, and audits the download', function (): void {
-    $data = $this->actingAs($this->admin)->postJson('/api/facility-list/export-cascade')->json('data');
-    $unsigned = '/api/facility-list/export-cascade/'.$data['filename'];
+    $data = $this->actingAs($this->admin)->postJson('/admin/api/facility-list/export-cascade')->json('data');
+    $unsigned = '/admin/api/facility-list/export-cascade/'.$data['filename'];
 
     $this->actingAs($this->admin)->get($unsigned)->assertForbidden();
     $download = $this->actingAs($this->admin)->get($data['url'])->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
@@ -104,14 +104,14 @@ it('downloads only through the signed link, signed in, and audits the download',
 });
 
 it('refuses the export and the download to a request that is not signed in', function (): void {
-    $this->postJson('/api/facility-list/export-cascade')->assertUnauthorized();
+    $this->postJson('/admin/api/facility-list/export-cascade')->assertUnauthorized();
     expect(Storage::disk('exports')->allFiles())->toBe([])
         ->and(Activity::query()->where('event', 'like', 'cascade_%')->count())->toBe(0);
 });
 
 it('serves nothing but a cascade file, even with a valid signature', function (string $file): void {
     Storage::disk('exports')->put('backfill-report.md', 'secret report');
-    $url = URL::temporarySignedRoute('api.facility-list.cascade.download', now()->addMinutes(5), ['file' => $file]);
+    $url = URL::temporarySignedRoute('admin.api.facility-list.cascade.download', now()->addMinutes(5), ['file' => $file]);
 
     $this->actingAs($this->admin)->get($url)->assertNotFound();
 })->with(['backfill-report.md', '..', 'odk-cascade-20261020-000000.zip']);

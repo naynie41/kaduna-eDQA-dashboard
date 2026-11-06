@@ -43,3 +43,13 @@ export type AdminPage = (typeof ADMIN_PAGES)[number]['page'];
 export const DASHBOARD_PAGES = ['home', 'facility', 'lga', 'monitor', 'visuals', 'plan'] as const;
 
 export type DashboardPage = (typeof DASHBOARD_PAGES)[number];
+
+/** Each dashboard page's public URL (ARCHITECTURE.md §9.0, D-76). */
+export const DASHBOARD_PATHS: Record<DashboardPage, string> = {
+    home: '/',
+    facility: '/facilities',
+    lga: '/lgas',
+    monitor: '/monitor',
+    visuals: '/visuals',
+    plan: '/plan',
+};

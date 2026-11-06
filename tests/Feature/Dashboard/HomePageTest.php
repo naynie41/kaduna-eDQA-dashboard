@@ -13,7 +13,7 @@ use Tests\Support\ReportingFixture;
 
 beforeEach(function (): void {
     $this->f = ReportingFixture::build();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 /** @return array<string, mixed> the value as the JSON response carries it */
@@ -27,7 +27,7 @@ it('takes the hero and the dimensions from the aggregators, with the rule versio
     $hero = asJson(app(StateSummaryAggregator::class)->summary($filter));
     $dimensions = asJson(app(DimensionAggregator::class)->dimensions($filter));
 
-    $this->actingAs($this->admin)->get('/dashboard/home?year=2026&quarter=2&lga=AAA')
+    $this->actingAs($this->admin)->get('/?year=2026&quarter=2&lga=AAA')
         ->assertInertia(fn (Assert $page) => $page
             ->component('dashboard/home')
             ->where('hero', $hero)
@@ -37,7 +37,7 @@ it('takes the hero and the dimensions from the aggregators, with the rule versio
 });
 
 it('trends every round whatever the year and quarter, respecting the other filters, and marks the selected round', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/home?year=2026&quarter=2&owner=public')
+    $this->actingAs($this->admin)->get('/?year=2026&quarter=2&owner=public')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->missing('trend')
@@ -53,13 +53,13 @@ it('trends every round whatever the year and quarter, respecting the other filte
 });
 
 it('selects the latest round in the trend when no round is chosen', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/home')
+    $this->actingAs($this->admin)->get('/')
         ->assertInertia(fn (Assert $page) => $page
             ->loadDeferredProps(fn (Assert $reload) => $reload->where('trend.selected', [$this->f->q2])->has('trend.points', 2)));
 });
 
 it('lists the weakest LGAs, and the weakest wards once an LGA is chosen', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/home')
+    $this->actingAs($this->admin)->get('/')
         ->assertInertia(fn (Assert $page) => $page
             ->loadDeferredProps(fn (Assert $reload) => $reload
                 ->where('weakest.scope', 'lgas')
@@ -67,7 +67,7 @@ it('lists the weakest LGAs, and the weakest wards once an LGA is chosen', functi
                 ->where('weakest.rows.0.name', 'Bravo'))); // (100 + 52) / 2 = 76, the lowest of the three
 
     // Alpha's wards, lowest first: F2 (70), F1 (80), F3 (86.7).
-    $this->actingAs($this->admin)->get('/dashboard/home?lga=AAA')
+    $this->actingAs($this->admin)->get('/?lga=AAA')
         ->assertInertia(fn (Assert $page) => $page
             ->loadDeferredProps(fn (Assert $reload) => $reload
                 ->where('weakest.scope', 'wards')
@@ -77,7 +77,7 @@ it('lists the weakest LGAs, and the weakest wards once an LGA is chosen', functi
 });
 
 it('says the trend takeaway in words, from the aggregator', function (): void {
-    $this->actingAs($this->admin)->get('/dashboard/home')
+    $this->actingAs($this->admin)->get('/')
         ->assertInertia(fn (Assert $page) => $page
             ->loadDeferredProps(fn (Assert $reload) => $reload->where('trend.takeaway', fn (string $text): bool => str_starts_with($text, 'Q2 2026: '))));
 });

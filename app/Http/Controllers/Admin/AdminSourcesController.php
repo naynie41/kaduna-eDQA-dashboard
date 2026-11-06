@@ -38,7 +38,7 @@ final class AdminSourcesController extends Controller
                     ...$status,
                     'report' => $report === null ? null : [
                         ...$report,
-                        'url' => URL::temporarySignedRoute('api.backfill-reports.show', now()->addMinutes(self::SIGNED_MINUTES), ['file' => $report['file']]),
+                        'url' => URL::temporarySignedRoute('admin.api.backfill-reports.show', now()->addMinutes(self::SIGNED_MINUTES), ['file' => $report['file']]),
                     ],
                 ];
             },

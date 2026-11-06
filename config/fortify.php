@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\ForgetRememberMe;
 use Laravel\Fortify\Features;
 
 return [
@@ -75,7 +76,12 @@ return [
     |
     */
 
-    'home' => '/',
+    // D-78: after sign-in, the admin area; after sign-out, the public dashboard (redirects.logout).
+    'home' => '/admin',
+
+    'redirects' => [
+        'logout' => '/',
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -103,7 +109,9 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    // SECURITY.md §2: the optional admin IP allow-list covers sign-in and password reset, and no
+    // "remember me" cookie may outlive the session limits.
+    'middleware' => ['web', 'admin.ip', ForgetRememberMe::class],
 
     /*
     |--------------------------------------------------------------------------
@@ -118,7 +126,6 @@ return [
 
     'limiters' => [
         'login' => 'login',
-        'two-factor' => 'two-factor',
     ],
 
     /*
@@ -148,11 +155,7 @@ return [
     'features' => [
         Features::resetPasswords(),
         Features::emailVerification(),
-        Features::twoFactorAuthentication([
-            'confirm' => true,
-            'confirmPassword' => true,
-            // 'window' => 0
-        ]),
+        // No two-factor authentication (D-35): SECURITY.md §2 lists the compensating controls.
     ],
 
 ];

@@ -25,7 +25,7 @@ test.describe('Data pulled from the mock ODK Central', () => {
     test.skip(visited === undefined || lga === undefined || lgaCount === undefined, 'Run by the Phase 2B close-out with the expected figures');
 
     test('Home counts the pulled visits', async ({ page }) => {
-        await page.goto('/dashboard/home?year=2026&quarter=2');
+        await page.goto('/?year=2026&quarter=2');
         await ready(page, 'Home');
 
         const term = page.getByRole('term').filter({ hasText: 'Facilities visited' });
@@ -33,7 +33,7 @@ test.describe('Data pulled from the mock ODK Central', () => {
     });
 
     test('the LGA view counts them, in total and for an LGA with new visits', async ({ page }) => {
-        await page.goto('/dashboard/lga?year=2026&quarter=2');
+        await page.goto('/lgas?year=2026&quarter=2');
         await ready(page, 'LGA view');
 
         await expect(page.getByText(`${formatted(String(visited))} facilities in view`).first()).toBeVisible();
@@ -48,7 +48,7 @@ test.describe('Data pulled from the mock ODK Central', () => {
         }));
 
         // The signed-in session, as the Data issues page would call it; newest first, so page 1 has them.
-        const response = await page.request.get('/api/quarantine?status=open', { headers: { Accept: 'application/json' } });
+        const response = await page.request.get('/admin/api/quarantine?status=open', { headers: { Accept: 'application/json' } });
         expect(response.status()).toBe(200);
         const body = (await response.json()) as { data: { instance_id: string; failures: { code: string }[] }[] };
         const found = new Map(body.data.map((record) => [record.instance_id, record.failures.map((f) => f.code)]));

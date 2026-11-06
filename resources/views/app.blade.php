@@ -3,6 +3,10 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        {{-- D-82: with the X-Robots-Tag header (NoIndex), unless edqa.public.indexable allows this page. --}}
+        @unless (\App\Http\Middleware\NoIndex::indexable(request()))
+            <meta name="robots" content="noindex, nofollow">
+        @endunless
 
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">

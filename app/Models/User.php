@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Support\Audit\Audited;
+use App\Support\Auth\PasswordHistory;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -13,37 +14,50 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Fortify\Events\RecoveryCodeReplaced;
-use Laravel\Fortify\TwoFactorAuthenticatable;
 
 /**
- * An administrator: the only role (SECURITY.md §3). Created, disabled and deleted by artisan
- * commands only. Audited without secrets: never the password or two-factor fields.
+ * An administrator: the only role (SECURITY.md §3). Signs in with a password alone (D-35).
+ * Created, disabled, unlocked and deleted by artisan commands only. Audited without secrets:
+ * never the password or the lockout counters.
  *
  * @property int $id
  * @property string $name
  * @property string $email
  * @property CarbonImmutable|null $email_verified_at
  * @property string $password
- * @property string|null $two_factor_secret
- * @property string|null $two_factor_recovery_codes
- * @property CarbonImmutable|null $two_factor_confirmed_at
  * @property bool $is_active
+ * @property int $failed_login_count
+ * @property CarbonImmutable|null $locked_until
+ * @property CarbonImmutable|null $locked_out_at
  * @property string|null $remember_token
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'remember_token'])]
 final class User extends Authenticatable implements MustVerifyEmail
 {
     use Audited;
 
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable;
 
-    /** Mirrors the column default, so a new model matches its stored row. */
-    protected $attributes = ['is_active' => true];
+    /** Mirrors the column defaults, so a new model matches its stored row. */
+    protected $attributes = ['is_active' => true, 'failed_login_count' => 0];
+
+    /**
+     * Every password the account is given goes into its history (SECURITY.md §2: no reuse of the
+     * last 5), whether set by edqa:admin:create, a reset or a change.
+     */
+    protected static function booted(): void
+    {
+        self::created(fn (User $user) => PasswordHistory::record($user));
+        self::updated(function (User $user): void {
+            if ($user->wasChanged('password')) {
+                PasswordHistory::record($user);
+            }
+        });
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -55,8 +69,10 @@ final class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'immutable_datetime',
             'password' => 'hashed',
-            'two_factor_confirmed_at' => 'immutable_datetime',
             'is_active' => 'boolean',
+            'failed_login_count' => 'integer',
+            'locked_until' => 'immutable_datetime',
+            'locked_out_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
@@ -65,32 +81,5 @@ final class User extends Authenticatable implements MustVerifyEmail
     protected function auditedAttributes(): array
     {
         return ['name', 'email', 'is_active'];
-    }
-
-    /**
-     * Stored recovery-code hashes (SECURITY.md §2), replacing Fortify's encrypted plain codes.
-     *
-     * @return list<string>
-     */
-    public function recoveryCodes(): array
-    {
-        $codes = json_decode((string) $this->two_factor_recovery_codes, true);
-
-        return is_array($codes) ? array_values(array_filter($codes, is_string(...))) : [];
-    }
-
-    /**
-     * Consumes a used recovery code: its hash is removed, so it can never be used again. No
-     * replacement is issued, because a new code could not be shown; regenerate to get more.
-     *
-     * @param  string  $code  the matched hash (see App\Http\Requests\Auth\TwoFactorLoginRequest)
-     */
-    public function replaceRecoveryCode($code): void
-    {
-        $this->forceFill([
-            'two_factor_recovery_codes' => json_encode(array_values(array_diff($this->recoveryCodes(), [$code])), JSON_THROW_ON_ERROR),
-        ])->save();
-
-        RecoveryCodeReplaced::dispatch($this, $code);
     }
 }

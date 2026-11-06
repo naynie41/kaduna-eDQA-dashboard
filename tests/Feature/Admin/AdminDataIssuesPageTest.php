@@ -24,7 +24,7 @@ use Tests\Support\Rows;
 
 beforeEach(function (): void {
     ScoringRuleVersion::factory()->published()->create();
-    $this->admin = User::factory()->withTwoFactor()->create(['name' => 'Amina Bello']);
+    $this->admin = User::factory()->create(['name' => 'Amina Bello']);
     $this->chikun = Lga::factory()->create(['code' => 'CHK', 'name' => 'Chikun']);
     $this->zaria = Lga::factory()->create(['code' => 'ZAR', 'name' => 'Zaria']);
     $this->facility = Facility::factory()->inWard(Ward::factory()->create(['lga_id' => $this->chikun->id]))->create(['name' => 'Kujama PHC']);
@@ -58,8 +58,8 @@ function issuesIds(mixed $test, string $query = ''): array
 
 it('is behind the sign-in, and so are its endpoints', function (): void {
     $this->get('/admin/data-issues')->assertRedirect('/login');
-    $this->getJson('/api/quarantine/1')->assertUnauthorized();
-    $this->getJson('/api/facility-options')->assertUnauthorized();
+    $this->getJson('/admin/api/quarantine/1')->assertUnauthorized();
+    $this->getJson('/admin/api/facility-options')->assertUnauthorized();
 });
 
 // ---- The page
@@ -114,8 +114,8 @@ it('filters by status: open, resolved (reprocessed), rejected and superseded', f
     $rejected = issuesNullLga(Facility::factory()->create(), $this->round);
     $fixed = issuesNullLga(Facility::factory()->inWard(Ward::factory()->create(['lga_id' => $this->chikun->id]))->create(), $this->round);
 
-    $this->actingAs($this->admin)->postJson("/api/quarantine/{$rejected->id}/resolve", ['action' => 'reject', 'reason' => 'Training submission, not real'])->assertOk();
-    $this->actingAs($this->admin)->postJson("/api/quarantine/{$fixed->id}/resolve", ['action' => 'correct', 'corrections' => ['lga_ref' => 'CHK'], 'reason' => 'Assessor confirmed the LGA by phone'])
+    $this->actingAs($this->admin)->postJson("/admin/api/quarantine/{$rejected->id}/resolve", ['action' => 'reject', 'reason' => 'Training submission, not real'])->assertOk();
+    $this->actingAs($this->admin)->postJson("/admin/api/quarantine/{$fixed->id}/resolve", ['action' => 'correct', 'corrections' => ['lga_ref' => 'CHK'], 'reason' => 'Assessor confirmed the LGA by phone'])
         ->assertOk()->assertJsonPath('data.status', 'accepted');
 
     expect(issuesIds($this))->toBe([$open->id])
@@ -169,9 +169,9 @@ it('names each record\'s source, and links to it there only when its link settin
 
 it('gives one record in full: failures, parsed values, the raw payload and its history', function (): void {
     $record = issuesNullLga($this->facility, $this->round);
-    $this->actingAs($this->admin)->postJson("/api/quarantine/{$record->id}/resolve", ['action' => 'reject', 'reason' => 'Training submission, not real'])->assertOk();
+    $this->actingAs($this->admin)->postJson("/admin/api/quarantine/{$record->id}/resolve", ['action' => 'reject', 'reason' => 'Training submission, not real'])->assertOk();
 
-    $this->actingAs($this->admin)->getJson("/api/quarantine/{$record->id}")->assertOk()
+    $this->actingAs($this->admin)->getJson("/admin/api/quarantine/{$record->id}")->assertOk()
         ->assertJsonPath('data.id', $record->id)
         ->assertJsonPath('data.failures.0.code', 'LGA_UNKNOWN')
         ->assertJsonPath('data.parsed.facility_ref', $this->facility->code)
@@ -181,7 +181,7 @@ it('gives one record in full: failures, parsed values, the raw payload and its h
 });
 
 it('answers 404 for a record that does not exist', function (): void {
-    $this->actingAs($this->admin)->getJson('/api/quarantine/999999')->assertNotFound();
+    $this->actingAs($this->admin)->getJson('/admin/api/quarantine/999999')->assertNotFound();
 });
 
 // ---- GET /api/facility-options
@@ -193,7 +193,7 @@ it('offers active facilities of the chosen LGA, searched by code or name, with w
     Facility::factory()->inWard($ward)->create(['code' => 'CHK-0102', 'name' => 'Narayi Closed', 'is_active' => false]);
     Facility::factory()->inWard(Ward::factory()->create(['lga_id' => $this->zaria->id]))->create(['code' => 'ZAR-0100', 'name' => 'Narayi in Zaria']);
 
-    $codes = fn (string $query): array => array_column($this->actingAs($this->admin)->getJson("/api/facility-options?{$query}")->assertOk()->json('data'), 'code');
+    $codes = fn (string $query): array => array_column($this->actingAs($this->admin)->getJson("/admin/api/facility-options?{$query}")->assertOk()->json('data'), 'code');
 
     expect($codes('lga=CHK&q=narayi'))->toEqualCanonicalizing(['CHK-0100', 'CHK-0101'])
         ->and($codes('lga=CHK&q=0101'))->toBe(['CHK-0101'])
@@ -208,7 +208,7 @@ it('refuses to correct a field outside the whitelist and leaves the record untou
     $record = issuesNullLga($this->facility, $this->round);
     $audits = Activity::query()->count();
 
-    $this->actingAs($this->admin)->postJson("/api/quarantine/{$record->id}/resolve", [
+    $this->actingAs($this->admin)->postJson("/admin/api/quarantine/{$record->id}/resolve", [
         'action' => 'correct', 'corrections' => ['lga_ref' => 'CHK', $field => $value], 'reason' => 'Assessor confirmed the LGA by phone',
     ])->assertStatus(409)->assertJsonPath('code', 'field_not_correctable');
 
@@ -226,7 +226,7 @@ it('refuses to correct a field outside the whitelist and leaves the record untou
 it('refuses a bulk correction of a field outside the whitelist', function (): void {
     $ids = [issuesWrongQuarter($this->facility, $this->round)->id, issuesWrongQuarter(Facility::factory()->create(), $this->round)->id];
 
-    $this->actingAs($this->admin)->postJson('/api/quarantine/bulk-resolve', [
+    $this->actingAs($this->admin)->postJson('/admin/api/quarantine/bulk-resolve', [
         'ids' => $ids, 'action' => 'correct', 'corrections' => ['items' => []], 'reason' => 'Changing the answers in bulk',
     ])->assertStatus(409)->assertJsonPath('code', 'field_not_correctable');
 
@@ -239,7 +239,7 @@ it('refuses bulk across different rules, and across one rule against two', funct
     $both = quarantineThrough(ParsedSubmissionBuilder::new()->forFacility(Facility::factory()->create())->inRound($this->round)->withLga(null)->withRoundRef($this->round->year, $this->round->quarter - 1)->build())->id;
 
     foreach ([[$window, $nullLga], [$nullLga, $both]] as $ids) {
-        $this->actingAs($this->admin)->postJson('/api/quarantine/bulk-resolve', ['ids' => $ids, 'action' => 'reject', 'reason' => 'Training submissions'])
+        $this->actingAs($this->admin)->postJson('/admin/api/quarantine/bulk-resolve', ['ids' => $ids, 'action' => 'reject', 'reason' => 'Training submissions'])
             ->assertStatus(409)->assertJsonPath('code', 'mixed_rules');
     }
     expect(QuarantinedRecord::query()->where('status', 'open')->count())->toBe(3);
@@ -251,7 +251,7 @@ it('bulk-corrects the same field on records failing the same rule, and they are 
         issuesWrongQuarter(Facility::factory()->inWard(Ward::factory()->create(['lga_id' => $this->chikun->id]))->create(), $this->round)->id,
     ];
 
-    $this->actingAs($this->admin)->postJson('/api/quarantine/bulk-resolve', [
+    $this->actingAs($this->admin)->postJson('/admin/api/quarantine/bulk-resolve', [
         'ids' => $ids, 'action' => 'correct', 'corrections' => ['round_quarter' => $this->round->quarter], 'reason' => 'Form defaulted to last quarter',
     ])->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('data.0.status', 'accepted')->assertJsonPath('data.1.record_status', 'resolved');
 
@@ -264,7 +264,7 @@ it('names the round whose rescore is queued, and queues it', function (): void {
     $record = issuesNullLga($this->facility, $this->round);
     Queue::fake([RequestRescoreJob::class]);
 
-    $this->actingAs($this->admin)->postJson("/api/quarantine/{$record->id}/resolve", [
+    $this->actingAs($this->admin)->postJson("/admin/api/quarantine/{$record->id}/resolve", [
         'action' => 'correct', 'corrections' => ['lga_ref' => 'CHK'], 'reason' => 'Assessor confirmed the LGA by phone',
     ])->assertOk()->assertJsonPath('data.rescore_round', ['id' => $this->round->id, 'year' => 2026, 'quarter' => 2]);
 
@@ -274,7 +274,7 @@ it('names the round whose rescore is queued, and queues it', function (): void {
 it('names no rescore while the record is still failing', function (): void {
     $record = issuesNullLga($this->facility, $this->round);
 
-    $this->actingAs($this->admin)->postJson("/api/quarantine/{$record->id}/resolve", [
+    $this->actingAs($this->admin)->postJson("/admin/api/quarantine/{$record->id}/resolve", [
         'action' => 'correct', 'corrections' => ['lga_ref' => 'ZAR'], 'reason' => 'Trying the neighbouring LGA',
     ])->assertOk()->assertJsonPath('data.record_status', 'open')->assertJsonPath('data.rescore_round', null)
         ->assertJsonPath('data.failures.0.code', 'FACILITY_LGA_MISMATCH');

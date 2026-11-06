@@ -8,7 +8,7 @@ async function ready(page: Page): Promise<void> {
 
 test.describe('Home', () => {
     test('the hero reads as terms and values, the dimensions as a list', async ({ page }) => {
-        await page.goto('/dashboard/home?year=2026&quarter=2');
+        await page.goto('/?year=2026&quarter=2');
         await ready(page);
 
         const average = page.getByRole('term').filter({ hasText: 'Average quality score' });
@@ -29,7 +29,7 @@ test.describe('Home', () => {
     });
 
     test('the trend shows every round whatever the quarter, and its table says so', async ({ page }) => {
-        await page.goto('/dashboard/home?year=2026&quarter=2');
+        await page.goto('/?year=2026&quarter=2');
         await ready(page);
 
         const figure = page.getByRole('figure', { name: 'Quality score by quarter' });
@@ -37,7 +37,7 @@ test.describe('Home', () => {
         await figure.getByRole('button', { name: 'Show as table' }).click();
 
         // Header + every round there is (four on the demo seed; more once a backfill has run).
-        const rounds = (await (await page.request.get('/api/rounds', { headers: { Accept: 'application/json' } })).json()) as { data: unknown[] };
+        const rounds = (await (await page.request.get('/admin/api/rounds', { headers: { Accept: 'application/json' } })).json()) as { data: unknown[] };
         expect(rounds.data.length).toBeGreaterThanOrEqual(4);
         const rows = figure.getByRole('row');
         await expect(rows).toHaveCount(rounds.data.length + 1);
@@ -46,7 +46,7 @@ test.describe('Home', () => {
     });
 
     test('an LGA filter turns the weakest list into its wards', async ({ page }) => {
-        await page.goto('/dashboard/home');
+        await page.goto('/');
         await ready(page);
         const lga = page.getByLabel('LGA');
         const name = (await lga.locator('option').nth(1).textContent()) ?? '';
@@ -56,7 +56,7 @@ test.describe('Home', () => {
     });
 
     test('no serious or critical axe violations with the page loaded', async ({ page }) => {
-        await page.goto('/dashboard/home');
+        await page.goto('/');
         await ready(page);
         await checkA11y(page);
 

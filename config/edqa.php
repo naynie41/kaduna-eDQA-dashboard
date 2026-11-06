@@ -3,14 +3,43 @@
 declare(strict_types=1);
 
 use App\Support\Config\EnvFlag;
+use App\Support\Config\EnvList;
 use App\Support\Config\EnvNumber;
 
 return [
 
     'auth' => [
-        // SECURITY.md §2 / D-26: 2FA is required unless EDQA_REQUIRE_2FA is explicitly false.
-        // When off, an account that has set up 2FA is still challenged at sign-in.
-        'require_two_factor' => EnvFlag::enabledUnlessFalse(env('EDQA_REQUIRE_2FA')),
+        // SECURITY.md §2: no MFA (D-35), so these compensating controls are mandatory.
+
+        // Optional allow-list (CIDRs or addresses, comma-separated). When set, sign-in, password
+        // reset and every signed-in page answer 404 to any other address. Empty = off.
+        'admin_allowed_ips' => EnvList::csv(env('EDQA_ADMIN_ALLOWED_IPS')),
+
+        // Progressive lockout per account: after this many failed sign-ins, locked for these
+        // minutes; null = until `edqa:admin:unlock`. Attempts while locked do not count.
+        'lockout' => [
+            ['failures' => 5, 'minutes' => 15],
+            ['failures' => 10, 'minutes' => 60],
+            ['failures' => 20, 'minutes' => null],
+        ],
+
+        // A session ends this long after sign-in, however active (the idle limit is SESSION_LIFETIME).
+        'absolute_session_hours' => 12,
+
+        // A sign-in from an IP + browser pair not seen for this long emails the administrators.
+        'new_device_days' => 90,
+
+        // A new password may not be any of the last this many (the current one included).
+        'password_history' => 5,
+    ],
+
+    'public' => [
+        // SECURITY.md §8, D-82: noindex everywhere until the client decides. When true, only the public
+        // dashboard pages drop the X-Robots-Tag and the robots meta tag; /admin and /login never do.
+        'indexable' => false,
+
+        // throttle:public, per IP, for the public pages (and the public JSON, Phase P step 3).
+        'per_minute' => 120,
     ],
 
     'aggregation' => [

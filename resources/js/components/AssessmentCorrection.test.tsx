@@ -151,7 +151,7 @@ describe('Correct this assessment', () => {
 
         await waitFor(() => expect(onCorrected).toHaveBeenCalled());
         const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-        expect(url).toBe('/api/assessments/9/corrections');
+        expect(url).toBe('/admin/api/assessments/9/corrections');
         expect(JSON.parse(String(init.body))).toEqual({ items: { avail_m2_reporting_rate: 'pass' }, reason: 'Supervisor re-checked the register' });
         expect(announce).toHaveBeenCalledWith('Correction saved.');
     });

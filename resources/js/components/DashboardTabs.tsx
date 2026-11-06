@@ -1,7 +1,7 @@
 import Tabs from '@/components/Tabs';
 import { formatCount } from '@/lib/format';
 import { useTranslate } from '@/lib/i18n';
-import { DASHBOARD_PAGES, type DashboardPage } from '@/lib/pageMeta';
+import { DASHBOARD_PAGES, DASHBOARD_PATHS, type DashboardPage } from '@/lib/pageMeta';
 import type { Filters } from '@/types/shell';
 
 export type DashboardTabsProps = {
@@ -22,7 +22,7 @@ export default function DashboardTabs({ current, filters, lgaCount }: DashboardT
         <Tabs
             label={t('dashboard.tabs.label')}
             items={DASHBOARD_PAGES.map((page) => ({
-                href: `/dashboard/${page}${query === '' ? '' : `?${query}`}`,
+                href: `${DASHBOARD_PATHS[page]}${query === '' ? '' : `?${query}`}`,
                 label: t(`dashboard.pages.${page}.title`),
                 current: page === current,
                 ...(page === 'lga'

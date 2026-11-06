@@ -24,7 +24,7 @@ use Tests\Support\ParsedSubmissionBuilder;
 
 beforeEach(function (): void {
     ScoringRuleVersion::factory()->published()->create();
-    $this->admin = User::factory()->withTwoFactor()->create(['name' => 'Amina Bello']);
+    $this->admin = User::factory()->create(['name' => 'Amina Bello']);
     $this->round = Round::factory()->create(['year' => 2026, 'quarter' => 2, 'window_start' => '2026-04-01', 'window_end' => '2026-06-30']);
     $this->facility = Facility::factory()->create();
 
@@ -44,7 +44,7 @@ beforeEach(function (): void {
 
 function replaceWith(mixed $test, QuarantinedRecord $record, ?string $reason = 'The Kobo copy is the supervisor-checked one'): TestResponse
 {
-    return $test->actingAs($test->admin)->postJson("/api/quarantine/{$record->id}/resolve", ['action' => 'replace', ...($reason === null ? [] : ['reason' => $reason])]);
+    return $test->actingAs($test->admin)->postJson("/admin/api/quarantine/{$record->id}/resolve", ['action' => 'replace', ...($reason === null ? [] : ['reason' => $reason])]);
 }
 
 it('holds the second copy as a duplicate to begin with', function (): void {

@@ -29,7 +29,8 @@ A Laravel + PostgreSQL application replacing the Kaduna State eDQA Looker Studio
    **ODK Central** and **KoboToolbox**, through one shared pipeline — nothing else.
 2. **Validates** every submission before it can influence any number. Failures are quarantined.
 3. **Computes** every score server-side from raw item responses. Scores are never accepted from input.
-4. **Presents** results on six dashboard pages and five administration pages.
+4. **Presents** results on a **public, read-only dashboard** (six pages, closed rounds only, no
+   login) and a **separate admin area** under `/admin`, reached only by typing `/login`.
 
 ~2,200 facilities, 23 LGAs, quarterly rounds, three dimensions (Availability, Consistency,
 Validity) × three month slots. Publication support from HSDF.
@@ -46,7 +47,7 @@ aggregate, chart or export — stop and flag it.
 
 Laravel 12 · PHP 8.3 · PostgreSQL 16 (14 min) · Inertia 2 + React 18 + TypeScript (strict) ·
 Tailwind CSS 4 · Recharts + hand-built SVG · TanStack Table (server-driven) · Redis queue/cache
-(database fallback) · Fortify with mandatory 2FA · maatwebsite/excel · spatie/laravel-pdf
+(database fallback) · Fortify (password login, no MFA — D-84) · maatwebsite/excel · spatie/laravel-pdf
 (Browsershot) · spatie/laravel-activitylog · Pest 3 · Larastan level 6 · Pint · Pulse.
 
 **Runtime:** Docker. One multi-stage `Dockerfile` (targets `app`, `worker`, `web`, `ci`, `dev`),
@@ -68,8 +69,9 @@ import/upload library, any DHIS2 / Google Sheets client. (KoboToolbox *is* suppo
    means a new adapter + a decision record. (The console-only facility master-list import, D-19,
    is reference data, not assessment data.)
 2. **Never accept a score from input.** Always derive from item responses.
-3. **One role: Administrator.** No permissions package, policy, gate or role column. One
-   middleware group (`auth`, `verified`, `two-factor.confirmed`) is the whole authorisation model.
+3. **Two audiences, one role.** Public visitors read the dashboard without logging in; the only
+   role is Administrator (`auth` on `/admin`; no MFA, D-84). No permissions
+   package, policy, gate or role column. Public routes are GET-only (SECURITY.md §3).
 4. **Postgres only.** `jsonb`, `timestamptz`, real CHECK constraints. Every migration reversible.
    Tests run on Postgres, never SQLite.
 5. **No aggregate outside an Aggregator class.** Nothing summed, averaged or counted in a
@@ -89,6 +91,10 @@ import/upload library, any DHIS2 / Google Sheets client. (KoboToolbox *is* suppo
     (`CONVENTION.md` §12).
 14. **Never commit, tag or push.** The owner does all git writes; Claude stops with the work
     uncommitted and suggests the message (§9).
+15. **Nothing private reaches the public site.** Public pages and endpoints use
+    `Http\Resources\Public\*` only, show closed rounds only, and never contain anything in
+    SECURITY.md §3.1 (assessor names, photos, source IDs and links, flags, quarantine, audit,
+    open-round figures). The leak test must pass. No link to `/login` on public pages.
 
 ---
 
@@ -126,7 +132,7 @@ Strictly in sequence. Each step green (Pint, Larastan, Pest) before the next.
 | 2 | Migrations for every table incl. CHECKs, GIN indexes, `refresh_round_aggregates()` — **constraint tests first, watch them fail** | A 347.66 score is rejected by the database |
 | 3 | Models, enums, relationships, factories | |
 | 4 | Seeders: 23 LGAs, wards, synthetic facilities, one round | |
-| 5 | Fortify + mandatory 2FA, `edqa:admin:create`, route-guard test | Only login/2FA/reset, webhook, `/up` unauthenticated |
+| 5 | Fortify password login (no MFA), lockout, login alerts, `edqa:admin:create`, route-guard test | Every route classified; `/admin/*` needs login |
 | 6 | `ValidationRule` contract, all **14** rules, pipeline, quarantine, broken-submission fixtures | Each fixture quarantines with the right code |
 | 7 | `ScoreCalculator` + rule versions | Reproduces the published figures — **before anything visual** |
 | 8 | Source contracts + normalisers; ODK Central and KoboToolbox adapters; field maps per (source, version); pull job per source, lock, idempotency, edits + reconcile, backfill, attachments, `pull_runs` | A submission from each source lands end to end; old form version parses; broken one quarantines |

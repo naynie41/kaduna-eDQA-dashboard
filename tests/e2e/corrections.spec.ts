@@ -5,7 +5,7 @@ import { checkA11y } from './support/a11y';
 // only. Q2 2026 is open in the seeded data. The first item's result is flipped each run, so the
 // journey can be repeated; the desktop project does it once.
 
-const PAGE = '/dashboard/facility?year=2026&quarter=2';
+const PAGE = '/facilities?year=2026&quarter=2';
 
 /** Press Tab from where focus is now until the target has it: no mouse. */
 async function tabTo(page: Page, target: Locator, max = 200): Promise<void> {

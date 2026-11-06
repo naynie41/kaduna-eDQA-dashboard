@@ -41,7 +41,8 @@
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="PULSE_ENABLED" value="false" force="true"/>
-        <env name="EDQA_REQUIRE_2FA" value="true" force="true"/>
+        <env name="SESSION_LIFETIME" value="120" force="true"/>
+        <env name="EDQA_ADMIN_ALLOWED_IPS" value="" force="true"/>
         <!-- The developer's .env may hold real source credentials (Kobo credentials day): tests never
              see them, so no test can reach a real server. A test that needs a source sets config(). -->
         <env name="ODK_CENTRAL_URL" value="" force="true"/>

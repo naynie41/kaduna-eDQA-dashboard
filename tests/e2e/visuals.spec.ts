@@ -10,7 +10,7 @@ async function ready(page: Page, path: string): Promise<void> {
 
 test.describe('Visuals', () => {
     test('three month charts and four rankings, the page never scrolls sideways; axe finds nothing serious', async ({ page }) => {
-        await ready(page, '/dashboard/visuals?year=2026&quarter=2');
+        await ready(page, '/visuals?year=2026&quarter=2');
 
         for (const month of ['April 2026', 'May 2026', 'June 2026']) {
             const figure = page.getByRole('figure', { name: month });
@@ -28,7 +28,7 @@ test.describe('Visuals', () => {
     });
 
     test('"Show as table" works from the keyboard and back', async ({ page }) => {
-        await ready(page, '/dashboard/visuals?year=2026&quarter=2');
+        await ready(page, '/visuals?year=2026&quarter=2');
 
         const figure = page.getByRole('figure', { name: 'April 2026' });
         const toggle = figure.getByRole('button', { name: 'Show as table' });
@@ -45,14 +45,14 @@ test.describe('Visuals', () => {
     });
 
     test('the Overall / Public / Private view reloads the blocks, and locks to the owner filter', async ({ page }) => {
-        await ready(page, '/dashboard/visuals?year=2026&quarter=2');
+        await ready(page, '/visuals?year=2026&quarter=2');
 
         await page.getByRole('group', { name: 'Facilities shown' }).getByRole('button', { name: 'Private' }).click();
         await expect(page).toHaveURL(/[?&]owner_view=private(&|$)/, { timeout: 60_000 });
         await expect(page.getByRole('heading', { name: 'Scores by local government: private facilities' })).toBeVisible();
         await expect(page.locator('[aria-live="polite"][aria-atomic="true"]')).toContainText('Showing Private.');
 
-        await ready(page, '/dashboard/visuals?year=2026&quarter=2&owner=public');
+        await ready(page, '/visuals?year=2026&quarter=2&owner=public');
         const group = page.getByRole('group', { name: 'Facilities shown' });
         await expect(group).toHaveAccessibleDescription(/owner filter above is set to Public facilities/);
         await expect(group.getByRole('button', { name: 'Public' })).toHaveAttribute('aria-pressed', 'true');

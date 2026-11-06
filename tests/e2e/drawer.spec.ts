@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { checkA11y } from './support/a11y';
 
-const PAGE = '/dashboard/facility?year=2026&quarter=2';
+const PAGE = '/facilities?year=2026&quarter=2';
 
 async function firstFacility(page: Page): Promise<Locator> {
     await page.goto(PAGE);

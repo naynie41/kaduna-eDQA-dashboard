@@ -26,7 +26,7 @@ use Tests\Support\ParsedSubmissionBuilder;
 
 beforeEach(function (): void {
     ScoringRuleVersion::factory()->published()->create();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
     $this->facility = Facility::factory()->create();
     $this->facility->load('lga');
 });

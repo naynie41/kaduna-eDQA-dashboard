@@ -109,7 +109,7 @@ export default function DeletionsPanel({ deletions, onReviewed }: DeletionsPanel
                     if (reviewing === null) {
                         return { ok: true };
                     }
-                    const result = await api.run('POST', `/api/submissions/${reviewing.submission_id}/deletion-review`, { reason });
+                    const result = await api.run('POST', `/admin/api/submissions/${reviewing.submission_id}/deletion-review`, { reason });
                     if (!result.ok) {
                         return { ok: false, message: result.message, fieldError: result.fieldErrors.reason ?? null };
                     }
@@ -127,7 +127,7 @@ function RecordLink({ row }: { row: DeletionRow }) {
     const t = useTranslate();
 
     if (row.assessment !== null && row.facility !== null && row.round !== null) {
-        const href = `/dashboard/facility?year=${row.round.year}&quarter=${row.round.quarter}&facility=${row.facility.id}`;
+        const href = `/facilities?year=${row.round.year}&quarter=${row.round.quarter}&facility=${row.facility.id}`;
 
         return (
             <span className="flex flex-col gap-0.5">

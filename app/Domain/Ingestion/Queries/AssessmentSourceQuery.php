@@ -46,7 +46,7 @@ final class AssessmentSourceQuery
                 'status' => $attachment->status->value,
                 'reason' => is_string($attachment->reason) ? $attachment->reason : null,
                 'url' => $attachment->status === AttachmentStatus::Fetched
-                    ? route('attachments.show', ['submission' => $submissionId, 'filename' => (string) $attachment->filename], absolute: false)
+                    ? route('admin.attachments.show', ['submission' => $submissionId, 'filename' => (string) $attachment->filename], absolute: false)
                     : null,
             ])
             ->values()

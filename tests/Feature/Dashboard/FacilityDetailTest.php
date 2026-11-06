@@ -14,7 +14,7 @@ use Tests\Support\Rows;
 
 beforeEach(function (): void {
     $this->f = ReportingFixture::build();
-    $this->admin = User::factory()->withTwoFactor()->create(['name' => 'Amina Bello']);
+    $this->admin = User::factory()->create(['name' => 'Amina Bello']);
     $this->facility = $this->f->facilities['F1'];
     $this->assessment = Assessment::query()->where('round_id', $this->f->q2)->where('facility_id', $this->facility)->firstOrFail();
 
@@ -27,7 +27,7 @@ beforeEach(function (): void {
 
 function detail(object $test, string $query = ''): array
 {
-    return $test->actingAs($test->admin)->getJson("/api/facilities/{$test->facility}{$query}")->assertOk()->json('data');
+    return $test->actingAs($test->admin)->getJson("/admin/api/facilities/{$test->facility}{$query}")->assertOk()->json('data');
 }
 
 it('returns the master-list details, the latest round and its score card', function (): void {
@@ -86,7 +86,7 @@ it('opens on the latest assessed round the dashboard filters put in view, as the
 });
 
 it('shows the round in view even when the facility was not assessed in it', function (): void {
-    $data = $this->actingAs($this->admin)->getJson("/api/facilities/{$this->f->facilities['F2']}?year=2026&quarter=1")->assertOk()->json('data');
+    $data = $this->actingAs($this->admin)->getJson("/admin/api/facilities/{$this->f->facilities['F2']}?year=2026&quarter=1")->assertOk()->json('data');
 
     expect($data['round']['label'])->toBe('Q1 2026')
         ->and($data['assessment'])->toBeNull()
@@ -94,7 +94,7 @@ it('shows the round in view even when the facility was not assessed in it', func
 });
 
 it('refuses filters that are not a year or a quarter', function (string $query): void {
-    $this->actingAs($this->admin)->getJson("/api/facilities/{$this->facility}{$query}")->assertUnprocessable();
+    $this->actingAs($this->admin)->getJson("/admin/api/facilities/{$this->facility}{$query}")->assertUnprocessable();
 })->with(['?year=abc', '?quarter=5', '?quarter[]=1']);
 
 it('says when the facility has no assessment in the asked round', function (): void {
@@ -168,7 +168,7 @@ it('lists the attachments, each fetched one with the route that serves it', func
     $attachments = detail($this)['attachments'];
 
     expect(array_map(fn (array $a): array => [$a['filename'], $a['status'], $a['reason'], $a['url']], $attachments))->toBe([
-        ['register.jpg', 'fetched', null, "/attachments/{$submission}/register.jpg"],
+        ['register.jpg', 'fetched', null, "/admin/attachments/{$submission}/register.jpg"],
         ['trace.geojson', 'pending', null, null],
         ['evil.jpg', 'rejected', 'type_not_allowed', null],
     ])
@@ -177,11 +177,11 @@ it('lists the attachments, each fetched one with the route that serves it', func
 });
 
 it('is 404 for an unknown facility, and 422 for a round that does not exist', function (): void {
-    $this->actingAs($this->admin)->getJson('/api/facilities/999999')->assertNotFound();
-    $this->actingAs($this->admin)->getJson('/api/facilities/abc')->assertNotFound();
-    $this->actingAs($this->admin)->getJson("/api/facilities/{$this->facility}?round=999999")->assertUnprocessable()->assertJsonValidationErrors('round');
+    $this->actingAs($this->admin)->getJson('/admin/api/facilities/999999')->assertNotFound();
+    $this->actingAs($this->admin)->getJson('/admin/api/facilities/abc')->assertNotFound();
+    $this->actingAs($this->admin)->getJson("/admin/api/facilities/{$this->facility}?round=999999")->assertUnprocessable()->assertJsonValidationErrors('round');
 });
 
 it('is behind the sign-in', function (): void {
-    $this->getJson("/api/facilities/{$this->facility}")->assertUnauthorized();
+    $this->getJson("/admin/api/facilities/{$this->facility}")->assertUnauthorized();
 });

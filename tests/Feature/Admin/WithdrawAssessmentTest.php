@@ -16,7 +16,7 @@ use Tests\Support\Rows;
 // (WithdrawnAssessmentsTest).
 
 beforeEach(function (): void {
-    $this->admin = User::factory()->withTwoFactor()->create(['name' => 'Amina Bello']);
+    $this->admin = User::factory()->create(['name' => 'Amina Bello']);
     $this->round = Rows::round(['year' => 2026, 'quarter' => 4, 'window_start' => '2026-10-01', 'window_end' => '2026-12-31']);
     $this->facility = Rows::facility();
     $this->submission = Rows::submission(['deleted_at_source' => now()->subDay(), 'status' => 'accepted']);
@@ -25,11 +25,11 @@ beforeEach(function (): void {
 
 function assessmentAction(mixed $test, string $action, int $assessmentId, ?string $reason = 'The LGA confirmed the visit never happened'): TestResponse
 {
-    return $test->actingAs($test->admin)->postJson("/api/assessments/{$assessmentId}/{$action}", $reason === null ? [] : ['reason' => $reason]);
+    return $test->actingAs($test->admin)->postJson("/admin/api/assessments/{$assessmentId}/{$action}", $reason === null ? [] : ['reason' => $reason]);
 }
 
 it('is behind the sign-in', function (string $action): void {
-    $this->postJson("/api/assessments/{$this->assessment}/{$action}", ['reason' => 'A long enough reason'])->assertUnauthorized();
+    $this->postJson("/admin/api/assessments/{$this->assessment}/{$action}", ['reason' => 'A long enough reason'])->assertUnauthorized();
 })->with(['withdraw', 'restore']);
 
 it('withdraws an assessment deleted at source: status, the deletion reviewed, audited with the reason, the round refreshed', function (): void {

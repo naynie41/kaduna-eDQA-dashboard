@@ -54,7 +54,7 @@ it('shows the wording in the facility drawer', function (): void {
         ->withChecks(Dimension::Consistency, 1, 'm__1a_21', ['pass', 'pass', 'fail'])->build();
     app(ProcessParsedBatch::class)->execute([[submissionRow($parsed), $parsed]]);
 
-    $items = $this->actingAs(User::factory()->withTwoFactor()->create())->getJson("/api/facilities/{$facility->id}?round={$round->id}")->assertOk()->json('data.items');
+    $items = $this->actingAs(User::factory()->create())->getJson("/admin/api/facilities/{$facility->id}?round={$round->id}")->assertOk()->json('data.items');
     $item = collect($items)->firstWhere(fn (array $g): bool => $g['dimension'] === 'consistency' && $g['slot'] === 1)['items'];
 
     expect(collect($item)->firstWhere('code', 'm__1a_21')['label'])->toStartWith('1a. How many of the three clients');

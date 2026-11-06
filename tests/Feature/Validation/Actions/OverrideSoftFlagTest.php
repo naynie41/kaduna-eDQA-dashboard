@@ -9,7 +9,7 @@ use App\Models\User;
 use Spatie\Activitylog\Models\Activity;
 
 beforeEach(function (): void {
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
     $this->assessment = Assessment::factory()->create([
         'status' => 'flagged',
         'flags' => ['VISIT_TOO_SHORT', 'ASSESSOR_VOLUME', 'SLOT_ALL_NA:validity:3'],

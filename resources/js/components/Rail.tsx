@@ -3,17 +3,21 @@ import { formatCount } from '@/lib/format';
 import { useTranslate } from '@/lib/i18n';
 
 /**
- * The left rail (ARCHITECTURE.md §9.1): the KD seal and "eDQA e-tool / Kaduna State", the two
- * workspaces, and a footer with the assessment count and "Support: HSDF". Below 760px it becomes
- * a bar across the top and the footer is left out.
+ * The left rail (ARCHITECTURE.md §9.1): the KD seal and "eDQA e-tool / Kaduna State", the
+ * dashboard and, for a signed-in administrator only, the admin area (D-78: the public site never
+ * links to it), and a footer with the assessment count and "Support: HSDF". Below 760px it
+ * becomes a bar across the top and the footer is left out.
  */
 export default function Rail() {
     const t = useTranslate();
     const { url, props } = usePage();
     const path = url.split('?')[0] ?? '';
+    const admin = path === '/admin' || path.startsWith('/admin/');
     const items = [
-        { label: t('common.nav.dashboard'), href: '/dashboard/home', current: path.startsWith('/dashboard'), icon: <DashboardIcon /> },
-        { label: t('common.nav.administration'), href: '/admin', current: path.startsWith('/admin'), icon: <AdminIcon /> },
+        { label: t('common.nav.dashboard'), href: '/', current: !admin, icon: <DashboardIcon /> },
+        ...(props.auth.user === null
+            ? []
+            : [{ label: t('common.nav.administration'), href: '/admin', current: admin, icon: <AdminIcon /> }]),
     ];
 
     return (

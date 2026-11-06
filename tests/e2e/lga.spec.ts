@@ -8,7 +8,7 @@ async function ready(page: Page): Promise<void> {
 
 test.describe('LGA view', () => {
     test('a tile toggles the LGA filter from the keyboard, the URL follows and focus stays on it', async ({ page }) => {
-        await page.goto('/dashboard/lga?year=2026&quarter=2');
+        await page.goto('/lgas?year=2026&quarter=2');
         await ready(page);
 
         const grid = page.getByRole('group', { name: 'Filter by local government' });
@@ -34,7 +34,7 @@ test.describe('LGA view', () => {
     });
 
     test('the table names months for one quarter, and sorts with aria-sort', async ({ page }) => {
-        await page.goto('/dashboard/lga?year=2026&quarter=2');
+        await page.goto('/lgas?year=2026&quarter=2');
         await ready(page);
 
         const table = page.getByRole('table', { name: /All four reports by local government: Q2 2026/ });
@@ -47,7 +47,7 @@ test.describe('LGA view', () => {
     });
 
     test('no serious or critical axe violations', async ({ page }) => {
-        await page.goto('/dashboard/lga');
+        await page.goto('/lgas');
         await ready(page);
         await checkA11y(page);
     });

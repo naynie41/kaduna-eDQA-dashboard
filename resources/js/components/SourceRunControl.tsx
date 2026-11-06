@@ -71,7 +71,7 @@ export default function SourceRunControl({ url, runId, attached, counters, label
                 <ProgressPanel<{ data: PullRun }>
                     key={runId}
                     title={labels.progress}
-                    url={`/api/pulls/${runId}`}
+                    url={`/admin/api/pulls/${runId}`}
                     stage={stage}
                     onDone={() => {
                         setFinished(runId);

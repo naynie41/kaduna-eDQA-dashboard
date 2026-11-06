@@ -10,25 +10,41 @@ use App\Domain\Scoring\Exceptions\InvalidRuleConfig;
 use App\Domain\Scoring\Exceptions\RescoreRefused;
 use App\Domain\Scoring\Exceptions\RuleVersionRefused;
 use App\Domain\Validation\Exceptions\QuarantineActionRefused;
-use App\Http\Middleware\EnsureTwoFactorConfirmed;
+use App\Http\Middleware\EnforceAbsoluteSessionLifetime;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\NoIndex;
+use App\Http\Middleware\PublicReadOnly;
+use App\Http\Middleware\RestrictToAllowedIps;
 use App\Http\Middleware\SecurityHeaders;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        // SECURITY.md §3: the admin area (/admin, admin.*) and the source webhooks, outside the web group.
+        then: function (): void {
+            Route::middleware(['web', 'admin.ip', 'auth'])->prefix('admin')->name('admin.')
+                ->group(base_path('routes/admin.php'));
+            Route::group([], base_path('routes/webhooks.php'));
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // D-82: X-Robots-Tag on every response, errors, health check and webhooks included.
+        $middleware->append(NoIndex::class);
+
         // Security headers first, so they are set on every web response.
         $middleware->web(prepend: [SecurityHeaders::class]);
         $middleware->web(append: [
+            // SECURITY.md §2: signed out 12 hours after sign-in, however active.
+            EnforceAbsoluteSessionLifetime::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
@@ -42,7 +58,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO,
         );
 
-        $middleware->alias(['two-factor.confirmed' => EnsureTwoFactorConfirmed::class]);
+        // SECURITY.md §2: the optional admin IP allow-list (EDQA_ADMIN_ALLOWED_IPS).
+        // Before auth, so an address outside it gets 404, not a redirect to the login page.
+        $middleware->alias(['admin.ip' => RestrictToAllowedIps::class, 'public.readonly' => PublicReadOnly::class]);
+        $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: RestrictToAllowedIps::class);
 
         // The source webhooks (/webhooks/{source}) are each verified their own way instead, ODK by
         // its HMAC signature and Kobo by its token header (SECURITY.md §6); nothing else is exempt.

@@ -19,14 +19,14 @@ use Tests\Support\Rows;
 
 beforeEach(function (): void {
     $this->f = ReportingFixture::build();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 /** The plan prop after its deferred load. */
 function planFor(object $test, string $query = '?year=2026&quarter=2'): array
 {
     $result = null;
-    $test->actingAs($test->admin)->get("/dashboard/plan{$query}")
+    $test->actingAs($test->admin)->get("/plan{$query}")
         ->assertOk()
         ->assertInertia(function (Assert $page) use (&$result): void {
             $page->component('dashboard/plan')

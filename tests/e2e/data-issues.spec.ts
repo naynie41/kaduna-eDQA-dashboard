@@ -143,11 +143,11 @@ test.describe('Data issues, resolving the demo records with the keyboard', () =>
         await expect(row(page, held.instance_id)).toContainText('Reprocessed');
 
         // On the dashboard: the facility now has its assessment in the round.
-        const round = await page.request.get('/api/rounds').then(async (r) => ((await r.json()) as { data: { id: number; year: number; quarter: number }[] }).data.find((x) => x.id === demo().round_id));
+        const round = await page.request.get('/admin/api/rounds').then(async (r) => ((await r.json()) as { data: { id: number; year: number; quarter: number }[] }).data.find((x) => x.id === demo().round_id));
         if (round === undefined) {
             throw new Error('The demo round is not in /api/rounds.');
         }
-        await page.goto(`/dashboard/facility?year=${round.year}&quarter=${round.quarter}&facility=${held.facility_id}`);
+        await page.goto(`/facilities?year=${round.year}&quarter=${round.quarter}&facility=${held.facility_id}`);
         const drawer = page.getByRole('dialog');
         await expect(drawer.getByText(/by Demo assessor 1/)).toBeVisible({ timeout: 60_000 });
     });

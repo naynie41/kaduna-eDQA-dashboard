@@ -22,7 +22,7 @@ use Tests\Support\Rows;
 // source, the combined history, the deletions at source, the backfill panel and its report link.
 
 beforeEach(function (): void {
-    $this->admin = User::factory()->withTwoFactor()->create(['name' => 'Amina Bello']);
+    $this->admin = User::factory()->create(['name' => 'Amina Bello']);
     $this->source = new FakeSubmissionSource;
     useSource('odk', $this->source);
     Storage::fake('exports');
@@ -165,7 +165,7 @@ it('shows each source\'s last backfill and checkpoint page, and a signed link to
         ->where('backfill.sources.1.run.outcome', 'failed')
         ->where('backfill.sources.1.checkpoint', ['position' => 2000, 'page' => 2, 'page_size' => 1000])
         ->where('backfill.report.file', 'backfill-report-20261020-090000.md')
-        ->where('backfill.report.url', fn (string $url): bool => str_contains($url, '/api/backfill-reports/backfill-report-20261020-090000.md') && str_contains($url, 'signature=')));
+        ->where('backfill.report.url', fn (string $url): bool => str_contains($url, '/admin/api/backfill-reports/backfill-report-20261020-090000.md') && str_contains($url, 'signature=')));
 });
 
 it('says no backfill has run and no report exists; a source not configured has no backfill line', function (): void {
@@ -219,14 +219,14 @@ it('says which settings a source is missing, by name, and never its values', fun
 
 it('downloads the backfill report through its signed link only, audited', function (): void {
     Storage::disk('exports')->put('backfill-report-20261020-090000.md', '# Backfill report');
-    $signed = URL::temporarySignedRoute('api.backfill-reports.show', now()->addMinutes(30), ['file' => 'backfill-report-20261020-090000.md']);
+    $signed = URL::temporarySignedRoute('admin.api.backfill-reports.show', now()->addMinutes(30), ['file' => 'backfill-report-20261020-090000.md']);
 
-    $this->actingAs($this->admin)->get('/api/backfill-reports/backfill-report-20261020-090000.md')->assertForbidden();
+    $this->actingAs($this->admin)->get('/admin/api/backfill-reports/backfill-report-20261020-090000.md')->assertForbidden();
     $response = $this->actingAs($this->admin)->get($signed)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
     expect($response->streamedContent())->toBe('# Backfill report')
         ->and(Activity::query()->where('event', 'backfill_report_downloaded')->sole()->causer?->is($this->admin))->toBeTrue();
 
-    $other = URL::temporarySignedRoute('api.backfill-reports.show', now()->addMinutes(30), ['file' => 'odk-cascade-20261020-090000.zip']);
+    $other = URL::temporarySignedRoute('admin.api.backfill-reports.show', now()->addMinutes(30), ['file' => 'odk-cascade-20261020-090000.zip']);
     $this->actingAs($this->admin)->get($other)->assertNotFound();
     // Signed in as well as signed: the route is in the auth group (RouteGuardTest).
 });
@@ -243,7 +243,7 @@ it('counts the rows a pull parsed, for the progress panel', function (): void {
 
     expect([$run->fetched, $run->parsed, $run->duplicates])->toBe([1, 1, 0])
         ->and([$again->fetched, $again->parsed, $again->duplicates])->toBe([1, 0, 1]);
-    $this->actingAs($this->admin)->getJson("/api/pulls/{$run->id}")->assertJsonPath('data.parsed', 1);
+    $this->actingAs($this->admin)->getJson("/admin/api/pulls/{$run->id}")->assertJsonPath('data.parsed', 1);
 });
 
 it('gives every configured source its own panel, in config order, each with its own counts', function (): void {

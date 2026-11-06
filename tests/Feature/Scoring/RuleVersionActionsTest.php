@@ -20,7 +20,7 @@ use Spatie\Activitylog\Models\Activity;
 beforeEach(function (): void {
     $this->seed(ScoringRuleVersionSeeder::class);
     $this->v1 = ScoringRuleVersion::query()->where('version', 1)->sole();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 const PUBLISH_REASON = 'Raise the Strong band after the 2026 review';

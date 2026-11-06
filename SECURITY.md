@@ -22,12 +22,15 @@ states how the server provides it.
 
 ## 1. Threat model in one paragraph
 
-There is one role: Administrator. Every account can close a round, edit a score, reject a
+The dashboard is **public and read-only**; the admin area is behind login. There is one role:
+Administrator. Every account can close a round, edit a score, reject a
 quarantined record, overwrite the facility master list and publish a new scoring rule version.
 Authorisation therefore does **no** work in this system. The controls that matter are:
-**strong authentication**, **a small number of accounts**, an **append-only audit trail**, and
+**password strength, lockout and login alerts** (there is no MFA — D-84), **a small number of accounts**, an **append-only audit trail**, and
 **database-level integrity constraints** that hold even if application code is wrong.
 The system holds no patient-level or personal health data — it scores facility record-keeping.
+Because the dashboard is public, the second main risk is **leaking private fields** (assessor
+names, photos, source internals, open-round figures) through a public page or prop — §3.1.
 
 Assets worth protecting, in order: published round figures (credibility of the state report),
 the facility master list (the validation authority), ODK Central and KoboToolbox credentials, the audit log,
@@ -40,15 +43,17 @@ administrator accounts.
 | Control | Setting |
 |---|---|
 | Method | Email + password via Laravel Fortify |
-| Two-factor | **Mandatory** for every account (TOTP). An account without confirmed 2FA can reach only the 2FA setup screen |
-| Recovery codes | Generated at 2FA setup, shown once, stored hashed |
-| Password policy | `Password::min(12)->mixedCase()->numbers()->uncompromised()` |
+| Multi-factor | **None** (client decision, D-84). Password is the only factor, so the compensating controls below are mandatory |
+| Password policy | `Password::min(14)->mixedCase()->numbers()->symbols()->uncompromised()`; no reuse of the last 5 |
 | Hashing | bcrypt (Laravel default) or argon2id |
+| Login page | `/login`, not linked from anywhere on the public site; `noindex`. After login → `/admin`; logout → public dashboard |
 | Login throttle | 5 attempts / minute per email + IP (`RateLimiter::for('login')`) |
-| 2FA throttle | 5 attempts / minute per session |
-| Session idle timeout | 8 hours (`SESSION_LIFETIME=480`) |
+| Progressive lockout | After 5 failures an account is locked 15 min, after 10 for 1 h, after 20 until an administrator unlocks it from the console (`edqa:admin:unlock`); all audited. Lockout responses don't reveal whether the email exists |
+| Login alerts | Every successful login from a new device/IP emails that administrator and the others (time, IP, browser) — the substitute early warning for a stolen password |
+| Optional IP allow-list | `EDQA_ADMIN_ALLOWED_IPS` (CIDR list). When set, `/login` and `/admin/*` return 404 to any other IP. Off by default; recommended if admins work from fixed offices or a VPN |
+| Session idle timeout | 2 hours for admin sessions (`SESSION_LIFETIME=120`); absolute maximum 12 h, then re-login |
 | Session cookie | `Secure`, `HttpOnly`, `SameSite=Lax`; `SESSION_ENCRYPT=true` |
-| Session fixation | Regenerate session ID on login and on 2FA confirmation |
+| Session fixation | Regenerate session ID on login and password change; changing a password logs out all other sessions |
 | Password reset | Emailed signed link, 60-minute expiry, throttled |
 | Registration | **Disabled.** Accounts are created by an artisan command only: `php artisan edqa:admin:create` |
 
@@ -60,26 +65,71 @@ launch (PRD open question 8).
 
 ---
 
-## 3. Authorisation
+## 3. Access model and authorisation
 
-A single middleware group guards everything:
+There are two audiences and still **one role** (decision D-76):
+
+| Audience | Logs in? | Can do |
+|---|---|---|
+| **Public visitor** | No | Read the public dashboard: six pages, filters and the public facility drawer, for **closed rounds only**. Nothing else |
+| **Administrator** | Yes, password (no MFA) | Everything in the admin area under `/admin`, plus an admin preview of the dashboard that includes the open round |
+
+Route groups (in `routes/web.php`, `routes/admin.php`, `routes/webhooks.php`):
 
 ```php
-Route::middleware(['auth', 'verified', 'two-factor.confirmed'])->group(function () { ... });
+// 1. Public, read-only — GET/HEAD only, rate limited, noindex
+Route::middleware(['web', 'public.readonly', 'throttle:public', 'noindex'])->group(...);
+
+// 2. Admin — everything that reads private data or changes anything
+Route::middleware(['web', 'admin.ip', 'auth', 'noindex'])   // admin.ip = optional allow-list
+    ->prefix('admin')->name('admin.')->group(...);
+
+// 3. Webhooks — signature/token verified per source (§6)
+// 4. GET /up — health only
+// 5. Fortify auth screens: /login, password reset (noindex, admin.ip)
 ```
 
-Only three routes sit outside it:
-
-1. The login / 2FA challenge / password reset screens (Fortify)
-2. `POST /webhooks/{source}` — verified per source instead (§6): HMAC for ODK, a shared header token for Kobo
-3. `GET /up` — Laravel's health route, used by uptime monitoring; returns status only, no data
-
 Rules:
-- Do not add policies, gates, `can()` checks or role columns. Their presence implies granularity
-  that does not exist.
-- Do not add any public/unauthenticated read route in v1 (public dashboard is a v2 item).
-- A route test asserts every registered route (except the allow-list above) returns 302/401 when
-  unauthenticated. New routes fail this test until they are inside the group.
+- **The public group is read-only by construction.** `public.readonly` middleware rejects any
+  method other than GET/HEAD with 405. No Action that writes may be called from a public
+  controller (architecture test).
+- **Public responses use public resources only.** Every public page and endpoint returns
+  `App\Http\Resources\Public\*` classes that whitelist fields. Admin resources are never reused
+  for public output. See §3.1 for what must never appear publicly.
+- **Public data is closed rounds only** (D-77). A `PublicScope` applied inside the Reporting layer
+  restricts every aggregator to `rounds.status = closed` when the request is not an
+  authenticated administrator. `config('edqa.public.show_open_round')` (default false) can widen
+  it later. Withdrawn assessments are excluded everywhere.
+- **No login link on the public site** (D-78). `/login` is reachable only by typing it. This is a
+  convenience, not a control: authentication strength (§2) is unchanged.
+- **Unauthenticated access to `/admin/*` redirects to `/login`** (client decision). After login the
+  administrator lands on `/admin`; after logout, on the public dashboard.
+- An administrator who visits the public dashboard sees an **admin preview**: a slim bar
+  ("Admin preview — includes the open round · Back to admin") and open-round data. Public
+  visitors never see the bar.
+- Do not add policies, gates, `can()` checks or role columns.
+- **Route-guard test:** every route is classified as public, admin, webhook, health or auth.
+  Unclassified routes fail the test. Admin routes redirect to `/login` when unauthenticated;
+  public routes refuse non-GET methods.
+
+### 3.1 Never public
+
+These must never appear in any public HTML, Inertia prop, JSON response, export or error page.
+A **leak test** crawls every public route with representative filters and fails if any of these
+keys or values appear:
+
+| Category | Examples |
+|---|---|
+| People | assessor names, device IDs, submitter usernames, administrator names/emails, plan owners' personal names |
+| Location of visits | visit GPS (facility master-list coordinates are allowed only if the client approves — default off) |
+| Evidence | attachments, register photos, attachment URLs |
+| Source internals | instance IDs, external IDs, submission IDs, form versions, raw payloads, deep links to ODK Central or KoboToolbox, source error messages |
+| Data quality internals | quarantine records and counts, soft flags, deletion-at-source status, cross-source duplicates |
+| Admin activity | audit log entries, correction reasons, rule-version reasons, who published or closed what |
+| Open round | any figure from a round that is not closed (unless the config switch is on) |
+
+The public facility drawer shows: facility name, LGA, ward, level, ownership, scores for each
+closed round (ScoreValues), pass/fail/N/A item results, and the round history. Nothing else.
 
 ---
 
@@ -91,7 +141,7 @@ Implemented with `spatie/laravel-activitylog`.
 `assessments`, `item_responses` (corrections), `assessment_scores`, `quarantined_records`
 (resolution), `facilities`, `wards`, `rounds`, `scoring_rule_versions`, `plan_actions`, `users`,
 plus: manual pulls and reconciles (with the source), backfill starts, deletion-at-source reviews, rescore triggers, exports, cascade-file regeneration,
-login, logout, failed login, 2FA enable/disable.
+login, logout, failed login, lockout, unlock, password change, login from a new device.
 
 **Each entry carries:** actor (`causer`), timestamp, subject, event, `properties.old`,
 `properties.attributes` (new), `properties.reason` where required, request IP and user agent.
@@ -169,13 +219,14 @@ HTTPS only, and webhooks that can only *trigger* a pull.
   `storage/app/attachments/{source}/{instance_id}/`
   on the `app-files` volume — **outside the web root** (the `web` container only has
   `public/`). Never on the `public` disk.
-- Served only through an authenticated route that streams the file:
-  `GET /attachments/{submission}/{filename}` — validates the filename against the submission's
+- Served only through an **admin** route that streams the file:
+  `GET /admin/attachments/{submission}/{filename}` — validates the filename against the submission's
   known attachment list (no path traversal), sets `Content-Disposition` and
   `X-Content-Type-Options: nosniff`.
 - MIME type sniffed on download (whatever the source claims) and checked against an allow-list
   (`image/jpeg`, `image/png`, `application/geo+json`, `text/csv`, `application/xml`).
-- Exports are written to a private disk and downloaded via signed, time-limited URLs (30 min).
+- Exports are **admin-only** (D-80): requested from the admin area, written to a private disk and
+  downloaded via signed, time-limited URLs (30 min). The public site has no export button.
 - The facility cascade CSV is generated to a private path and uploaded by an administrator as
   form media on ODK Central and KoboToolbox; it is not publicly reachable on the portal.
 
@@ -191,11 +242,16 @@ HTTPS only, and webhooks that can only *trigger* a pull.
   - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
     `Referrer-Policy: strict-origin-when-cross-origin`,
     `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `X-Robots-Tag: noindex, nofollow` on every response and `<meta name="robots" content="noindex">`
+  in the layout, plus `robots.txt` disallowing `/admin` and `/login` (D-82). Controlled by
+  `config('edqa.public.indexable')`, default false.
+- Public error pages (404/429/500) never show stack traces, IDs or source details.
 - Fonts are **self-hosted** (no Google Fonts CDN) — keeps the CSP tight and works on poor links.
 - `APP_DEBUG=false` in staging and production. Custom error pages; no stack traces to the browser.
 - Mass assignment: explicit `$fillable` on every model; never `$guarded = []`.
 - Output escaping: React escapes by default; `dangerouslySetInnerHTML` is banned (lint rule).
-- Rate limiting: `api` group 120/min per user; `POST /api/sources/{key}/pull` and `/reconcile` 6/min per source; exports 10/min.
+- Rate limiting: public pages and public JSON 120/min per IP (`throttle:public`, returns 429 with
+  a friendly page); admin `api` group 120/min per user; `POST /api/sources/{key}/pull` and `/reconcile` 6/min per source; exports 10/min.
 
 ---
 
@@ -242,13 +298,16 @@ HTTPS only, and webhooks that can only *trigger* a pull.
 - The Data sources page shows **time since last success, per source**, in plain language. If no successful pull **from any enabled source** in
   24 hours during an open round, a banner appears on every admin page.
 - Suspected compromise of an admin account: disable the account via
-  `php artisan edqa:admin:disable {email}`, rotate `APP_KEY` with the old key in `APP_PREVIOUS_KEYS` so 2FA secrets still decrypt (logs everyone out), rotate the ODK
+  `php artisan edqa:admin:disable {email}`, rotate `APP_KEY` with the old key in `APP_PREVIOUS_KEYS` (logs everyone out), rotate the ODK
   service-account password and the Kobo API token, review `activity_log` for the account's actions since last known-good
   time, restore affected records from audit old-values or from backup.
 
 ---
 
 ## 13. Data protection statement (for the client)
+
+The dashboard is public. It shows facility-level scores and item results for closed rounds
+only; it never shows assessor names, devices, visit locations, photos or anything from §3.1.
 
 The portal stores facility-level record-keeping assessments, assessor names and device IDs from
 submission metadata (ODK Central or KoboToolbox), optional GPS coordinates of the visit and optional register photos. It stores **no
@@ -269,10 +328,12 @@ Expect acknowledgement within 3 working days.
 
 ## 15. Security checklist before go-live
 
-- [ ] Every admin has 2FA confirmed; ≤ 3 accounts
+- [ ] ≤ 3 admin accounts, one per person, passwords meet the policy; lockout and new-device login emails tested end to end; IP allow-list decision recorded
 - [ ] `APP_DEBUG=false`, `APP_ENV=production`
 - [ ] HTTPS + HSTS live; security headers verified (securityheaders.com or curl)
-- [ ] Route-guard test passing; only login/2FA/reset, webhook and `/up` are unauthenticated
+- [ ] Route-guard test passing; every route classified; public routes refuse non-GET; `/admin/*` redirects to `/login`
+- [ ] Leak test passing over every public route (§3.1); no open-round figures publicly
+- [ ] No link to `/login` anywhere on public pages; `noindex` header present
 - [ ] ODK service account is Project Viewer only
 - [ ] Kobo token belongs to a dedicated account with view-only access to the one asset
 - [ ] Attachment fetches refuse hosts other than the configured source hosts (test passing)

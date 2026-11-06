@@ -9,21 +9,21 @@ use Tests\Support\RescoreFixture;
 
 beforeEach(function (): void {
     $this->f = RescoreFixture::build();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 it('refuses the rescore endpoints to an unauthenticated user', function (string $method, string $uri): void {
     $this->json($method, $uri)->assertUnauthorized();
 })->with([
-    ['POST', '/api/rounds/1/rescore'],
-    ['GET', '/api/rescores/abc'],
+    ['POST', '/admin/api/rounds/1/rescore'],
+    ['GET', '/admin/api/rescores/abc'],
 ]);
 
 it('starts a rescore with a reason, audited, and returns the batch id', function (): void {
     $this->f->assessment($this->f->q2);
 
     $response = $this->actingAs($this->admin)
-        ->postJson("/api/rounds/{$this->f->q2}/rescore", ['reason' => 'Facility list corrected by the LGA'])
+        ->postJson("/admin/api/rounds/{$this->f->q2}/rescore", ['reason' => 'Facility list corrected by the LGA'])
         ->assertAccepted()
         ->assertJsonPath('data.round_id', $this->f->q2)
         ->assertJsonPath('data.trigger', 'manual');
@@ -35,16 +35,16 @@ it('starts a rescore with a reason, audited, and returns the batch id', function
 });
 
 it('needs a reason of at least 10 characters', function (?string $reason): void {
-    $this->actingAs($this->admin)->postJson("/api/rounds/{$this->f->q2}/rescore", ['reason' => $reason])
+    $this->actingAs($this->admin)->postJson("/admin/api/rounds/{$this->f->q2}/rescore", ['reason' => $reason])
         ->assertUnprocessable()->assertJsonValidationErrors('reason');
 
     expect(RescoreRun::query()->exists())->toBeFalse();
 })->with([null, 'too short']);
 
 it('refuses a closed round with 409 and an unknown one with 404', function (): void {
-    $this->actingAs($this->admin)->postJson("/api/rounds/{$this->f->q1}/rescore", ['reason' => 'Rescore the closed round please'])
+    $this->actingAs($this->admin)->postJson("/admin/api/rounds/{$this->f->q1}/rescore", ['reason' => 'Rescore the closed round please'])
         ->assertConflict()->assertJsonPath('code', 'round_closed');
-    $this->actingAs($this->admin)->postJson('/api/rounds/999999/rescore', ['reason' => 'Rescore a round that is not there'])
+    $this->actingAs($this->admin)->postJson('/admin/api/rounds/999999/rescore', ['reason' => 'Rescore a round that is not there'])
         ->assertNotFound();
 });
 
@@ -53,10 +53,10 @@ it('reports progress from the batch and the run', function (): void {
     $this->f->assessment($this->f->q2);
     $this->f->assessment($this->f->q2);
     $batchId = $this->actingAs($this->admin)
-        ->postJson("/api/rounds/{$this->f->q2}/rescore", ['reason' => 'Facility list corrected by the LGA'])
+        ->postJson("/admin/api/rounds/{$this->f->q2}/rescore", ['reason' => 'Facility list corrected by the LGA'])
         ->json('data.batch_id');
 
-    $this->actingAs($this->admin)->getJson("/api/rescores/{$batchId}")
+    $this->actingAs($this->admin)->getJson("/admin/api/rescores/{$batchId}")
         ->assertOk()
         ->assertJsonPath('data.batch_id', $batchId)
         ->assertJsonPath('data.round_id', $this->f->q2)
@@ -70,5 +70,5 @@ it('reports progress from the batch and the run', function (): void {
         ->assertJsonPath('data.changed_scores', 18)
         ->assertJsonPath('data.reason', 'Facility list corrected by the LGA');
 
-    $this->actingAs($this->admin)->getJson('/api/rescores/not-a-batch')->assertNotFound();
+    $this->actingAs($this->admin)->getJson('/admin/api/rescores/not-a-batch')->assertNotFound();
 });

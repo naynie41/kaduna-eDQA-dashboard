@@ -8,7 +8,7 @@ use App\Models\User;
 
 it('sends the security headers', function (string $path, bool $authenticated): void {
     if ($authenticated) {
-        $this->actingAs(User::factory()->withTwoFactor()->create());
+        $this->actingAs(User::factory()->create());
     }
 
     $response = $this->get($path);

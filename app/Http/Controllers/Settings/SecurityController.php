@@ -6,32 +6,33 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
+use App\Models\User;
+use App\Support\Auth\PasswordChange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Password change and recovery codes. 2FA is set up through TwoFactorSetupController: on first
- * sign-in when required, otherwise from this page. There is no switch to turn it off here.
+ * Password change (SECURITY.md §2): the policy and history apply, the user's other sessions end,
+ * this one gets a new ID, and the change is audited.
  */
 final class SecurityController extends Controller
 {
     public function edit(Request $request): Response
     {
-        $codes = $request->session()->get('recovery_codes');
-
         return Inertia::render('settings/security', [
             'status' => $request->session()->get('status'),
-            'twoFactorEnabled' => $request->user()?->two_factor_confirmed_at !== null,
-            // Flashed once by GenerateNewRecoveryCodes, never re-displayed.
-            'recoveryCodes' => is_array($codes) ? array_values($codes) : null,
         ]);
     }
 
     public function update(PasswordUpdateRequest $request): RedirectResponse
     {
-        $request->user()?->update(['password' => $request->password]);
+        /** @var User $user */
+        $user = $request->user();
+
+        PasswordChange::apply($user, $request->string('password')->toString(), 'settings', keepSession: $request->session()->getId());
+        $request->session()->regenerate(true);
 
         return back()->with('status', __('auth.settings.password_saved'));
     }

@@ -39,7 +39,7 @@ final class CascadeExportController extends Controller
             'lgas' => $export['lgas'],
             'wards' => $export['wards'],
             'facilities' => $export['facilities'],
-            'url' => URL::temporarySignedRoute('api.facility-list.cascade.download', $expires, ['file' => $export['filename']]),
+            'url' => URL::temporarySignedRoute('admin.api.facility-list.cascade.download', $expires, ['file' => $export['filename']]),
             'expires_at' => $expires->toIso8601String(),
         ]], 201);
     }

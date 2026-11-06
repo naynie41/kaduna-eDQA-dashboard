@@ -12,14 +12,14 @@ use Tests\Support\ReportingFixture;
 
 beforeEach(function (): void {
     $this->f = ReportingFixture::build();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 /** The facilities prop after its deferred load, for a query string. */
 function facilitiesFor(object $test, string $query): array
 {
     $result = null;
-    $test->actingAs($test->admin)->get("/dashboard/facility{$query}")
+    $test->actingAs($test->admin)->get("/facilities{$query}")
         ->assertOk()
         // A full closure, not fn(): an arrow function captures $result by value, so the inner
         // reference would point at its copy.

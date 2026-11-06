@@ -3,7 +3,7 @@ import { checkA11y } from './support/a11y';
 
 test.describe('Monitor', () => {
     test('shows the owner split, the ranked coverage lists with the mean in words, and the window table; axe finds nothing serious', async ({ page }) => {
-        await page.goto('/dashboard/monitor?year=2026&quarter=2');
+        await page.goto('/monitor?year=2026&quarter=2');
         await expect(page.getByRole('heading', { level: 1, name: 'Monitor' })).toBeVisible();
         await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 60_000 }); // deferred blocks
 

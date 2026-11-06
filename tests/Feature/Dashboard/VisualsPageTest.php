@@ -11,14 +11,14 @@ use Tests\Support\ReportingFixture;
 
 beforeEach(function (): void {
     $this->f = ReportingFixture::build();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 /** Every prop after the deferred ones load. */
 function visualsFor(object $test, string $query = ''): array
 {
     $result = null;
-    $test->actingAs($test->admin)->get("/dashboard/visuals{$query}")
+    $test->actingAs($test->admin)->get("/visuals{$query}")
         ->assertOk()
         ->assertInertia(function (Assert $page) use (&$result): void {
             $page->component('dashboard/visuals')

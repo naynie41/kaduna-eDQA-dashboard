@@ -15,7 +15,7 @@ use Tests\Support\Rows;
 
 beforeEach(function (): void {
     $this->seed(LgaSeeder::class);
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 it('never shows more than 23 LGAs in the tab badge or the grid, whatever sits in quarantine', function (): void {
@@ -26,7 +26,7 @@ it('never shows more than 23 LGAs in the tab badge or the grid, whatever sits in
     }
     $rows = DB::table('lgas')->count();
 
-    $this->actingAs($this->admin)->get('/dashboard/lga')
+    $this->actingAs($this->admin)->get('/lgas')
         ->assertInertia(fn (Assert $page) => $page
             ->where('summary.lgas', fn (int $lgas): bool => $lgas <= 23)
             ->has('tiles', $rows)
@@ -38,7 +38,7 @@ it('never shows more than 23 LGAs in the tab badge or the grid, whatever sits in
 it('gives the grid every LGA whatever the LGA filter, and the table only the chosen one', function (): void {
     ReportingFixture::build();
 
-    $this->actingAs($this->admin)->get('/dashboard/lga?lga=AAA')
+    $this->actingAs($this->admin)->get('/lgas?lga=AAA')
         ->assertInertia(fn (Assert $page) => $page
             ->has('tiles', 26)
             ->loadDeferredProps(fn (Assert $reload) => $reload
@@ -50,12 +50,12 @@ it('takes the rows from the LGA table aggregator, and lists the rounds in view f
     $f = ReportingFixture::build();
     $rows = json_decode((string) json_encode(app(LgaTableAggregator::class)->rows(new ReportFilter(year: 2026, quarter: 2, owner: Ownership::Public))), true);
 
-    $this->actingAs($this->admin)->get('/dashboard/lga?year=2026&quarter=2&owner=public')
+    $this->actingAs($this->admin)->get('/lgas?year=2026&quarter=2&owner=public')
         ->assertInertia(fn (Assert $page) => $page
             ->where('rounds', [['year' => 2026, 'quarter' => 2]])
             ->loadDeferredProps(fn (Assert $reload) => $reload->where('lgas', $rows)));
 
-    $this->actingAs($this->admin)->get('/dashboard/lga?year=2026')
+    $this->actingAs($this->admin)->get('/lgas?year=2026')
         ->assertInertia(fn (Assert $page) => $page->where('rounds', [['year' => 2026, 'quarter' => 1], ['year' => 2026, 'quarter' => 2]]));
     expect($f->q1)->toBeInt();
 });

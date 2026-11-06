@@ -16,16 +16,16 @@ use Tests\Support\Rows;
 // with a reason, which takes it out of the open issues on the Data issues badge. Audited.
 
 beforeEach(function (): void {
-    $this->admin = User::factory()->withTwoFactor()->create(['name' => 'Amina Bello']);
+    $this->admin = User::factory()->create(['name' => 'Amina Bello']);
 });
 
 function reviewDeletion(mixed $test, int $submissionId, ?string $reason = 'Confirmed with the LGA M&E officer'): TestResponse
 {
-    return $test->actingAs($test->admin)->postJson("/api/submissions/{$submissionId}/deletion-review", $reason === null ? [] : ['reason' => $reason]);
+    return $test->actingAs($test->admin)->postJson("/admin/api/submissions/{$submissionId}/deletion-review", $reason === null ? [] : ['reason' => $reason]);
 }
 
 it('is behind the sign-in', function (): void {
-    $this->postJson('/api/submissions/1/deletion-review', ['reason' => 'A long enough reason'])->assertUnauthorized();
+    $this->postJson('/admin/api/submissions/1/deletion-review', ['reason' => 'A long enough reason'])->assertUnauthorized();
 });
 
 it('marks a deletion at source reviewed, with who and when, audits it with the reason, and says so', function (): void {

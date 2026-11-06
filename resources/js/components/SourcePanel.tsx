@@ -156,7 +156,7 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
                 {source.enabled && (
                     <div className="flex flex-col gap-4 border-t border-rule pt-3">
                         <SourceRunControl
-                            url={`/api/sources/${source.key}/pull`}
+                            url={`/admin/api/sources/${source.key}/pull`}
                             runId={pull?.id ?? null}
                             attached={pull?.attached ?? false}
                             counters={PULL_COUNTERS}
@@ -173,7 +173,7 @@ export default function SourcePanel({ source, runbookUrl, pull, reconcile, onPul
                         <div className="flex flex-col gap-2">
                             <p className="text-sm text-ink-2">{t('admin.sources.reconcile.description')}</p>
                             <SourceRunControl
-                                url={`/api/sources/${source.key}/reconcile`}
+                                url={`/admin/api/sources/${source.key}/reconcile`}
                                 runId={reconcile?.id ?? null}
                                 attached={reconcile?.attached ?? false}
                                 counters={RECONCILE_COUNTERS}

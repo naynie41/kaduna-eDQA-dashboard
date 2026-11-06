@@ -73,6 +73,9 @@ final class CloseRound
 - Validation only in `FormRequest` classes; `authorize()` returns `true` (the route group
   handles auth — do not add checks here).
 - Inertia props are built by Resources or Aggregators, never inline arrays of computed values.
+- Public controllers live in `Http\Controllers\Public`, admin ones in `Http\Controllers\Admin`.
+  Public controllers only read, only use `Public\*` resources, and never call a writing Action
+  (architecture test).
 - No `DB` facade or query builder calls in controllers (architecture test).
 
 ### 2.4 Models
@@ -167,7 +170,8 @@ Backed string enums in `App\Domain\*\Enums`: `Dimension`, `Severity`, `RoundStat
 | Form question names (both sources) | `(avail|consist|valid)_m[1-3]_<item>` | `consist_m2_opd_register` |
 | Source keys | lower-case, short: `odk`, `kobo` | `PullSubmissionsJob('kobo', …)` |
 | Source adapters | `<Platform>Source`, `<Platform>Client`, `<Platform>PayloadNormalizer` in `Ingestion\<Platform>` | `Kobo\KoboPayloadNormalizer` |
-| Routes | kebab-case URLs, dot names | `/admin/data-issues` → `admin.data-issues` |
+| Routes | kebab-case URLs, dot names; public routes `public.*`, admin routes `admin.*` | `/lgas` → `public.lgas`; `/admin/data-issues` → `admin.data-issues` |
+| Resources | `Http\Resources\Public\*` for public output, `Http\Resources\Admin\*` for admin; never shared | `Public\FacilityDetailResource` |
 | Artisan commands | `edqa:<noun>[:<verb>]` | `edqa:admin:create` |
 | Config keys | snake_case under `edqa.` | `edqa.soft_rules.visit_min_minutes` |
 | Lang keys | `area.page.element` | `dashboard.home.average_score` |
@@ -203,49 +207,14 @@ Define in `resources/css/app.css` with Tailwind 4 `@theme`:
   --font-sans: "IBM Plex Sans", "Segoe UI", Roboto, system-ui, sans-serif;
   --font-display: "Archivo", "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
 
-  --color-rule-strong: #C3CDC6;  /* section dividers, the line under the page title */
-  --color-control: #7B8D86;      /* input, select and secondary-button borders: 3.3:1 (WCAG 1.4.11) */
-
-  --shadow-panel: none;          /* panels are ruled, not floating */
-  --shadow-overlay: 0 1px 3px rgba(13,40,36,.12), 0 24px 48px -16px rgba(13,40,36,.32);
-  --radius-panel: 6px;
+  --shadow-panel: 0 1px 2px rgba(23,48,43,.06), 0 8px 24px -16px rgba(23,48,43,.28);
+  --radius-panel: 10px;
 }
 ```
 
-**Visual direction (2026-11 redesign): a statistical bulletin, not a card dashboard.** Flat paper
-and white panels separated by hairline rules; hierarchy comes from type and figures, never from
-shadows. Only what sits above the page (the drawer, a dialog, the skip link) casts
-`shadow-overlay`. Colour marks state only: Kaduna green for the institution and the primary
-action, ok / warn / bad for bands. No gradients, glass, coloured side borders on cards or tiles,
-or glyph characters standing in for icons.
-
-**Type scale.** Components use these steps only, never a pixel size (`text-[13px]` is a defect):
-
-| Token | Size (15px root) | Role |
-|---|---|---|
-| `text-2xs` | 11.5px | badges, legends, table headers, tile captions |
-| `text-xs` | 12.5px | captions, help under a label, the sync line |
-| `text-sm` | 13.5px | table cells, controls, panel descriptions |
-| `text-base` | 15px | body |
-| `text-md` | 16.5px | panel and figure titles |
-| `text-lg` | 21px | the page title (h1) |
-| `text-xl` | 24px | figures in tiles; auth page titles |
-| `text-2xl` | 36px | owner-split figures |
-| `text-display` | 63px | the headline quality score |
-
-**Control vocabulary** (`@layer components` in `app.css`): `.btn` with `.btn-primary` (one main
-action per panel), `.btn-secondary` (every other action), `.btn-quiet` (low-weight actions in a
-header or row), `.btn-danger` (behind a confirmation), and `.btn-sm` / `.btn-block`; `.control`
-for every input and select; `.notice` with `-ok` / `-warn` / `-bad` / `-info` for in-page
-messages. A state's shape is drawn by `StateMark` (circle, ring, half, triangle, square), never
-typed as a glyph.
-
-**Motion.** 150 ms colour transitions on controls, 500 ms ease-out on score bars, and the
-skeleton shimmer; all of it off under `prefers-reduced-motion`. No page-load choreography.
-
 - Fonts **self-hosted** via `@fontsource/archivo` (500/600/700) and `@fontsource/ibm-plex-sans`
   (400/500/600), `font-display: swap`. No Google Fonts CDN (CSP + 3G).
-- Base: body 15px / 1.5, `-webkit-font-smoothing: antialiased`, numbers `tabular-nums`; headings `text-wrap: balance`, paragraphs `pretty`.
+- Base: body 15px / 1.5, `-webkit-font-smoothing: antialiased`, numbers `tabular-nums`.
 - Headings use `font-display`, letter-spacing `-0.012em`.
 - Focus: `outline: 2px solid deep-2; outline-offset: 2px` — never removed (`ACCESSIBILITY.md` §5).
 - Secondary text uses `ink-2` (5.37:1 on white, 4.81:1 on paper). `ink-3` is for dividers and
@@ -276,7 +245,7 @@ Strong/Acceptable → ok, Review → warn, Needs action → bad. Always render t
 
 ### Component inventory
 `AppShell`, `Rail`, `SyncStatusBar`, `TopBar`, `FilterBar`, `Tabs`, `Panel`, `SegmentedControl`,
-`ScoreTag`, `StatusLabel`, `StateMark`, `HeatCell`, `DimensionBar`, `OwnerSplit`, `LgaTile`, `RankedBars`,
+`ScoreTag`, `StatusLabel`, `HeatCell`, `DimensionBar`, `OwnerSplit`, `LgaTile`, `RankedBars`,
 `TrendChart`, `MonthGroupChart`, `DataTable`, `Drawer`, `Toast`, `ConfirmWithReasonDialog`,
 `EmptyState`, `Skeleton`.
 
@@ -359,6 +328,11 @@ pair (`deprecatedID`), one with all-N/A slot.
   (ARCHITECTURE.md §7, Reference figures).
 - **Determinism (G3):** score the same fixture twice → identical `ScoreCard`s.
 - **Idempotency:** pulling the same page twice creates no duplicate rows.
+- **Leak test (SECURITY.md §3.1):** crawl every public route and public API with representative
+  filters as an anonymous visitor; fail on any forbidden key or value (assessor names, instance
+  IDs, photos, flags, open-round figures, admin names). Runs in CI.
+- **Public scope:** every aggregator returns closed-round data only for anonymous requests, and
+  open-round data for an administrator.
 - **Source parity:** every parsed fixture's ODK and Kobo raw counterparts normalise and parse to
   exactly the same `ParsedSubmission` (apart from `source` and IDs), and produce the same outcome.
 - **Cross-source duplicates:** the same instance ID from the other source is counted, not inserted.
@@ -366,8 +340,10 @@ pair (`deprecatedID`), one with all-N/A slot.
 - **Cursor:** `last_pulled_at` does not advance when a page fails mid-way.
 - **Lock:** manual pull during a running pull does not double-process.
 - **LGA count (G4):** after ingesting all fixtures, every aggregate reports ≤ 23 LGAs.
-- **Route guard:** every route except login/2FA/reset/webhook redirects unauthenticated users.
-- **2FA:** a user without confirmed 2FA cannot reach any dashboard route.
+- **Route guard:** every route is classified (public, admin, webhook, health, auth); admin routes
+  redirect guests to `/login`; public routes are GET-only.
+- **No MFA:** no two-factor routes, middleware, columns or UI exist (D-84); lockout and login
+  alerts are tested instead.
 - **Audit (G7):** each write Action → activity entry with causer, old, new, reason.
 - **Webhook:** bad/missing signature → 401; valid → pull job dispatched, no data written.
 - **Performance smoke:** seeded 5-year dataset, each dashboard page < 1.5 s (tagged `@slow`).

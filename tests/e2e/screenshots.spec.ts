@@ -10,12 +10,12 @@ const PROTOTYPE = `file://${process.cwd()}/docs/${encodeURIComponent('kaduna-edq
 
 /** Each page: its path, how to tell it has loaded, and the prototype tab that matches it. */
 const PAGES = [
-    { name: 'home', path: '/dashboard/home?year=2026&quarter=2', loaded: /Line chart/, prototypeTab: 'Home' },
-    { name: 'lga', path: '/dashboard/lga?year=2026&quarter=2', loaded: null, prototypeTab: 'LGA view' },
-    { name: 'facility', path: '/dashboard/facility?year=2026&quarter=2', loaded: null, prototypeTab: 'Facility view' },
-    { name: 'monitor', path: '/dashboard/monitor?year=2026&quarter=2', loaded: null, prototypeTab: 'Monitor' },
-    { name: 'visuals', path: '/dashboard/visuals?year=2026&quarter=2', loaded: /April 2026: grouped bars/, prototypeTab: 'Visuals' },
-    { name: 'plan', path: '/dashboard/plan?year=2026&quarter=2', loaded: null, prototypeTab: 'Implementation plan' },
+    { name: 'home', path: '/?year=2026&quarter=2', loaded: /Line chart/, prototypeTab: 'Home' },
+    { name: 'lga', path: '/lgas?year=2026&quarter=2', loaded: null, prototypeTab: 'LGA view' },
+    { name: 'facility', path: '/facilities?year=2026&quarter=2', loaded: null, prototypeTab: 'Facility view' },
+    { name: 'monitor', path: '/monitor?year=2026&quarter=2', loaded: null, prototypeTab: 'Monitor' },
+    { name: 'visuals', path: '/visuals?year=2026&quarter=2', loaded: /April 2026: grouped bars/, prototypeTab: 'Visuals' },
+    { name: 'plan', path: '/plan?year=2026&quarter=2', loaded: null, prototypeTab: 'Implementation plan' },
 ] as const;
 
 test.describe.configure({ mode: 'serial' });

@@ -18,7 +18,7 @@ use Tests\Support\ParsedSubmissionBuilder;
 
 beforeEach(function (): void {
     ScoringRuleVersion::factory()->published()->create();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
     $this->lga = Lga::factory()->create(['code' => 'CHK', 'name' => 'Chikun']);
     $ward = Ward::factory()->create(['lga_id' => $this->lga->id]);
     // Three null-LGA submissions from Chikun: the same failure, the same fix.

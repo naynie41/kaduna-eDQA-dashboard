@@ -189,7 +189,7 @@ export default function CorrectionPanel({ detail, correction, onSaved }: Correct
                 confirmLabel={t('dashboard.drawer.correct.dialog_confirm')}
                 onClose={() => setReviewing(false)}
                 onConfirm={async (reason) => {
-                    const result = await api.run('POST', `/api/assessments/${assessment.id}/corrections`, correctionBody(draft, reason));
+                    const result = await api.run('POST', `/admin/api/assessments/${assessment.id}/corrections`, correctionBody(draft, reason));
                     if (!result.ok) {
                         return { ok: false, message: result.message, fieldError: result.fieldErrors.reason ?? null };
                     }

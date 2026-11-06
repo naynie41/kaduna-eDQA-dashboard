@@ -14,13 +14,13 @@ $forwarded = [
 
 it('builds its URLs from the forwarded host when a private-network peer forwards the request', function (string $peer) use ($forwarded): void {
     $this->withServerVariables(['REMOTE_ADDR' => $peer])->withHeaders($forwarded)
-        ->get('/')
+        ->get('/admin')
         ->assertRedirect('https://tunnel.example/login');
 })->with(['172.18.0.1', '10.0.0.5', '192.168.1.20', '127.0.0.1']);
 
 it('ignores forwarded headers from a public address', function () use ($forwarded): void {
     $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])->withHeaders($forwarded)
-        ->get('/')
+        ->get('/admin')
         ->assertRedirect(config('app.url').'/login');
 });
 

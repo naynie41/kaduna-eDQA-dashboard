@@ -26,7 +26,7 @@ export default function PullAllPanel({ names, onStarted }: PullAllPanelProps) {
 
     const start = async () => {
         setStarted(null);
-        const result = await action.run('POST', '/api/sources/pull-all');
+        const result = await action.run('POST', '/admin/api/sources/pull-all');
         if (result.ok) {
             const list = result.data.runs.map((run) => {
                 const name = names[run.source] ?? run.source;

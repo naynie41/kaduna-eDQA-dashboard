@@ -115,3 +115,15 @@ arch('domain models extend Eloquent and are final')
     ->expect('App\Domain\*\Models')
     ->toExtend('Illuminate\Database\Eloquent\Model')
     ->toBeFinal();
+
+// SECURITY.md §3, CONVENTION.md §2: public controllers only read. None may reach a writing Action.
+it('keeps every Domain Action out of the public controllers', function (): void {
+    $actions = array_map(
+        fn (string $dir): string => 'App\\Domain\\'.basename(dirname($dir)).'\\Actions',
+        glob(dirname(__DIR__, 2).'/app/Domain/*/Actions', GLOB_ONLYDIR) ?: [],
+    );
+
+    expect($actions)->not->toBeEmpty()
+        ->and(is_dir(dirname(__DIR__, 2).'/app/Http/Controllers/Public'))->toBeTrue();
+    expect('App\Http\Controllers\Public')->not->toUse($actions);
+});

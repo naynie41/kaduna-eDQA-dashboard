@@ -9,18 +9,15 @@ use Illuminate\Database\Seeder;
 use RuntimeException;
 
 /**
- * The administrator the Playwright suite signs in as (`make e2e`), with a known password and a
- * fixed TOTP secret that tests/e2e/support/login.ts turns into codes. Local and the test suite
- * only, and never called by DatabaseSeeder: these credentials are public in the repository.
+ * The administrator the Playwright suite signs in as (`make e2e`, tests/e2e/auth.setup.ts), with a
+ * known password (no MFA, D-35). Local and the test suite only, and never called by
+ * DatabaseSeeder: these credentials are public in the repository.
  */
 final class E2eAdminSeeder extends Seeder
 {
     public const EMAIL = 'e2e-admin@edqa.test';
 
     public const PASSWORD = 'E2e-Local-Only-2026';
-
-    /** 32 base32 characters (160 bits): long enough for otplib's guardrails. */
-    public const TOTP_SECRET = 'KADUNAEDQAEZEADMINTOTPSECRETABCD';
 
     public function run(): void
     {
@@ -34,9 +31,10 @@ final class E2eAdminSeeder extends Seeder
             'password' => self::PASSWORD,
             'email_verified_at' => now(),
             'is_active' => true,
-            'two_factor_secret' => encrypt(self::TOTP_SECRET),
-            'two_factor_recovery_codes' => encrypt(json_encode([], JSON_THROW_ON_ERROR)),
-            'two_factor_confirmed_at' => now(),
+            // A rerun also lifts any lockout a failed e2e run left behind.
+            'failed_login_count' => 0,
+            'locked_until' => null,
+            'locked_out_at' => null,
         ])->save();
     }
 }

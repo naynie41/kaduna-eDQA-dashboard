@@ -28,7 +28,7 @@ use Tests\Support\ParsedSubmissionBuilder;
 
 beforeEach(function (): void {
     $this->version = ScoringRuleVersion::factory()->published()->create();
-    $this->admin = User::factory()->withTwoFactor()->create(['name' => 'Amina Bello']);
+    $this->admin = User::factory()->create(['name' => 'Amina Bello']);
     $this->round = Round::factory()->create(['year' => 2026, 'quarter' => 2, 'window_start' => '2026-04-01', 'window_end' => '2026-06-30']);
     $this->facility = Facility::factory()->create();
 });
@@ -51,11 +51,11 @@ function storedScores(Assessment $assessment, int $versionId): array
 
 function correct(mixed $test, Assessment $assessment, array $body): TestResponse
 {
-    return $test->actingAs($test->admin)->postJson("/api/assessments/{$assessment->id}/corrections", [...$body, 'reason' => $body['reason'] ?? 'Supervisor re-checked the register']);
+    return $test->actingAs($test->admin)->postJson("/admin/api/assessments/{$assessment->id}/corrections", [...$body, 'reason' => $body['reason'] ?? 'Supervisor re-checked the register']);
 }
 
 it('is behind the sign-in', function (): void {
-    $this->postJson('/api/assessments/1/corrections', ['reason' => 'A long enough reason'])->assertUnauthorized();
+    $this->postJson('/admin/api/assessments/1/corrections', ['reason' => 'A long enough reason'])->assertUnauthorized();
 });
 
 // ---- Scores come only from the calculator
@@ -181,7 +181,7 @@ it('raises and clears soft flags after scoring: a perfect assessment, then a sho
 it('never raises again a flag an administrator overrode', function (): void {
     $assessment = acceptedAssessment($this->facility, $this->round, ParsedSubmissionBuilder::new()->withVisitMinutes(12));
     expect($assessment->flags)->toBe(['VISIT_TOO_SHORT']);
-    $this->actingAs($this->admin)->postJson("/api/assessments/{$assessment->id}/flags/VISIT_TOO_SHORT/override", ['reason' => 'Visit time confirmed with the supervisor'])->assertOk();
+    $this->actingAs($this->admin)->postJson("/admin/api/assessments/{$assessment->id}/flags/VISIT_TOO_SHORT/override", ['reason' => 'Visit time confirmed with the supervisor'])->assertOk();
 
     correct($this, $assessment, ['ended_at' => $assessment->started_at->addMinutes(11)->toIso8601String()])->assertOk()
         ->assertJsonPath('data.flags', []);
@@ -227,7 +227,7 @@ it('refuses an item of another assessment', function (): void {
 it('validates the request: a reason, something to correct, times in order', function (array $body, string $field): void {
     $assessment = acceptedAssessment($this->facility, $this->round);
 
-    $this->actingAs($this->admin)->postJson("/api/assessments/{$assessment->id}/corrections", $body)->assertUnprocessable()->assertJsonValidationErrors($field);
+    $this->actingAs($this->admin)->postJson("/admin/api/assessments/{$assessment->id}/corrections", $body)->assertUnprocessable()->assertJsonValidationErrors($field);
 })->with([
     'no reason' => [['items' => ['avail_m2_reporting_rate' => 'pass']], 'reason'],
     'short reason' => [['items' => ['avail_m2_reporting_rate' => 'pass'], 'reason' => 'short'], 'reason'],
@@ -260,14 +260,14 @@ it('refuses what the action catches: no change, a visit moved out of its round, 
 it('gives the drawer what correction mode needs: the round open, the times and each item\'s key', function (): void {
     $assessment = acceptedAssessment($this->facility, $this->round);
 
-    $this->actingAs($this->admin)->getJson("/api/facilities/{$this->facility->id}?round={$this->round->id}")->assertOk()
+    $this->actingAs($this->admin)->getJson("/admin/api/facilities/{$this->facility->id}?round={$this->round->id}")->assertOk()
         ->assertJsonPath('data.round.open', true)
         ->assertJsonPath('data.assessment.started_at', $assessment->started_at->toIso8601String())
         ->assertJsonPath('data.assessment.ended_at', $assessment->ended_at->toIso8601String())
         ->assertJsonPath('data.items.0.items.0.key', 'avail_m1_register_present');
 
     $this->round->update(['status' => 'closed', 'rule_version_id' => $this->version->id]);
-    $this->actingAs($this->admin)->getJson("/api/facilities/{$this->facility->id}?round={$this->round->id}")->assertJsonPath('data.round.open', false);
+    $this->actingAs($this->admin)->getJson("/admin/api/facilities/{$this->facility->id}?round={$this->round->id}")->assertJsonPath('data.round.open', false);
 });
 
 // ---- A question answered as several checks (the real Kobo form's consistency items, D-67)
@@ -281,7 +281,7 @@ function withCheckedQuestion(Facility $facility, Round $round, array $checks = [
 /** @return list<array<string, mixed>> the drawer's items for one dimension and month */
 function drawerItems(mixed $test, Facility $facility, Round $round, string $dimension, int $slot): array
 {
-    $groups = $test->actingAs($test->admin)->getJson("/api/facilities/{$facility->id}?round={$round->id}")->assertOk()->json('data.items');
+    $groups = $test->actingAs($test->admin)->getJson("/admin/api/facilities/{$facility->id}?round={$round->id}")->assertOk()->json('data.items');
 
     return collect($groups)->firstWhere(fn (array $g): bool => $g['dimension'] === $dimension && $g['slot'] === $slot)['items'];
 }
@@ -408,7 +408,7 @@ it('lets an administrator clear the flag with a reason, and does not raise it ag
     correct($this, $assessment, ['items' => ['avail_m2_reporting_rate' => 'pass']])->assertOk();
     editedAtSource($this->facility, $this->round, 'uuid:visit-3');
 
-    $this->actingAs($this->admin)->postJson("/api/assessments/{$assessment->id}/flags/SOURCE_EDIT_OVER_CORRECTION/override", ['reason' => 'The source edit is the right answer'])->assertOk();
+    $this->actingAs($this->admin)->postJson("/admin/api/assessments/{$assessment->id}/flags/SOURCE_EDIT_OVER_CORRECTION/override", ['reason' => 'The source edit is the right answer'])->assertOk();
     expect($assessment->refresh()->flags)->not->toContain('SOURCE_EDIT_OVER_CORRECTION');
 
     // A second edit at source, with no new correction since the override: nothing new to see.
@@ -418,7 +418,7 @@ it('lets an administrator clear the flag with a reason, and does not raise it ag
 
 it('tells the drawer the assessment was corrected in the portal, until a source edit replaces it', function (): void {
     $assessment = acceptedAssessment($this->facility, $this->round, ParsedSubmissionBuilder::new()->withInstanceId('uuid:visit-4'));
-    $drawer = fn () => $this->actingAs($this->admin)->getJson("/api/facilities/{$this->facility->id}?round={$this->round->id}")->assertOk();
+    $drawer = fn () => $this->actingAs($this->admin)->getJson("/admin/api/facilities/{$this->facility->id}?round={$this->round->id}")->assertOk();
 
     $drawer()->assertJsonPath('data.assessment.corrected', null);
 

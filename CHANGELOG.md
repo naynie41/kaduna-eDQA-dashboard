@@ -7,8 +7,47 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: public dashboard routes and a separate admin area (Phase P step 1, D-76–D-78).**
+  - The dashboard is at `/`, `/facilities`, `/lgas`, `/monitor`, `/visuals` and `/plan`, with no
+    login: GET/HEAD only (`public.readonly`, else 405) and 120 requests a minute per IP
+    (`throttle:public`, then a plain 429 page linking to Home). The old `/dashboard/*` URLs answer
+    301 to the new ones, filters kept.
+  - Everything else that needs a login is under `/admin` (`routes/admin.php`, `admin.*`): the admin
+    pages, the security settings (`/admin/settings/security`), the component gallery, attachments
+    (`/admin/attachments/…`) and the admin JSON (`/admin/api/…`). The old `/api/*`, `/settings/*`
+    and `/attachments/*` URLs are gone.
+  - After sign-in an administrator lands on `/admin`, after sign-out on `/`. The public pages show no
+    link to `/login` or to the admin area: the rail's Administration item and the account links
+    appear only when signed in.
+  - The source webhooks moved to `routes/webhooks.php`, outside the web group (no session).
+  - `X-Robots-Tag: noindex, nofollow` on every response, a robots meta tag in the layout, and
+    `robots.txt` disallowing `/admin` and `/login` (D-82, `edqa.public.indexable`, default false).
+  - The route guard is now a classifier: every route is public, admin, webhook, health or auth.
+  - Public controllers live in `Http\Controllers\Public`, which may not use any Domain Action.
+
+### Removed
+
+- **BREAKING: multi-factor authentication (D-84).** No two-factor routes, middleware, pages,
+  columns (`two_factor_*` dropped by a reversible migration), recovery codes, `EDQA_REQUIRE_2FA`
+  switch or e2e TOTP login. Administrators sign in with email and password alone. The signed-in
+  area needs only `auth` (no `verified`). "Keep me signed in" is gone: it would outlive the
+  session limits below.
+
 ### Added
 
+- **Compensating controls for no MFA (SECURITY.md §2):**
+  - Optional admin IP allow-list, `EDQA_ADMIN_ALLOWED_IPS` (comma-separated CIDRs): sign-in,
+    password reset and every signed-in page answer 404 to any other address. Off when empty.
+  - Progressive lockout per account: 5 failures lock it for 15 minutes, 10 for an hour, 20 until
+    `edqa:admin:unlock {email}`. The per-IP throttle stays; every refusal reads the same.
+  - New-device sign-in alerts: a sign-in from an IP + browser not seen in 90 days emails that
+    administrator and the other active ones (time in WAT, IP, browser). Devices are stored as
+    keyed hashes only.
+  - Sessions end 12 hours after sign-in, however active; a password change ends the user's other
+    sessions, a reset all of them.
+  - Failed logins, lockouts, unlocks, password changes and new-device sign-ins are audited.
 - **Source edit over a portal correction (Q-23, default):** when a corrected assessment is edited
   at its source, the source edit wins, the correction stays in the audit log, and the assessment
   is flagged `SOURCE_EDIT_OVER_CORRECTION` on the Soft tab of Data issues.
@@ -39,6 +78,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Password policy:** at least 14 characters with upper and lower case, a number and a symbol,
+  not found in breaches (outside tests), and none of the last 5 (`password_histories`). Applies to
+  `edqa:admin:create`, password reset and password change.
+- **Idle timeout:** `SESSION_LIFETIME=120` (was 480).
 - `edqa:backfill {source} --survey` counts each visit under the round it will be held to: the
   quarter the form declares it reviews, else the quarter of the visit. Each row now shows the
   visit dates, and the survey warns when an existing round's window misses some of its visits.

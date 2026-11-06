@@ -45,10 +45,6 @@ export default function Login({ status }: LoginProps) {
                             required
                             error={errors.password}
                         />
-                        <div className="flex items-center gap-2">
-                            <input id="remember" name="remember" type="checkbox" className="size-4 accent-deep" />
-                            <label htmlFor="remember">{t('auth.fields.remember')}</label>
-                        </div>
                         <SubmitButton processing={processing}>{t('auth.login.submit')}</SubmitButton>
                         <p className="text-center">
                             <Link href={request()} className="text-deep underline underline-offset-2">

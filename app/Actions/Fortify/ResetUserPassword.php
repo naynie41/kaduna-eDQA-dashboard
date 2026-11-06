@@ -6,26 +6,27 @@ namespace App\Actions\Fortify;
 
 use App\Concerns\PasswordValidationRules;
 use App\Models\User;
+use App\Support\Auth\PasswordChange;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
+/**
+ * A forgotten password, reset from the emailed link (SECURITY.md §2): the policy and history
+ * apply, every session of the account ends, and the change is audited.
+ */
 final class ResetUserPassword implements ResetsUserPasswords
 {
     use PasswordValidationRules;
 
     /**
-     * Validate and reset the user's forgotten password.
-     *
      * @param  array<string, string>  $input
      */
     public function reset(User $user, array $input): void
     {
         Validator::make($input, [
-            'password' => $this->passwordRules(),
+            'password' => $this->passwordRules($user),
         ])->validate();
 
-        $user->forceFill([
-            'password' => $input['password'],
-        ])->save();
+        PasswordChange::apply($user, $input['password'], 'reset');
     }
 }

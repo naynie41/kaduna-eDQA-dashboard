@@ -20,7 +20,7 @@ use Tests\Support\Rows;
 // cached count, and the stale-ingestion banner (SECURITY.md §12).
 
 beforeEach(function (): void {
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 const ADMIN_PAGES = [
@@ -66,7 +66,7 @@ it('keeps every admin page behind the sign-in', function (string $path): void {
 it('does not compute the admin props for a dashboard page', function (): void {
     $this->seed(LgaSeeder::class);
 
-    $this->actingAs($this->admin)->get('/dashboard/home')
+    $this->actingAs($this->admin)->get('/')
         ->assertInertia(fn (Assert $page) => $page->where('admin', null)->missing('translations.admin'));
 });
 

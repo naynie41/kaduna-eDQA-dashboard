@@ -72,11 +72,10 @@ it('records the request IP and user agent with each entry', function (): void {
         ->and($entry->properties['user_agent'])->toBe('Mozilla/5.0 (Audit test)');
 });
 
-it('never logs passwords or two-factor secrets', function (): void {
+it('never logs passwords or the lockout counters', function (): void {
     $user = User::factory()->create();
 
-    // forceFill, as Fortify does: the secret is not mass-assignable.
-    $user->forceFill(['password' => 'a-new-password-12', 'two_factor_secret' => 'secret', 'name' => 'Renamed'])->save();
+    $user->forceFill(['password' => 'a-new-password-12', 'failed_login_count' => 3, 'name' => 'Renamed'])->save();
 
     $entry = Activity::query()->forSubject($user)->where('event', 'updated')->sole();
     expect(array_keys($entry->properties['attributes']))->toBe(['name']);

@@ -336,7 +336,7 @@ it('resolves the quarantined original when its edit arrives (fix at source)', fu
 });
 
 it('counts the run row exactly, and audits a manual pull with its administrator', function (): void {
-    $admin = User::factory()->withTwoFactor()->create();
+    $admin = User::factory()->create();
     $this->source->add(pullEntry(1), pullEntry(2, 'broken'), pullEntry(3, 'short'), pullEntry(4));
 
     $run = pullNow(PullTrigger::Manual, $admin->id);

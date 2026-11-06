@@ -50,7 +50,7 @@ export default function CorrectIssueForm({ row, lgas, onReview, onCancel }: Corr
         const controller = new AbortController();
         const timer = setTimeout(() => {
             const query = new URLSearchParams({ ...(values.lga_ref === '' ? {} : { lga: values.lga_ref }), ...(search === '' ? {} : { q: search }) });
-            getJson<{ data: FacilityOption[] }>(`/api/facility-options?${query.toString()}`, controller.signal)
+            getJson<{ data: FacilityOption[] }>(`/admin/api/facility-options?${query.toString()}`, controller.signal)
                 .then((response) => setOptions(response.data))
                 .catch(() => undefined);
         }, 250);

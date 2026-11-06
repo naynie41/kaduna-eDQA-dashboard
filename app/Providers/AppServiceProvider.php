@@ -28,7 +28,6 @@ use App\Domain\Validation\Events\QuarantineResolved;
 use App\Domain\Validation\Events\SubmissionQuarantined;
 use App\Domain\Validation\Listeners\FlushOpenQuarantineCount;
 use App\Domain\Validation\Listeners\RescoreAfterQuarantineResolved;
-use App\Support\Security\TwoFactorSwitch;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -60,8 +59,6 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // EDQA_REQUIRE_2FA=false is for local development only: anywhere else the app stops here.
-        TwoFactorSwitch::assertAllowed();
         $this->configureDefaults();
 
         // "Pull now": 6 a minute per administrator (SECURITY.md §8). Named, with its own key, so it
@@ -70,6 +67,10 @@ final class AppServiceProvider extends ServiceProvider
         RateLimiter::for('source-pull', fn (Request $request): Limit => Limit::perMinute(6)->by('source-pull:'.($request->user()?->getAuthIdentifier() ?? $request->ip()).':'.$request->path()));
         // The webhooks: 60 a minute per source and sending address.
         RateLimiter::for('webhook', fn (Request $request): Limit => Limit::perMinute(60)->by('webhook:'.$request->path().':'.$request->ip()));
+        // The public dashboard: 120 a minute per IP (SECURITY.md §8), then a plain page back to Home.
+        RateLimiter::for('public', fn (Request $request): Limit => Limit::perMinute((int) config('edqa.public.per_minute'))
+            ->by('public:'.$request->ip())
+            ->response(fn (Request $request, array $headers) => response()->view('errors.public-throttled', [], 429, $headers)));
 
         // Domain listeners live outside app/Listeners, so they are registered here.
         Event::listen(QuarantineResolved::class, RescoreAfterQuarantineResolved::class);
@@ -112,7 +113,7 @@ final class AppServiceProvider extends ServiceProvider
         // SECURITY.md §2, in every environment. uncompromised() asks the Have I Been Pwned API
         // (k-anonymity range query); tests skip it so they never depend on the network.
         Password::defaults(function (): Password {
-            $rule = Password::min(12)->mixedCase()->numbers();
+            $rule = Password::min(14)->mixedCase()->numbers()->symbols();
 
             return app()->environment('testing') ? $rule : $rule->uncompromised();
         });

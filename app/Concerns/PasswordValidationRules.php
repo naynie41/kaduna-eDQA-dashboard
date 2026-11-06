@@ -4,19 +4,22 @@ declare(strict_types=1);
 
 namespace App\Concerns;
 
+use App\Models\User;
+use App\Support\Auth\NotRecentlyUsed;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rules\Password;
 
 trait PasswordValidationRules
 {
     /**
-     * Get the validation rules used to validate passwords.
+     * The password policy (SECURITY.md §2, Password::defaults), plus no reuse of the user's last 5
+     * when there is a user (a reset or a change).
      *
      * @return array<int, Password|ValidationRule|array<mixed>|string>
      */
-    protected function passwordRules(): array
+    protected function passwordRules(?User $user = null): array
     {
-        return ['required', 'string', Password::default(), 'confirmed'];
+        return ['required', 'string', Password::default(), 'confirmed', ...($user !== null ? [new NotRecentlyUsed($user)] : [])];
     }
 
     /**

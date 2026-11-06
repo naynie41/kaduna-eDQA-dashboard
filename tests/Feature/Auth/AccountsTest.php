@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Support\Config\EnvFlag;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 use Spatie\Activitylog\Models\Activity;
 
 // ---- edqa:admin:create (SECURITY.md §2: accounts by artisan command only)
@@ -24,7 +23,6 @@ it('creates a verified, active administrator interactively', function (): void {
     expect($user->name)->toBe('Amina Bello')
         ->and($user->is_active)->toBeTrue()
         ->and($user->email_verified_at)->not->toBeNull()
-        ->and($user->two_factor_confirmed_at)->toBeNull()
         ->and(Hash::check('Correct-Horse-12', $user->password))->toBeTrue();
 
     $entry = Activity::query()->forSubject($user)->where('event', 'created')->sole();
@@ -60,7 +58,7 @@ it('warns when more than three administrators are active', function (): void {
 // ---- edqa:admin:disable
 
 it('disables an administrator, ends their sessions and records it', function (): void {
-    $user = User::factory()->withTwoFactor()->create(['email' => 'leaver@example.test']);
+    $user = User::factory()->create(['email' => 'leaver@example.test']);
     DB::table('sessions')->insert(['id' => 'sess-1', 'user_id' => $user->id, 'payload' => '', 'last_activity' => time()]);
 
     $this->artisan('edqa:admin:disable', ['email' => 'leaver@example.test'])->assertSuccessful();
@@ -76,7 +74,7 @@ it('fails for an unknown email', function (): void {
 });
 
 it('refuses to log a disabled administrator in', function (): void {
-    $user = User::factory()->withTwoFactor()->create(['is_active' => false]);
+    $user = User::factory()->create(['is_active' => false]);
 
     $this->post(route('login'), ['email' => $user->email, 'password' => 'password'])
         ->assertSessionHasErrors('email');
@@ -85,18 +83,11 @@ it('refuses to log a disabled administrator in', function (): void {
 
 // ---- Password policy and session cookie (SECURITY.md §2)
 
-it('requires 12+ characters with mixed case and numbers', function (): void {
-    $rule = Password::defaults();
+// The password policy itself is in PasswordPolicyTest.
 
-    expect(validator(['p' => 'Short1a'], ['p' => $rule])->fails())->toBeTrue()
-        ->and(validator(['p' => 'alllowercase123'], ['p' => $rule])->fails())->toBeTrue()
-        ->and(validator(['p' => 'NoNumbersHereAtAll'], ['p' => $rule])->fails())->toBeTrue()
-        ->and(validator(['p' => 'Correct-Horse-12'], ['p' => $rule])->passes())->toBeTrue();
-});
-
-it('issues a Secure, HttpOnly, SameSite=Lax session cookie, encrypted, for 8 hours', function (): void {
+it('issues a Secure, HttpOnly, SameSite=Lax session cookie, encrypted, for 2 hours idle', function (): void {
     expect(config('session.encrypt'))->toBeTrue()
-        ->and(config('session.lifetime'))->toBe(480);
+        ->and(config('session.lifetime'))->toBe(120);
 
     config(['session.secure' => true]);
     $cookie = collect($this->get(route('login'))->headers->getCookies())

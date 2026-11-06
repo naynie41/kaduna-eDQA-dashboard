@@ -18,7 +18,7 @@ use Tests\Support\ParsedSubmissionBuilder;
 
 beforeEach(function (): void {
     ScoringRuleVersion::factory()->published()->create();
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
     $this->record = quarantineThrough(ParsedSubmissionBuilder::new()->withFacilityRef('2019.00')->build());
 });
 

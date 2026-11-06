@@ -8,7 +8,7 @@ async function ready(page: Page): Promise<void> {
 
 test.describe('Facility view', () => {
     test('lists weakest first; sorting from the keyboard reloads the order, updates the URL and is announced', async ({ page }) => {
-        await page.goto('/dashboard/facility?year=2026&quarter=2');
+        await page.goto('/facilities?year=2026&quarter=2');
         await ready(page);
 
         const table = page.getByRole('table', { name: /Facilities in view, by Overall, lowest first/ });
@@ -29,7 +29,7 @@ test.describe('Facility view', () => {
     });
 
     test('the measure switcher and the pages work, the table caption following', async ({ page }) => {
-        await page.goto('/dashboard/facility?year=2026&quarter=2');
+        await page.goto('/facilities?year=2026&quarter=2');
         await ready(page);
 
         await page.getByRole('group', { name: 'Measure' }).getByRole('button', { name: 'Consistency' }).click();
@@ -42,7 +42,7 @@ test.describe('Facility view', () => {
     });
 
     test('the table scrolls in a focusable region and axe finds nothing serious', async ({ page }) => {
-        await page.goto('/dashboard/facility');
+        await page.goto('/facilities');
         await ready(page);
 
         const region = page.getByRole('region', { name: /Facilities in view.*scrollable/ });

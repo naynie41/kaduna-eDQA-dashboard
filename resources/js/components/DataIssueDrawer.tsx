@@ -27,7 +27,7 @@ export default function DataIssueDrawer({ recordId, instanceId, onClose }: DataI
 
     useEffect(() => {
         const controller = new AbortController();
-        getJson<{ data: DataIssueDetail }>(`/api/quarantine/${recordId}`, controller.signal)
+        getJson<{ data: DataIssueDetail }>(`/admin/api/quarantine/${recordId}`, controller.signal)
             .then((response) => setDetail(response.data))
             .catch(() => undefined);
 

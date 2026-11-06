@@ -28,7 +28,8 @@ flowchart LR
     V -->|pass / soft flag| A[(assessments<br/>item_responses)]
     A --> SC[ScoreCalculator] --> AS[(assessment_scores)]
     AS --> MV[(round_aggregates<br/>materialised view)]
-    MV --> AG[Aggregators] --> UI[Inertia + React dashboard]
+    MV --> AG[Aggregators + PublicScope] --> UI[Public dashboard<br/>closed rounds, no login]
+    AG --> ADMUI[Admin area /admin<br/>password login]
     Q --> ADM[Data issues admin] --> PR
   end
   OC --> P
@@ -58,7 +59,10 @@ not a query filter.
 **Data sources:** ODK Central and KoboToolbox, both pulled through one shared pipeline (§5).
 
 **Out of scope for v1:** any source besides ODK Central and KoboToolbox, roles/permissions, writing back to ODK, Kobo or
-DHIS2, sampling logic, mobile app, multi-state tenancy, DHIS2 comparison, public dashboard.
+DHIS2, sampling logic, mobile app, multi-state tenancy, DHIS2 comparison.
+
+**Audiences:** a **public, read-only dashboard** (no login, closed rounds only) and an **admin
+area** under `/admin`, reached by typing `/login` (D-76–D-83, SECURITY.md §3).
 
 ---
 
@@ -245,7 +249,7 @@ All timestamps `timestamptz`. All raw payloads `jsonb`. Every migration reversib
 | `rounds` | id, year smallint, quarter smallint, window_start date, window_end date, status, closed_at?, reopened_reason?, timestamps | UQ (year, quarter); CHECK quarter 1–4; CHECK window_end ≥ window_start; status CHECK in ('open','closed') |
 | `submission_sources` | id, key UQ, type, name, is_enabled, timestamps | `type` CHECK in ('odk_central','kobo'); seeded from config; credentials never stored here |
 | `submissions` | id, source_id FK, external_id, instance_id UQ, deprecated_id?, form_ref, form_version, payload jsonb, submitted_at, source_updated_at?, received_at, processed_at?, status, superseded_by_id?, deleted_at_source? | Payload never mutated; index (source_id, external_id) |
-| `assessments` | id, round_id FK, facility_id FK, submission_id FK, source_id (from the submission), assessor_name, device_id?, started_at, ended_at, gps jsonb?, status, flags jsonb default '[]', timestamps | UQ (round_id, facility_id); CHECK ended_at ≥ started_at; FK (submission_id, source_id) → submissions (id, source_id) ON UPDATE CASCADE; trigger `assessments_take_source` sets source_id from the submission on every insert and on any change to submission_id or source_id |
+| `assessments` | id, round_id FK, facility_id FK, submission_id FK, assessor_name, device_id?, started_at, ended_at, gps jsonb?, status, flags jsonb default '[]', timestamps | UQ (round_id, facility_id); CHECK ended_at ≥ started_at |
 | `item_responses` | id, assessment_id FK cascade, dimension, month_slot smallint, item_code, value, is_applicable bool | CHECK month_slot 1–3; dimension CHECK |
 | `assessment_scores` | id, assessment_id FK cascade, dimension, month_slot smallint, score numeric(5,2) NULL, rule_version_id FK, computed_at | CHECK score 0–100; UQ (assessment_id, dimension, month_slot, rule_version_id) |
 | `quarantined_records` | id, submission_id FK, source_id FK, instance_id, round_id?, facility_ref?, lga_ref?, payload jsonb, failures jsonb, status, resolution, resolved_by?, resolved_at?, resolution_note?, timestamps | `failures` = `[{code, severity, detail}]` |
@@ -390,46 +394,6 @@ flowchart TD
 - **Adding a third source** (e.g. ODK Aggregate, SurveyCTO) means writing a new adapter that
   implements the same contracts, plus a decision record. It never means a shortcut path such as
   a file upload.
-- **Built (Phase 2C step 1):**
-  - **Schema** (migration `2026_10_28_000100_make_ingestion_source_aware`): every row stored
-    before Phase 2C belongs to the `odk` source. `external_id` comes from the payload's `__id`.
-  - **The cursor keeps two timestamps.** `edit_cursor_at` is kept beside `cursor_at`, because
-    ODK's edits pass needs it (D-51 in the build-era numbering).
-  - **One cursor per source.** `form_ref` records the form it follows; when the configured form
-    changes, `SourceSync::forForm()` starts the cursor again. The migration refuses to merge two
-    ODK cursor rows; a person has to delete the stale one first.
-  - **Two switches per source:** the env flag (`ODK_ENABLED`, `KOBO_ENABLED`) for the operator,
-    and `submission_sources.is_enabled` for the administrator. `edqa:sources:sync` sets
-    `is_enabled` only when it creates a row.
-  - **`SourceRegistry`** resolves a key to its config, row and adapter. KoboToolbox's adapter is
-    refused until step 4, and the per-source normaliser arrives with step 2.
-  - **Attachments** live in `storage/app/attachments/{source}/{instance}/`. The one-off
-    `edqa:attachments:relocate` moves files from the old `odk` disk and is safe to run again.
-- **Built (Phase 2C step 2):**
-  - **Normaliser layer.** `Contracts\PayloadNormalizer` turns a raw payload into a
-    `SubmissionEnvelope` (`SubmissionMeta` + `data`, as §5.2). `Odk\OdkPayloadNormalizer` holds
-    every ODK-specific read: `__id`, `meta`, `__system`.
-  - **The parser** (`App\Domain\Ingestion\SubmissionParser`) reads only the envelope. An
-    architecture test keeps it, and `FieldMap`, free of any source's classes. Reprocessing reads a
-    stored payload through its own source's normaliser (`ReadSubmission::fromStored`).
-  - **`ParsedSubmission`** carries `source` and `externalId`.
-  - **Field maps** are now named maps with `extends`, plus `sources` (source → version → map
-    name). `FieldMap::for(source, version)` gives null for any unmapped pair (Kobo versions were
-    mapped in step 4). Paths stay dot paths into the envelope's `data`; the Kobo normaliser
-    (step 4) nests its `facility/lga` keys. UNKNOWN_FORM_VERSION names the source ("kobo form version vQ8x…
-    has no field map").
-  - **Edits (D-61).** `SubmissionSource::changedSince(cursor)` is the pull's
-    second pass. On ODK it filters `__system/submissionDate ge X or __system/updatedAt ge X` and
-    sorts by `updatedAt asc, __id asc` (Central v2024.1+). With no edit cursor yet, it asks for the
-    edited submissions only.
-  - **D-51's two cursors are kept.** Ordering a single cursor across two fields can't page safely.
-  - **`source_updated_at`** is stored from `__system/updatedAt`.
-  - **Edits without `deprecatedID`.** A new row whose `external_id` the source already sent,
-    under another instance ID, is treated as an edit of the latest unsuperseded version. Its
-    `deprecated_id` is set to that version (the payload is untouched), and it takes the usual
-    edit path.
-  - **Fixtures** moved to `tests/Fixtures/sources/odk/` unchanged. The parsed fixtures gained only
-    `source` and `external_id`.
 
 ### 5.1 Form contract (both sources)
 
@@ -480,31 +444,6 @@ system fields (`_id`, `_submission_time`, `__version__`, `_attachments`, `_submi
 timestamps without a timezone suffix (treat as UTC). After normalisation the parser cannot tell
 the sources apart.
 
-- **Built (Phase 2C step 4):** `Kobo\KoboPayloadNormalizer`, returned by
-  `SourceRegistry::normaliser('kobo')`.
-  - **Meta:** `_id` → externalId. The instance ID is `meta/instanceID`, else the nested
-    `meta.instanceID`, else `"uuid:" + _uuid`; `meta/deprecatedID` likewise.
-  - **Times:** a zoneless `_submission_time` is read as UTC; a time that carries a zone is read
-    as written. updatedAt is always null.
-  - **Other meta:** `__version__` → formVersion; `_submitted_by` and the form's `deviceid`.
-  - **Attachments:** `_attachments` → attachments (`media_file_basename`, else the file's
-    basename; `mimetype`; `download_url`). Deleted entries are skipped.
-  - **Answers:** slash keys are nested into groups, and each repeat row is nested to the
-    repeat's own path. Every underscore field, `meta/*`, `formhub/*` and `deviceid` stay out of
-    the answers. The stored payload is untouched.
-  - **Clashes:** a key that can't be nested (a malformed path such as `a//b`, or one that clashes
-    with an answer or a group) stays flat under its full key. The one clash with nowhere flat to
-    go, a top-level answer named like a group, keeps the group; the raw payload keeps both.
-  - **Never throws**, like the parser (500-row property test).
-  - **The parser** also reads the XForms text geopoint `"lat lng [alt [accuracy]]"`, as Kobo
-    sends it. Out-of-range or malformed values give null.
-  - **Source parity** (CONVENTION.md §8): every fixture has a Kobo KPI-v2-shaped row in
-    `tests/Fixtures/sources/kobo/`. It parses to the ODK row's `ParsedSubmission` apart from
-    source, external_id and form_version, and ends with the same outcome. There are two
-    Kobo-only cases: a missing meta block, and a select_multiple-style "yes no" answer.
-  - **Version uids:** the two Kobo `__version__` uids in the field maps are fictional
-    (CONTRACT-ASSUMED) until the real deployments are listed (§5.5).
-
 ### 5.3 Pull mechanics
 
 **Common to both sources**
@@ -540,46 +479,6 @@ the sources apart.
 - **Schedule:** one scheduled pull per **configured and enabled** source, every 10 minutes,
   `withoutOverlapping()` per source; a nightly `ReconcileSourceJob` per source for the open round.
 - **Latency target:** a submission on either source visible on the dashboard ≤ 15 minutes.
-- **Built (Phase 2C step 5):**
-  - **Pull per source.** `PullSubmissions::execute(source, trigger)`, `PullSubmissionsJob(source, …)`,
-    `BackfillSubmissions::execute(source, …)` and `BackfillSubmissionsJob(source, …)` all go through
-    `ProcessSubmissionsPage`. They know no source's shape: times and IDs come from the source's
-    normaliser, and adapters and settings from `SourceRegistry` (`adapter`, `formRef`,
-    `pageSize`, `backfillThrottle`, `notConfigured`).
-  - **No default adapter.** There is no container binding for `SubmissionSource`. Tests bind a
-    fake per key (`SourceRegistry::adapterBinding`).
-  - **Locks.** `PullLock` (`pull:{source}`) is per source. The reconcile sweep and each backfill
-    page take it too. Its config moved to `edqa.pull` (`lock_seconds`, `lock_wait_seconds`,
-    `reconcile_at`). `BackfillLock` (`backfill`) is shared by all sources.
-  - **Heartbeats per source:** `HEARTBEAT_PULL_ODK_URL` and `HEARTBEAT_PULL_KOBO_URL`. The old
-    `HEARTBEAT_ODK_PULL_URL` is read for one more release.
-  - **Cross-source duplicates (D-60).** Inside the page transaction, a row not inserted whose
-    instance another source holds is counted in `cross_source_duplicates`, not `duplicates`. A
-    warning names both sources, with IDs only.
-  - **Attachments.** They come from the envelope where the row lists them (Kobo's
-    `_attachments`); otherwise the adapter's list is used (ODK). Both adapters look attachments
-    up by the logical ID: `__id` on ODK, `_id` on Kobo (`query={"_id": n}`).
-  - **Reconcile (D-61, D-62).** `ReconcileSource::execute(source)`, `ReconcileSourceJob(source)`
-    and `edqa:reconcile {source}`. The sweep reads the whole open-round window first: every
-    submission received since the window's first day, local midnight. A failure part-way flags
-    nothing.
-    - **Instances we don't hold** go through the page path: an edit of a known `external_id`,
-      or a submission the pull missed.
-    - **Deletions at source:** a held submission (its latest version) whose `external_id` is no
-      longer returned gets `deleted_at_source`, an audit entry and `SourceDeletionDetected`.
-      Nothing else changes. Each submission is flagged once.
-    - **Bookkeeping:** run trigger `reconcile`; new `pull_runs.deletions_detected` (migration
-      `2026_10_30_000100`); `last_reconciled_at` on success; no cursor moves.
-  - **Schedule** (`routes/console.php`): for each *configured* source, `edqa:pull:{source}`
-    every ten minutes and `edqa:reconcile:{source}` daily at 02:30.
-    - Each event has its own name, so `withoutOverlapping()` holds per source.
-    - *Enabled* (the env flag plus the administrator's switch) is checked when the event is due,
-      so reading the schedule needs no database.
-  - **Commands.** `edqa:pull {source?} {--all} {--dry-run} {--limit=}` needs a source or
-    `--all`. `edqa:backfill {source} …` and `edqa:reconcile {source}` take one source.
-  - **Mocks.** `docker/kobo-mock` sits beside the ODK mock (profile `sources`).
-    `edqa:source-mock:generate {source} {--count} {--broken} {--edits} {--overlap=N}` writes
-    either mock; see `docker/kobo-mock/README.md`.
 
 **ODK Central**
 
@@ -595,26 +494,6 @@ the sources apart.
   (open question Q-17).
 - Check parameter names, page-size limits and rate limits against the current KPI API docs when
   building the adapter; record what was verified in the adapter's docblock.
-- **Built (Phase 2C step 3):** `Kobo\KoboClient` and `Kobo\KoboSource`. They were checked
-  against the KPI OpenAPI schema (`/api/v2/schema/`, api_v2 2.0.0, 28 Oct 2026), recorded in
-  `KoboClient`'s docblock.
-  - **Auth:** `Authorization: Token …`.
-  - **Data:** `GET /api/v2/assets/{uid}/data/?format=json&query={"_submission_time":{"$gte":"…"}}&sort={"_submission_time":1,"_id":1}&start=&limit=`.
-    The limit is at most 1000 a page. Times are UTC, to the second, with no zone.
-  - **Paging** uses `start`/`limit`, and the answer's `next` URL is never followed.
-  - **Versions:** `/versions/`, those with a `date_deployed`. **Account:** `/me/`.
-  - **Rate limits:** none documented for these endpoints; 429/5xx are retried with Retry-After.
-  - **No last-edited field on Kobo submissions**, so `KoboSource::changedSince` returns none
-    without asking. The reconcile sweep (2C.5) is Kobo's edit path.
-  - **Attachments** come from the row's `_attachments`. A `download_url` is followed only over
-    https, on the configured host and port, with no credentials in the URL. Redirects are followed
-    only while they stay there; anything else is `KoboUnsafeUrl`.
-  - **Not confirmed by the docs:** whether the hosted servers' `download_url` redirects to file
-    storage on another host. If it does, that host must be allowed deliberately; check on
-    credentials day.
-  - `edqa:source:check {source?} {--all} {--json}` replaces `edqa:odk:check`, which stays one
-    release as an alias.
-  - Shared code catches `Exceptions\SourceException`, the parent of both the ODK and Kobo families.
 
 ### 5.4 Webhooks (optional, per source)
 
@@ -625,20 +504,6 @@ scheduled pull always runs regardless.
 - **ODK:** HMAC-SHA256 over the raw body with `ODK_WEBHOOK_SECRET` (SECURITY.md §6).
 - **Kobo:** Kobo's REST Services can't sign requests, so a long random token is sent in a custom
   header (`X-EDQA-Webhook-Token`) and compared with `hash_equals`; HTTPS only.
-- **Built (Phase 2C step 6):**
-  - **One route.** `SourceWebhookController` serves `POST /webhooks/{source}`, so
-    `/webhooks/odk` keeps working unchanged. Each source type has its `WebhookVerifier`:
-    `OdkHmacVerifier` (the D-54 signature, headers unchanged) and `KoboTokenVerifier`
-    (`KOBO_WEBHOOK_TOKEN`).
-  - **When it is a 404:** a key not in config, or a source whose secret is unset. A Kobo token
-    shorter than 32 characters counts as unset.
-  - **Not genuine:** 401 with a reason code. Only the source and the reason are logged, never
-    a header value or the body.
-  - **Genuine:** it queues `PullSubmissionsJob(source, Webhook)` for that source only, at most
-    once per `debounce_seconds` per source. A source switched off answers 202 and queues
-    nothing.
-  - **Rate limit:** `throttle:webhook`, 60 a minute per source and sending address.
-  - **HTTPS:** enforced at the web tier (Caddy), not checked by the app.
 
 ### 5.5 Form versions and field maps
 
@@ -678,41 +543,6 @@ return [
 the source named in the detail. Never fall back to another version's map. Silent misparsing is
 the worst outcome.
 
-**Built (Kobo credentials day, step 2b): the real KoboToolbox form (D-65–D-74).**
-- **Item rules.** `config/edqa_item_rules.php` holds 1,192 rules: 541 availability, 182
-  consistency and 469 validity. They are generated by `discovery/kobo_item_rules.py` from every
-  term of the form's own score formulas (`dqa_<a|c|v>_<m|q>_…_p`), with none left unread. Map
-  `kobo-2024010101` names the rule set, and all seven deployment uids point at the map.
-  `SubmissionParser` reads a map that has item rules rule by rule:
-  - `choice` goes through the rule version's choice map. An unanswered item, or one whose service
-    is not offered, is N/A.
-  - `count3`: an answer *k* gives *k* passes of 3 checks. An unanswered item is N/A.
-  - `match`: all the numbers entered and equal is a pass; any missing or different is a fail;
-    none entered is N/A.
-- **Visits.** `visit_mode` decides the rules that apply.
-  - A monthly visit covers its `review_month`'s slot: `ParsedSubmission::monthSlots`, and
-    `ITEMS_INCOMPLETE` requires that slot only.
-  - A quarterly visit reads its quarter's rules, each in its own slot.
-  - The round is the reviewed period. `round_quarter_format => 'q'` reads q1–q4.
-- **Out of scope.** `out_of_scope` matches marks a submission `out_of_scope`. It is never validated,
-  scored or quarantined, and `pull_runs.out_of_scope` counts it.
-- **Facility slugs.** The form's slugs resolve through `facility_source_refs`, loaded by
-  `edqa:facilities:source-refs {source} {file}`: all or nothing, audited. A real code wins; an
-  ambiguous or unmapped slug stays unknown.
-- **Dry run on the 6 real submissions.** The portal's scores equal the form's own to the decimal in
-  every dimension. The exception is consistency where items were left unanswered: D-67's
-  deliberate N/A, against the form's 1.5 of 1.5.
-- **Drawer and corrections (2026-11-01).** Items carry the form's wording (`lang/en/items.php`,
-  generated by `discovery/kobo_item_labels.php`; a three-number validity item is named by the data
-  element in the note before it). A question stored as several checks (D-67) is one drawer item
-  whose result is the count passed (`"2"`, with `checks: {passed, total}`), or `na`; a correction
-  sends a count `0`–total or `na`, and `CorrectAssessment` sets the first *k* checks to pass and
-  the rest to fail, auditing each changed check under the question's key.
-- **Not built yet:**
-  - Merging monthly visits into one round assessment (D-70). Until then a second visit for the
-    same facility and round quarantines as `DUPLICATE_ASSESSMENT`.
-  - The form's action plans (D-73).
-
 **Phase 0 task, per source:** list every deployed form version (ODK:
 `GET /v1/projects/{p}/forms/{f}/versions`; Kobo: the asset's deployed versions from the KPI API),
 download each XLSForm, and diff question names. That diff *is* the field map.
@@ -729,24 +559,10 @@ source at a time**.
   `ROUND_WINDOW`, never guessed into the nearest round.
 - Throttle between pages per source (default 5 s); run out of hours on the first pass.
 - Commands: `edqa:backfill {source} {--survey} {--from-page=} {--throttle=} {--dry-run}`.
-- The survey counts each visit under the round `ROUND_WINDOW` will hold it to: the declared
-  quarter (D-71), else the visit's own. It shows the visit dates per row and warns when a round's
-  window misses some of its visits. A form filled in after the period it reviews needs a window
-  that runs past the quarter's end (Q-10).
 - The **backfill report** breaks results down by source, round, year, rule and form version.
 - If both sources hold history for the same quarters, expect `DUPLICATE_ASSESSMENT` and
   `cross_source_duplicate` counts; the report lists them so the client can decide which copy is
   authoritative (Q-15).
-- **Built (Phase 2C step 5):**
-  - **One source at a time.** `edqa:backfill {source}` refuses while another source's backfill
-    is running: the shared `BackfillLock`, or an open backfill run of another source that
-    started, or committed a page, within `edqa.backfill.stale_after_seconds` (1 h).
-  - **The report** has a section per source (its rounds and its total), then all sources.
-    - Rule tables, by year and by form version, carry the source.
-    - "Duplicates between the sources" gives, per source: its open `DUPLICATE_ASSESSMENT`
-      records, how many clash with an assessment from the other source, and the cross-source
-      duplicates its runs counted.
-    - The CSV gains a `source` column.
 
 ### 5.7 Reprocessing
 
@@ -761,10 +577,6 @@ facility is submitted for the same round on both sources, the first accepted one
 other quarantines under `DUPLICATE_ASSESSMENT`, with the detail naming both sources and instance
 IDs. The administrator decides in Data issues. If the client assigns sources by LGA or by period
 (Q-15), that is configuration for a future soft rule, not a v1 behaviour.
-
-- **Built (Phase 2C step 5):** the detail reads "Q2 2026 already recorded for facility FX-5001
-  (instance uuid:… from ODK Central; this one from KoboToolbox)". `ValidationContext` keeps the
-  source of every accepted instance, from the database and from the batch.
 
 
 ---
@@ -840,36 +652,6 @@ Detail strings must be specific: `"availability_m1 derived score 347.66 exceeds 
    entry per record).
 5. Every action writes an audit entry. Nothing is silently fixed.
 6. Resolving triggers a rescore of the affected round.
-
-**Built (Phase 5 step 2): Data issues completed.** Already in place from D-57/2C.7 and kept: the
-rule summary (14 + RULE_ERROR) with counts and "why", the URL filters (status, rule, source, LGA,
-round, hard/soft tab), the whitelisted inline correction, reject, override, bulk (single shared
-rule only), the record drawer (failures, parsed values, collapsed read-only payload, history) and
-the outcome with its rescore link.
-- **Cross-source duplicates** (§5.8). A DUPLICATE_ASSESSMENT row shows both submissions side by
-  side (source, instance ID, submitted at, assessor, and the overall each scores under the current
-  rule version, by `DuplicateComparison` through ScoreCalculator, never stored). Two actions, each
-  with a reason: **Keep the existing one** rejects the record; **Use this one instead**
-  (`ReplaceAssessmentFromSubmission`, action `replace` on `POST /api/quarantine/{record}/resolve`)
-  reprocesses the record as an edit of the accepted instance, so the pipeline replaces the same
-  assessment row's items and scores, marks the old submission superseded (the source follows by
-  trigger), and the round is rescored. Audited as `assessment_replaced` with both instance IDs.
-  Refused for anything but an open record held only as a duplicate, in a closed round (D-18), and
-  when the submission would now fail another rule.
-- **Deleted at source tab** (D-24): each assessment whose submission its source no longer returns
-  (`DeletionsAtSourceQuery::assessedPage`), open while unreviewed. **Keep** marks the deletion
-  reviewed; **Withdraw** (`WithdrawAssessment`, `POST /api/assessments/{id}/withdraw`) sets
-  `assessments.status = 'withdrawn'` and marks the deletion reviewed; **Restore** puts back
-  accepted or flagged (from its soft flags). Both reasoned, audited (`assessment_withdrawn`,
-  `assessment_restored`), refused in a closed round; restore is refused once the facility has a
-  live assessment in the round again. `AssessmentStatusChanged` flushes the round cache, refreshes
-  `round_aggregates` and queues the round rescore.
-- **Withdrawn counts nowhere.** Migration `add_withdrawn_assessments`: a CHECK on assessment
-  statuses (accepted, flagged, withdrawn; there was none) and the unique (round, facility) index made
-  partial (`WHERE status <> 'withdrawn'`), so a withdrawn facility can be assessed again; `down()`
-  refuses while a withdrawn row shares its facility and round with a live one. Every aggregator and
-  the view already read accepted and flagged only; the duplicate lookup, assessor-day counts and the
-  facility's prior overalls (SCORE_JUMP, facility history) now skip withdrawn too.
 
 ### The guarantee
 
@@ -985,15 +767,29 @@ Triggered by: rule version publish, quarantine resolution, assessment correction
 
 ## 8. Internal API surface
 
-Dashboard pages are Inertia; these JSON endpoints serve admin interactivity and exports only.
-All require an authenticated, 2FA-confirmed administrator session (session cookie + CSRF).
-No public API, no API tokens in v1.
+Dashboard pages are Inertia. JSON endpoints come in two groups (SECURITY.md §3):
+
+- **Public** (`/api/public/*`): GET only, no login, rate limited, closed rounds only, public
+  resources only. Used by the public dashboard for partial reloads and the facility drawer.
+- **Admin** (`/admin/api/*`): authenticated administrator session (cookie + CSRF).
+
+No API tokens in v1.
+
+**Public**
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/aggregates` | Scores by scope, honouring all five filters |
-| GET | `/api/facilities` | Paginated (50), sortable, filterable facility scores |
-| GET | `/api/facilities/{id}` | Detail: item responses, history, attachments, audit |
+| GET | `/api/public/aggregates` | Scores by scope, all five filters, closed rounds |
+| GET | `/api/public/facilities` | Paginated (50), sortable, filterable facility scores |
+| GET | `/api/public/facilities/{id}` | Public drawer: facility details, scores, item results, history (SECURITY.md §3.1) |
+| GET | `/api/public/status` | "Figures last updated …" only |
+
+**Admin** (all paths below are under `/admin`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/facilities/{id}` | Full admin detail: item responses, history, flags, attachments, audit, source + deep link |
+| POST | `/api/assessments/{id}/corrections` | Correct an assessment (reason required) |
 | GET | `/api/rounds` | Rounds and status |
 | POST | `/api/rounds/{id}/close` | Close round, snapshot aggregates |
 | POST | `/api/rounds/{id}/reopen` | Reopen (reason required) |
@@ -1011,27 +807,9 @@ No public API, no API tokens in v1.
 | POST | `/api/scoring-rules/{id}/publish` | Publish (reason required), triggers rescore |
 | POST | `/api/exports` | Queue an export; returns `{ export_id }` |
 | GET | `/api/exports/{id}` | Poll status; returns signed download URL when ready |
-| POST | `/webhooks/{source}` | Optional, verified per source (§5.4), outside auth group; only enqueues a pull |
+| POST | `/webhooks/{source}` (not under /admin) | Optional, verified per source (§5.4), outside auth group; only enqueues a pull |
 
 **There is no `POST /api/imports`.** Removing that route is the enforcement of "field-collection sources only".
-
-**Built (Phase 2C step 6):**
-- **Removed:** `/api/odk/pull`, `/api/odk/pull/{run}` and `/api/odk/status`.
-- **Moved:** the signed backfill-report download is now `GET /api/backfill-reports/{file}`.
-- **Starting runs.** `StartManualPull` starts a pull (`execute`), pull-all (`all`) and a
-  sweep (`reconcile`).
-  - Each creates its run first and returns the source's run already in progress instead of
-    queueing a second.
-  - Each is audited (`pull_requested` / `reconcile_requested`, with the source).
-  - A source not configured or switched off is a 409: `source_not_configured` or
-    `source_disabled`. With no source on, pull-all is a 409 too (`no_source_enabled`).
-- **Rate limit:** `throttle:source-pull`, 6 a minute per administrator, source and action.
-- **Progress:** `GET /api/pulls/{runId}` (`PullRunResource`) adds `source`,
-  `cross_source_duplicates` and `deletions_detected`.
-- **`GET /api/sources`.** For each source in config order: `SourceStatusQuery` (configured,
-  problems, enabled, reachable cached 60 s per source, cursor, `last_reconciled_at`, running
-  pull and sweep, last pull), its `status` (`SourceStatusAggregator`) and its own
-  `open_rounds` counts. Then `open_rounds` across all sources.
 
 ### Conventions
 
@@ -1047,33 +825,31 @@ No public API, no API tokens in v1.
 
 Visual design tokens are in `CONVENTION.md` §6; accessibility rules in `ACCESSIBILITY.md`. The prototype (`kaduna-edqa-prototype-v4.html`) is the visual reference only.
 
+### 9.0 Two surfaces
+
+| | Public dashboard | Admin area |
+|---|---|---|
+| URL | `/` (Home), `/facilities`, `/lgas`, `/monitor`, `/visuals`, `/plan` | `/admin/*`; `/login` to enter |
+| Who | Anyone, no login | Administrators, password login |
+| Data | Closed rounds only (D-77) | All rounds; admin preview of the dashboard includes the open round |
+| Layout | Public shell: header with KD seal and title, filter bar, page tabs. **No** Administration link, **no** login link | Admin shell: rail with the admin pages, admin status bar, link to "View public dashboard", logout |
+| Status bar | "Figures last updated {date}" (D-81) | Full per-source sync status |
+| Facility drawer | Public drawer (scores, item results, history only) | Admin facility view with flags, attachments, audit, source links, corrections |
+| Exports | None (D-80) | All exports |
+| Implementation plan | Read-only, owners shown as roles (D-79) | Editable |
+
 ### 9.1 Layout shell
 
-- Left **rail** (210px, `--color-rail`): KD seal, "eDQA e-tool / Kaduna State", nav:
-  **Dashboard**, **Administration**. Footer: assessment count, "Support: HSDF".
-  Collapses to a horizontal bar under 760px.
-- **Built (Phase 2C step 6): status per source.** `App\Domain\Ingestion\Aggregators\SourceStatusAggregator`
-  lives in Ingestion: Reporting may not read the source registry.
-  - **States:** `not_configured`, `disabled`, `auth_failed` (latest finished pull failed with
-    `*AuthFailed`), `failed`, `not_connected` (no pull finished yet), `stale`, `healthy`. Only
-    the source's own runs count, backfills excluded.
-  - **Shell:** shares `shell.sources`, worst first: auth_failed, failed, stale, not_connected,
-    healthy, disabled, not_configured.
-  - **Bar:** `SyncStatusBar` names each source with a mark and words, then the counts, in the
-    worst source's tone.
-- **Built (Phase 2C step 6): deep links per source.** `SourceLinks::submission(source,
-  external_id)` for the facility drawer (`source: {key, name, instance_id, url}`) and Data
-  issues (`source`, `source_url`).
-  - **Inputs:** the configured base URL (rebuilt from its parts: https, no user, query or
-    fragment) and IDs that match their patterns. Anything else gives no link.
-  - **ODK:** Central's submission page, by `__id`.
-  - **Kobo:** the submission's record at `/api/v2/assets/{uid}/data/{_id}/` (Kobo's web app has
-    no address for one submission).
-- **Status bar** above the top bar: sync state across sources (worst state wins; each source named) — green "Last pull 4 min ago · 2,184
+- **Public shell:** header with KD seal and "eDQA e-tool / Kaduna State"; footer with
+  "Support: HSDF" and the figures-last-updated line. No Administration or login link.
+- **Admin shell:** left **rail** (210px, `--color-rail`) with the admin pages and "View public
+  dashboard". Collapses to a horizontal bar under 760px.
+- **Admin status bar** above the top bar: sync state across sources (worst state wins; each source named) — green "Last pull 4 min ago · 2,184
   assessments · 12 in quarantine" / amber when > 30 min / red when last pull failed.
   (Replaces the prototype's "Sample data / Import data" bar.)
-- Sticky **top bar**: page title + subtitle; **global filter bar** (Year, Duration — a quarter or one month, D-75 — LGA, Level,
-  Owner) + Export button; tabs underneath.
+- Sticky **top bar**: page title + subtitle; **global filter bar** (Year, Quarter, LGA, Level,
+  Owner); tabs underneath. The Year/Quarter options on the public site list closed rounds only.
+  Export buttons appear in the admin preview only.
 - Filters live in the **URL query string** (Inertia `router.get` with `preserveState`,
   `preserveScroll`). Any view is bookmarkable and shareable.
 - Content max-width 1280px, padding 22/26px.
@@ -1110,12 +886,6 @@ Visual design tokens are in `CONVENTION.md` §6; accessibility rules in `ACCESSI
 - Facilities visited per LGA — ranked bar list (hand-built SVG/CSS), state-mean marker.
 - Coverage by level (Primary / Secondary / Tertiary).
 - Assessment window table: rounds in view, first visit, last visit, assessments recorded.
-- Assessments by source (Phase 2C step 7): a small table, one row per configured source.
-  - `AssessmentsBySourceAggregator` counts accepted and flagged assessments in the selection (the
-    rounds the summaries cover, plus the LGA, level and owner filters) by `assessments.source_id`.
-    It never reads `submissions`: the database copies the source onto the assessment.
-  - `SourceCountsPayload` names each source from the registry, which Reporting may not read.
-    Configured sources with no assessments are listed at 0.
 
 #### 9.2.5 Visuals
 - Toggle Overall / Public / Private.
@@ -1125,20 +895,26 @@ Visual design tokens are in `CONVENTION.md` §6; accessibility rules in `ACCESSI
   Consistency, Validity. Bar colour by band.
 
 #### 9.2.6 Implementation plan
-- Per LGA: overall (tag), weakest dimension, its score (heat), standard action, **owner
-  (editable)**, **review date (editable)**, **status** (Not started / In progress / Done).
+- Per LGA: overall (tag), weakest dimension, its score (heat), standard action, **owner role**
+  (a unit such as "LGA M&E officer" — never a personal name publicly), **review date**,
+  **status** (Not started / In progress / Done). Editable in the admin area only; read-only on
+  the public site.
 - Standard actions:
   - Availability — Restock HMIS tools; confirm current register set is in place
   - Consistency — On-site mentoring on reconciling the monthly summary against the register
   - Validity — Retraining on data element definitions and correct tool completion
 - "Actions by type" summary + "What each action means" reference panel.
-- Export to Excel workplan.
+- Export to Excel workplan (admin only).
 - Edits persist to `plan_actions` and are audited (prototype was read-only).
 
 #### 9.2.7 Facility detail drawer
-Right-side sheet: score card for current round, item-level responses grouped by dimension ×
-month (pass / fail / N/A), round-over-round sparkline, soft flags, attachments (authenticated
-URLs), correction audit trail, the source (ODK Central or KoboToolbox), instance ID and deep link.
+**Public drawer:** facility name, LGA, ward, level, ownership, score card for the selected
+closed round, item-level results grouped by dimension × month (pass / fail / N/A),
+round-over-round sparkline. Nothing from SECURITY.md §3.1.
+
+**Admin facility view** (`/admin/facilities/{id}`): everything above for all rounds, plus soft
+flags, attachments (admin URLs), correction audit trail, the source (ODK Central or
+KoboToolbox), instance ID and deep link, and "Correct this assessment".
 
 ### 9.3 Administration pages (five)
 
@@ -1151,78 +927,6 @@ URLs), correction audit trail, the source (ODK Central or KoboToolbox), instance
 | **Scoring rules** | "Scoring rules" | Band thresholds, item weights, N/A policy; draft → preview band changes → publish with reason |
 
 The admin tab shows a red badge with the open quarantine count.
-
-**Built (Phase 2C step 7).**
-- **Data sources page.** `/admin/sources` (`AdminSourcesController`) replaces the ODK pull page.
-  `/admin` opens it, and `/admin/odk` redirects to it with a 301.
-  - **One panel per source** (`SourcePanel`), named by the source and built from the same entries
-    as `GET /api/sources` (`SourcesPayload`). Each shows:
-    - configured (the missing env keys) or switched off;
-    - reachable;
-    - last success, how long ago, and when;
-    - what the last pull fetched, cross-source duplicates included;
-    - this source's counts in each open round;
-    - the cursor and the last reconcile;
-    - the last error in plain language: the HTTP status when known, else the error class in
-      words (`*AuthFailed`, `*Unreachable`, `*UnexpectedResponse`).
-  - **Pull now and Reconcile** (`SourceRunControl`) each post to the sources API and follow
-    their run in a ProgressPanel. The page owns which run each panel follows, so the runs Pull
-    all starts (`PullAllPanel`) show in each source's own progress.
-  - **Combined history** (`PullHistoryQuery`): source column and filter (a configured key),
-    duplicates and cross-source duplicates, and reconcile as a trigger.
-  - **Deletions at source** (`DeletionsAtSourceQuery`): the newest 50 of `deleted_at_source`,
-    with the total. Each row links to what it touches: the facility drawer in its round, or Data
-    issues when the record is in quarantine. It also links to the submission on its source.
-    Nothing is removed (D-62).
-  - **Backfill** (`BackfillStatusQuery`, formerly `OdkStatusQuery`) is unchanged.
-- **Data issues.**
-  - **Source filter** (`?source=`, a configured key) on both tabs: the hard tab filters
-    `quarantined_records.source_id`, the soft tab `assessments.source_id`.
-  - **Rows:** a source column on both tabs, and the per-source "Open in …" link.
-  - **Duplicates.** A DUPLICATE_ASSESSMENT row shows both sides (`duplicate_of`, from
-    `QuarantineQuery::duplicateOriginals`). The accepted assessment shows with its source,
-    instance ID and link, and this submission with its source.
-**Built (Phase 5 step 0): the admin shell.**
-- **Badge.** `admin.openIssueCount` = open quarantine records + deletions at source not yet reviewed
-  (`QuarantineQuery::openIssueCountCached`, 60 s), forgotten on `SubmissionQuarantined`,
-  `QuarantineResolved`, `SourceDeletionDetected` and `DeletionReviewed`. The Data issues tab is named
-  "Data issues, 12 open".
-- **Reviewing a deletion at source** (D-62). `submissions.deletion_reviewed_at` / `deletion_reviewed_by`
-  (CHECK `submissions_deletion_review_valid`: only for a deletion, with both who and when).
-  `POST /api/submissions/{submission}/deletion-review` with a reason (`ReviewSourceDeletion`): audited
-  as `deletion_reviewed`, refused (409) for a submission still at its source or already reviewed.
-  The Data sources page's deletions list has a Review column: "Mark reviewed" through
-  ConfirmWithReasonDialog, or who reviewed it and when. Nothing is removed from the portal.
-- **Stale-ingestion banner, per source.** `SourceStatusAggregator::staleIngestion()` (moved from
-  Reporting, which may not read the source registry): a round is open and an enabled source has had
-  no successful non-backfill pull for 24 h, or ever. The banner names each such source with its last
-  success, so a healthy source never hides another.
-- **SourceTag**: a record's source as its name in words, the same look for every source, in the
-  pull history, Data issues and deletions tables.
-- Already in place from 2C.7 and kept: the rail item, the five tabs, `/admin` → `/admin/sources`,
-  no dashboard filters on admin pages, the sync bar, ConfirmWithReasonDialog, ProgressPanel (2 s →
-  10 s, stage changes announced only), `useApiAction` (CSRF, 422, 409) and AdminTable.
-
-**Built (Phase 5 step 1): the Data sources page completed.**
-- **State in words** heads each configured, switched-on source's panel: Healthy / Behind / Failing /
-  Credentials rejected / Waiting for the first pull (with not configured and switched off as
-  before). Reachability stays as its own line.
-- **The last error says what it means and what happens next.** With an HTTP status: 401 is "the API
-  token was rejected" (Kobo) or "the service account's email or password was rejected" (ODK), 403
-  no access to the form, 404 the form or project not found, 429 slow down, 5xx a server problem.
-  The schedule keeps trying every ten minutes, so a settings problem (401/403/404) says every
-  scheduled pull will fail until the setting is fixed; anything else says the next pull tries
-  again. (Pulls are not paused: the page says what actually happens.)
-- **Backfill per source** (`BackfillStatusQuery`): each configured source's last backfill run and
-  checkpoint (its own page size); one link to the newest report, which covers every source.
-- **Facility media file**: after a regeneration, the steps for both platforms (Media on the ODK
-  Central form, then publish; Media in the KoboToolbox form's settings, then redeploy).
-- **e2e**: `make e2e-sources` runs a second pass with the Kobo mock refusing the token
-  (`tests/e2e/support/kobo-mock-token.php`), checking the plain-language 401, keyboard reach and axe.
-
-- **Facility list** is still a placeholder (Phase 5). Until it is built, the facility media file
-  panel ("Regenerate facility media file") is on the Data sources page. It says the one file is
-  attached to the form on both platforms.
 
 
 ---
@@ -1238,7 +942,7 @@ The admin tab shows a red badge with the open quarantine count.
 | Rescore | one round (~2,200 assessments) < 5 min |
 | Export | 10,000-row CSV < 30 s, queued with progress |
 | Volume | ~40,000 submissions, ~400,000 score rows over 5 years |
-| Concurrency | 50 simultaneous users |
+| Concurrency | 50 simultaneous administrators/known users; public traffic unknown — public pages served from cache, rate limited 120/min per IP, load-tested at 200 concurrent anonymous visitors |
 | Availability | 99% monthly excl. maintenance window |
 | Browsers | Chrome, Edge, Firefox, Safari — current + one prior |
 | Responsive | usable from 360px; tables scroll horizontally |
@@ -1258,7 +962,7 @@ blocks use Inertia 2 deferred props; charts are `React.lazy`; fonts self-hosted 
 | ID | Decision | Rationale |
 |---|---|---|
 | D-01 | Field-collection sources are the only way data enters, including history — **ODK Central and KoboToolbox** (amended by D-59) | One normaliser-parser-validation path; a second path is a second place validation can be bypassed |
-| D-02 | One role: Administrator, 2FA mandatory | Saves ~1 week; audit trail becomes the control |
+| D-02 | One role: Administrator (2FA removed by D-84) | Saves ~1 week; audit trail becomes the control |
 | D-03 | PostgreSQL 16 | jsonb + GIN, enforceable CHECKs, materialised views |
 | D-04 | Unweighted aggregation (config flag) | Matches the live tool's published figures |
 | D-05 | `assessment_scores` unique key includes `rule_version_id` | PRD requires old-version scores to remain readable after a rescore; the PRD's 3-column UQ would forbid that |
@@ -1276,13 +980,13 @@ blocks use Inertia 2 deferred props; charts are `React.lazy`; fonts self-hosted 
 | D-17 | **React 19**, not the React 18 in the PRD | The official starter kit and Inertia 3 ship React 19 (19.3 at scaffold) with the React Compiler; staying on 18 would mean maintaining a fork of the kit. No PRD feature depends on the difference |
 | D-18 | **Laravel 13 + Inertia 3**, not Laravel 12 + Inertia 2 | Laravel 12's security support ends ~Feb 2027, at go-live; 13 is supported to ~Mar 2028. The current kit targets 13; its last Laravel 12 version was frozen in Mar 2026. Knock-on: **Pest 4** (Pest 3 needs PHPUnit 11; Laravel 13 uses PHPUnit 12), and **ESLint 9** (`eslint-plugin-jsx-a11y` does not support ESLint 10 yet) |
 | D-19 | Wayfinder generates typed route helpers (`resources/js/{actions,routes,wayfinder}`, git-ignored) | Its Vite plugin runs `php artisan wayfinder:generate` at the start of every build. The Docker `assets` stage has no PHP (`DEPLOY.md` §6.2): generate the files in the `vendor` stage, copy them into `assets`, and point the plugin's `command` option at a no-op there |
-| D-20 | Starter kit trimmed to what one role with mandatory 2FA needs | Removed: registration, passkeys (a login path around TOTP 2FA), profile edit, delete account, appearance/dark mode, welcome and demo dashboard pages, Sail, `laravel/pao`, `vite-plus` (plain Vite + ESLint + Vitest instead). Kept: Fortify login, password reset, email verification, TOTP 2FA, password confirmation, settings → Security. Packages this adds to the stack: `laravel/fortify`, `laravel/wayfinder`, `larastan/larastan`, `pestphp/pest` + `-plugin-laravel` + `-plugin-arch`; npm: Radix UI primitives, `lucide-react`, `sonner`, `input-otp`, `clsx`/`tailwind-merge`/`class-variance-authority` (kit UI), `eslint` + `typescript-eslint`/`react`/`react-hooks`/`jsx-a11y` plugins, `vitest` |
+| D-20 | **Superseded by D-84 (no MFA).** Starter kit trimmed to what one role with mandatory 2FA needs | Removed: registration, passkeys (a login path around TOTP 2FA), profile edit, delete account, appearance/dark mode, welcome and demo dashboard pages, Sail, `laravel/pao`, `vite-plus` (plain Vite + ESLint + Vitest instead). Kept: Fortify login, password reset, email verification, TOTP 2FA, password confirmation, settings → Security. Packages this adds to the stack: `laravel/fortify`, `laravel/wayfinder`, `larastan/larastan`, `pestphp/pest` + `-plugin-laravel` + `-plugin-arch`; npm: Radix UI primitives, `lucide-react`, `sonner`, `input-otp`, `clsx`/`tailwind-merge`/`class-variance-authority` (kit UI), `eslint` + `typescript-eslint`/`react`/`react-hooks`/`jsx-a11y` plugins, `vitest` |
 | D-21 | **Node 24** (`node:24-bookworm-slim`) instead of Node 20 for the `assets` stage, the dev `vite` service and the `worker` image | Node 20 reached end of life in Apr 2026; Vite 8 needs ≥ 20.19. The `worker` copies Node and a pinned Puppeteer from the Node image rather than Debian's `nodejs` package (v18, also end of life). `/usr/bin/node` is symlinked so `BROWSERSHOT_NODE_BINARY` from `DEPLOY.md` §15.2 still works |
 | D-22 | Assets precompressed at build with `vite-plugin-compression2` (`.br` + `.gz`) | `DEPLOY.md` §6.1/§10: Caddy serves them with `precompressed br gzip`; Brotli matters on 3G. New npm dev dependency |
 | D-23 | Fonts from `@fontsource/archivo` (500/600/700) and `@fontsource/ibm-plex-sans` (400/500/600), bundled by Vite | CONVENTION.md §6 and D-09: self-hosted, so the CSP has no external host (SECURITY.md §8). Replaces the kit's build-time Bunny Fonts download. New npm dependencies |
-| D-24 | 2FA recovery codes stored as SHA-256 hashes and shown once, overriding Fortify's encrypted, re-displayable codes | SECURITY.md §2. Custom Fortify actions (enable, confirm, regenerate) and challenge request; Fortify's "show codes" endpoint returns 404. A fast hash suffices: each code carries ~119 bits of randomness. A used code is consumed, not replaced |
+| D-24 | **Superseded by D-84 (no MFA).** 2FA recovery codes stored as SHA-256 hashes and shown once, overriding Fortify's encrypted, re-displayable codes | SECURITY.md §2. Custom Fortify actions (enable, confirm, regenerate) and challenge request; Fortify's "show codes" endpoint returns 404. A fast hash suffices: each code carries ~119 bits of randomness. A used code is consumed, not replaced |
 | D-25 | The starter kit's UI primitives (shadcn/Radix) and sidebar shell removed | Replaced by our own tokens and components (AppShell, Rail, TopBar, TextField, ErrorSummary). Removed npm packages: 13 `@radix-ui/*`, `class-variance-authority`, `clsx`, `tailwind-merge`, `input-otp`, `lucide-react`, `sonner`, `tw-animate-css`. Re-add a primitive only when a page needs it |
-| D-26 | 2FA requirement made switchable: `EDQA_REQUIRE_2FA` (config `edqa.auth.require_two_factor`) | Owner decision, 2026-10-03: no 2FA wanted for now. Amends D-02. Unset or empty means required (fail-safe, as `SESSION_SECURE_COOKIE`); the local `.env` sets false. When off, the `two-factor.confirmed` middleware passes everyone, 2FA can still be set up from Security settings, and an account that has it is still challenged. Tests force it on. New env key for `edqa-infra` (DEPLOY.md §1.3) Amended 2026-10-31 (Kobo credentials day, step 0): the switch works in `APP_ENV=local` only. Anywhere else `EDQA_REQUIRE_2FA=false` stops the app at boot with a clear error (`TwoFactorSwitch::assertAllowed`, as the `*_ALLOW_INSECURE_LOCAL` flags are refused outside local), and the middleware never skips the check there, whatever the config says |
+| D-26 | **Superseded by D-84 (no MFA).** 2FA requirement made switchable: `EDQA_REQUIRE_2FA` (config `edqa.auth.require_two_factor`) | Owner decision, 2026-10-03: no 2FA wanted for now. Amends D-02. Unset or empty means required (fail-safe, as `SESSION_SECURE_COOKIE`); the local `.env` sets false. When off, the `two-factor.confirmed` middleware passes everyone, 2FA can still be set up from Security settings, and an account that has it is still challenged. Tests force it on. New env key for `edqa-infra` (DEPLOY.md §1.3) Amended 2026-10-31 (Kobo credentials day, step 0): the switch works in `APP_ENV=local` only. Anywhere else `EDQA_REQUIRE_2FA=false` stops the app at boot with a clear error (`TwoFactorSwitch::assertAllowed`, as the `*_ALLOW_INSECURE_LOCAL` flags are refused outside local), and the middleware never skips the check there, whatever the config says |
 | D-27 | `item_weights` keyed `"<dimension>.<item_code>"`, the same weight in every month slot; unlisted items weigh 1; weights must be positive. The calculator divides before multiplying (`passed / applicable × 100`) and sums items in item-code order | §7 gave no key format. Divide-first keeps a weighted all-pass slot at exactly 100 (× 100 first gave 100.00000000000001, caught by the 1,000-set property test); fixed summing order keeps the result independent of item order (G3). Rule version 1 has no weights, so no stored number changes |
 | D-28 | A visit's round is decided by its visit date: `startedAt`, falling back to `submittedAt` when the start did not parse, as a local (Africa/Lagos) day. The date must fall inside exactly one round's window and that round must be open. When the form gives both `round_year` and `round_quarter` and they name a different round, `ROUND_WINDOW` quarantines; a form that gives neither (or only one) is placed by date alone | Owner decision, 2026-10-08 (answers Q-24). Never guess the nearest round (hard rule 12): no window, two overlapping windows, a closed round and a disagreeing form each quarantine with their own detail |
 | D-29 | For `ASSESSOR_VOLUME` an assessor is the name (case and spacing ignored) plus the device ID when present. A visit with no device ID is matched to other no-device visits under that name only. Counted: distinct facilities per local day across accepted assessments, the batch's accepted submissions and the visit being checked. Soft-rule thresholds are never written into rule text: the "why" strings take `:points`, `:minutes`, `:maximum` from `edqa.validation.soft_rules` | Owner spec, 2026-10-08. Two people with the same name on different phones are counted apart; the same facility twice in a day counts once |
@@ -1294,7 +998,7 @@ blocks use Inertia 2 deferred props; charts are `React.lazy`; fonts self-hosted 
 | D-35 | **Round lifecycle actions.** `CreateRound`, `UpdateRoundWindow`, `CloseRound`, `ReopenRound` each write one explicit audit entry (`created`, `window_updated`, `closed`, `reopened` with the reason) and suppress the model's own. Close pins the version and refreshes `round_aggregates` synchronously (the snapshot; the Round::saved hook that queued a refresh is gone) and is refused while any counted assessment lacks scores under that version, so a round is never pinned to scores it does not have. Window edits are refused on a closed round. Overlap is enforced in the actions under a table lock, not by an exclusion constraint, because older data and ROUND_WINDOW's ambiguity test rely on overlapping windows being representable | Phase 3 step 6 |
 | D-36 | **The report cache unserializes only an allow-list.** Laravel 13 refuses to unserialize any class from the cache unless listed (`cache.serializable_classes`, against gadget chains). The list is `RoundCache::SERIALIZABLE`: the aggregators’ readonly DTOs and the enums inside them, never an Eloquent model (`RoundSelection` caches each round’s raw columns and hydrates them, no query). Found by `make fresh` on Redis: the array store the tests use never serializes, so `SerializingCacheTest` now runs every aggregator through the file store | Phase 3 step 7. Before this, every cached dashboard answer on Redis or the database store came back as `__PHP_Incomplete_Class` |
 | D-37 | **Frontend test dependencies (dev only):** `@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event`, `jsdom`, `vitest-axe` and `axe-core`. Vitest runs in jsdom; every component test finds elements by role or label and runs axe (`resources/js/test/render.tsx`). vitest-axe 0.1 types its matcher for an old Vitest, so `resources/js/test/vitest-axe.d.ts` declares it for Vitest 5. Components read translations from an `I18nProvider` the layouts fill from the shared Inertia prop, so they render in a test without an Inertia app. None of these ship in the bundle | Phase 4 step 0. ACCESSIBILITY.md asks for automated checks; axe-core is already what eslint-plugin-jsx-a11y depends on |
-| D-38 | **End-to-end and budget harness.** Playwright (`@playwright/test` 1.64.1, `@axe-core/playwright`, `otplib`, all dev only) in its own compose service (profile `e2e`, image pinned to the same 1.64.1 by digest: bump both together), run by `make e2e` against the running dev stack. Inside the container a small TCP forwarder (`tests/e2e/support/forwarder.mjs`, its own process) makes localhost:8080 and :5173 reach `web` and `vite`, so the browser sees the developer's origins (APP_URL, CSP, the Vite dev server). It signs in as `E2eAdminSeeder`'s administrator (local and testing only; fixed password and TOTP secret, public in the repo, never in DatabaseSeeder). `checkA11y(page)` fails on serious or critical axe violations against WCAG 2.2 AA; viewports 360×740 and 1280×800. `npm run size` / `make size` sums the gzipped JS of the first visit to /dashboard/home (app entry, the page and their static imports) against 300 KB | Phase 4 step 1. First measure: 117.8 KB |
+| D-38 | (`otplib` removed by D-84.) **End-to-end and budget harness.** Playwright (`@playwright/test` 1.64.1, `@axe-core/playwright`, `otplib`, all dev only) in its own compose service (profile `e2e`, image pinned to the same 1.64.1 by digest: bump both together), run by `make e2e` against the running dev stack. Inside the container a small TCP forwarder (`tests/e2e/support/forwarder.mjs`, its own process) makes localhost:8080 and :5173 reach `web` and `vite`, so the browser sees the developer's origins (APP_URL, CSP, the Vite dev server). It signs in as `E2eAdminSeeder`'s administrator (local and testing only; fixed password and TOTP secret, public in the repo, never in DatabaseSeeder). `checkA11y(page)` fails on serious or critical axe violations against WCAG 2.2 AA; viewports 360×740 and 1280×800. `npm run size` / `make size` sums the gzipped JS of the first visit to /dashboard/home (app entry, the page and their static imports) against 300 KB | Phase 4 step 1. First measure: 117.8 KB |
 | D-39 | **Home (Phase 4 step 2).** `recharts` 3.10 added for the trend (in the §2 stack; loaded lazily, so outside the first-load budget). The trend uses `ReportFilter::withoutRound()`: every round, with the LGA, level and owner filters, and `trend.selected` marks the rounds the summaries cover (the prototype collapsed to one point). Its one-line takeaway is computed by `QuarterTrendAggregator::takeaway()` (a comparison of aggregates, so not in a component). `StateSummary` carries the rule version's `strongAt` and `weakBelow`, so no threshold is written in the UI. With an LGA chosen, `WeakestWardsAggregator` gives its wards. `ShareDashboardContext` compares queries as sets: Inertia reports page URLs with sorted keys, which a key-order redirect turned into a 302 on every deferred reload. Vite's watcher ignores `public/build`, `tests`, `database` and `docs`: polling them on the Windows bind mount kept it at ~70% CPU idle and slowed module requests to ~20 s | Phase 4 step 2 |
 | D-40 | **LGA view (Phase 4 step 3).** The tile grid (`tiles`) leaves the LGA filter out, so another LGA can always be chosen; the chosen tile is pressed (`aria-pressed`) and toggles the filter in place (focus stays on it, the result is announced). The table (`lgas`) is in the filter's scope. Both come from `LgaTableAggregator`, driven by the lgas table, so never more than 23 rows whatever is in quarantine. The table sorts on the client (at most 23 rows of server figures; `lib/sortRows` only compares, no data last), default overall highest first as in the prototype. Month headings are the real months when the rounds in view share one quarter, else "Month 1/2/3" with a hidden "of the quarter" | Phase 4 step 3 |
 | D-41 | **Facility view (Phase 4 step 4).** `@tanstack/react-table` pinned to ^8.21 (v9 changed the API; it is in the §2 stack) and used in manual mode only for the column model and sort state; rows arrive sorted and paged from `FacilityScoresQuery`. `?metric=`, `?sort=`, `?dir=`, `?page=` are read against whitelists (`Metric` enum, `FacilitySort::COLUMNS`, asc/desc): anything else falls back to the default, weakest first by the chosen measure, never into SQL. 50 rows per page, fixed; `per_page` is ignored. Measure, sort and page change through partial reloads (`only: ['facilities']`), so the shell, the filters and focus stay put and the new order is announced. The count says "facilities", not "assessments": a row is one facility's latest assessment in the rounds in view (Q-28). The facility name becomes the drawer button in step 4.5. Components using TanStack opt out of the React Compiler (`'use no memo'`) | Phase 4 step 4 |
@@ -1332,8 +1036,15 @@ blocks use Inertia 2 deferred props; charts are `React.lazy`; fonts self-hosted 
 | D-73 | **Action plans recorded in the form** (`follow_up/*`: the plan, the responsible person, the due date, for each dimension) are read into the implementation plan (`plan_actions`, D-10) as actions from the source, beside the ones the portal generates | Client answer (Q10) |
 | D-74 | **Community visits** (`field_visit_type` = `community_visit`) **and DDU at LGA level** (`ddu_dqa` = `ddu`) are not facility assessments. They are stored, never scored and never quarantined, and counted apart in each pull run and the backfill report | Owner decision, taken by the developer on the owner's instruction. They are valid submissions of another kind. Quarantining them would put them in front of an administrator for no action; scoring them would mix them into facility figures |
 | D-75 | **Duration filter: a quarter or one month.** The Quarter filter becomes **Duration**: all quarters, Q1–Q4, or one month of a quarter with a round (`?month=1–12`, which implies its quarter; a link carries the month or the quarter, never both). A month switches every figure on every page to that month slot: each facility's dimension is its month score, and its overall is the mean of that month's dimensions that have a score (the `m{slot}` of `FacilityScoresSql`). Facility means then aggregate as usual (§7). `round_aggregates` holds quarters, so a month always reads from the scores. The quarter trend and the month-slot series stay quarterly. Also: Home and Visuals break the quarter in view down month by month (each month's three dimensions and overall); Visuals has a quarterly view (every round's three dimensions and overall); Monitor shows the overall of all facilities, public and private together, beside the two, narrowed by the Owner filter | Client request (2026-11-02); the owner chose each option. Every figure still comes from the item responses through the one scoring path. The month's overall follows §5's rule (mean of the dimensions) applied to one month |
-
-**Numbering (2026-10-31).** D-17–D-58 are the build-era decisions, restored from the register as it stood at commit `ebd43e5` (D-57 and D-58 written back from what was built). The KoboToolbox decisions were first numbered D-21–D-26, which reused numbers already taken (Node 24, asset precompression, fonts, hashed recovery codes, the starter UI, the 2FA switch); they are now **D-59–D-64**, and every reference has been changed with them.
+| D-76 | **Public read-only dashboard; admin area separate under `/admin`.** Change request against the PRD (public dashboard was v2). Still one role | Client decision; dashboard is a public accountability tool |
+| D-77 | Public data is closed rounds only, via a `PublicScope` inside Reporting; config switch for the open round | Published figures don't shift in public while data issues are resolved |
+| D-78 | No login link on the public site; `/login` reached by URL only; `/admin/*` redirects guests to `/login`; after login → `/admin`, after logout → public dashboard | Client decision; hiding is convenience, not a control |
+| D-79 | Implementation plan public read-only; owners stored and shown as roles/units, not personal names | Accountability without exposing individuals |
+| D-80 | Exports admin-only | Client decision |
+| D-81 | Public status shows only "Figures last updated {date}"; source health is admin-only | Source errors are operational detail, not public information |
+| D-82 | `noindex` everywhere until the client decides | Avoid search exposure before sign-off |
+| D-83 | Separate public resources + a leak test over every public route | The main new risk is private fields leaking through shared resources |
+| D-84 | **No multi-factor authentication anywhere** (client decision). Compensating controls: stronger passwords, progressive lockout, new-device login emails, optional IP allow-list, shorter idle timeout (SECURITY.md §2) | Client decision; the remaining controls are documented so the residual risk is visible |
 
 Add new decisions here with the next ID. Any new Composer/npm package needs a line.
 
@@ -1366,32 +1077,23 @@ real month names for single-quarter views, LGA tile grid, Data issues "why it ex
 
 ### 11.4 Open questions for the client
 
-Kobo answers name their source, from Kobo credentials day (2026-10-31, read-only against the live
-asset): **K.1** inventory (`discovery/out/kobo_inventory.md`), **K.2** form diff
-(`discovery/out/kobo_form_diff.md`), **K.3** defect scan (`discovery/out/kobo_defect_scan.md`),
-**K.4** dry run, **K.5** local backfill and its report. The client-facing summary is
-`discovery/KOBO_FINDINGS.md`.
-
 | # | Question | Blocks |
 |---|---|---|
 | Q-01 | ODK Central (OData) or legacy ODK Aggregate? | Phase 2 |
-| Q-02 | Does the form use a cascading facility select and `select_one` scored items?<br>**Answered for Kobo (K.2):** no. The facility cascades LGA → ward → facility, but from the form's own 1,070 choices, not a CSV. Scored items come in three kinds: yes/no, 0–3 counts and three-number matches. The portal reads the form as it is (D-65–D-68). ODK waits for its credentials. | Phase 2 estimate |
-| Q-03 | How are dimensions scored today — pass rate or weighted rubric?<br>**Answered for Kobo (K.2; client answers Q3–Q6):** the form's own formulas give points (2, 1 per check, 10). Every item in a dimension carries the same weight, so the pass rate gives the same percentage (D-69). K.4 confirms: portal scores equal the form's, except D-67's unanswered consistency. | Phase 3 |
+| Q-02 | Does the form use a cascading facility select and `select_one` scored items? | Phase 2 estimate |
+| Q-03 | How are dimensions scored today — pass rate or weighted rubric? | Phase 3 |
 | Q-04 | Aggregation weighted or unweighted? | Every number |
-| Q-05 | How many form versions exist and how far do names drift?<br>**Answered for Kobo (K.1, K.2):** 7 deployed versions (25 Sep–22 Oct 2026). The answered questions are the same in all seven, with no renames, so one field map covers them (D-63). ODK waits for its credentials. | Backfill estimate |
-| Q-06 | Who owns and signs off the facility master list, by when?<br>**Kobo finding (K.3, K.5):** the form names facilities by its own slugs. All 6 used so far quarantine as `FACILITY_UNKNOWN` until the master list arrives and the slug mapping is signed off (D-72). | Phase 2+, every Kobo score |
+| Q-05 | How many form versions exist and how far do names drift? | Backfill estimate |
+| Q-06 | Who owns and signs off the facility master list, by when? | Phase 2+ |
 | Q-07 | VPS acceptable (Postgres ≥ 14)? Who pays? | Deployment |
 | Q-08 | How many administrator logins? (> 3 → revisit roles before launch) | Launch |
 | Q-09 | Display rounding: half-up or truncate? (explains 73 vs 74) | Phase 3 tests |
-| Q-10 | Round assessment windows for historical quarters — exact dates?<br>**Kobo finding (K.5):** the real form is filled in after the period it reviews (all 4 Q3 2026 visits were made 22–25 Oct), and `ROUND_WINDOW` needs the visit date inside the reviewed quarter's window. Locally, 2026 Q3 runs 1 Jul–31 Oct (one month's lag, assumed). To confirm: how long after a quarter ends may its visits still be made? If always one month, windows run Jul–Oct, Nov–Jan and so on, and the next window starts the day after the last one ends. | Backfill, every round window |
-| Q-11 | Webhooks available on their ODK Central host? Kobo REST Services enabled on their Kobo account?<br>**Kobo side (K.1):** no REST Services are configured on the asset. Whether the client will enable one is still open; the scheduled pull works without it. | Optional latency |
-| Q-15 | Why both ODK and Kobo? Split by LGA, by period (e.g. history on Kobo, current on ODK), by partner, or overlapping? Which is authoritative if the same facility+round appears on both?<br>**Kobo finding (K.1, K.5):** the Kobo asset holds 6 submissions, all from 22–25 Oct 2026, so it holds no history (see Q-19). Still open. | Duplicate handling, backfill triage |
-| Q-16 | Is the same XLSForm deployed on both platforms, and are versions kept in step?<br>**Kobo side known (K.2):** the real form on Kobo is not the contract form (D-65); which form ODK Central carries waits for its credentials. | Field-map effort |
-| Q-17 | Which KoboToolbox server — global, EU, or self-hosted (URL)? Hosted servers sit outside Nigeria; any data-residency requirement?<br>**Answered for the server (K.1):** `eu.kobotoolbox.org`, hosted in the EU. Whether EU hosting is acceptable for data protection is still the client's to confirm. | Config, hosting, data protection |
-| Q-18 | Can the client create a dedicated read-only Kobo account (view submissions only on the asset) for the API token?<br>**Kobo finding (K.1):** the token in use is the asset **owner's**: it can add, change, validate and delete submissions, change, delete and manage the asset, and its account owns 4 other assets. Only GETs were made. The request is in `discovery/KOBO_FINDINGS.md` §6, for the client. Still open. | Security, go-live |
+| Q-10 | Round assessment windows for historical quarters — exact dates? | Backfill |
+| Q-11 | Webhooks available on their ODK Central host? Kobo REST Services enabled on their Kobo account? | Optional latency |
+| Q-15 | Why both ODK and Kobo? Split by LGA, by period (e.g. history on Kobo, current on ODK), by partner, or overlapping? Which is authoritative if the same facility+round appears on both? | Duplicate handling, backfill triage |
+| Q-16 | Is the same XLSForm deployed on both platforms, and are versions kept in step? | Field-map effort |
+| Q-17 | Which KoboToolbox server — global, EU, or self-hosted (URL)? Hosted servers sit outside Nigeria; any data-residency requirement? | Config, hosting, data protection |
+| Q-20 | Should facility master-list coordinates (not visit GPS) be shown publicly, e.g. on a future map? Default: no | Public drawer |
+| Q-21 | When should the public site be indexed by search engines? Default: never until the client says so | Go-live |
+| Q-18 | Can the client create a dedicated read-only Kobo account (view submissions only on the asset) for the API token? | Security |
 | Q-12 | Standard action texts and default owners for the plan — confirm wording | Phase 6 |
-| Q-19 | Where is the history the Looker Studio report shows? The Kobo asset has nothing before 22 Oct 2026 (K.1, K.5). On ODK Central, another Kobo asset (the owning account has 4 others), or elsewhere? | Backfill (step 14), "every historical round loaded or gaps explained" |
-| Q-20 | Two Kobo submissions name future periods (January 2027 and Q1 2029, both visited 25 Oct 2026; K.3, K.5). Tests or mistakes? Will they be removed or corrected at source? The portal quarantines them as `ROUND_WINDOW` either way | Clean data at go-live |
-| Q-21 | Will the client switch the Kobo form's LGA/ward/facility questions to `select_one_from_file` with the portal's CSV (D-72)? If not, who keeps the slug mapping in step with the form's facility list? | Facility matching, every Kobo score |
-| Q-22 | Is the 20-minute minimum visit (`VISIT_TOO_SHORT`, soft) right for the real Kobo form? 3 of the 6 real visits took 11–18 minutes (K.3, K.5) | Flag noise on the Data issues page |
-| Q-23 | If a submission is edited at source after an administrator corrected its assessment in the portal, does the source edit overwrite the correction?<br>**Default, built (2026-11-04):** the source edit wins. The assessment takes the edited answers and is scored again from them. The portal correction stays in the audit log (and in the drawer's trail). The assessment gets the soft flag `SOURCE_EDIT_OVER_CORRECTION` (`EventFlags`), so it shows on the Soft tab of Data issues; an administrator reviews it and corrects again or overrides the flag with a reason. A further source edit raises it again only if there was a new correction since the override. The overwrite is audited on the assessment (`source_edit_over_correction`). The drawer's "Corrected in the portal, differs from {source}" note shows only while a correction is newer than the last such overwrite.<br>(Prompted as Q-19; that number was already taken by the history question.) | Which answers a facility's score uses after an edit at source |

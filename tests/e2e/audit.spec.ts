@@ -15,18 +15,18 @@ const Q = 'year=2026&quarter=2';
 
 /** Every signed-in page, and how to tell it has loaded. */
 const PAGES: { name: string; path: string; heading: string }[] = [
-    { name: 'home', path: `/dashboard/home?${Q}`, heading: 'Home' },
-    { name: 'facility', path: `/dashboard/facility?${Q}`, heading: 'Facility view' },
-    { name: 'lga', path: `/dashboard/lga?${Q}`, heading: 'LGA view' },
-    { name: 'monitor', path: `/dashboard/monitor?${Q}`, heading: 'Monitor' },
-    { name: 'visuals', path: `/dashboard/visuals?${Q}`, heading: 'Visuals' },
-    { name: 'plan', path: `/dashboard/plan?${Q}`, heading: 'Implementation plan' },
+    { name: 'home', path: `/?${Q}`, heading: 'Home' },
+    { name: 'facility', path: `/facilities?${Q}`, heading: 'Facility view' },
+    { name: 'lga', path: `/lgas?${Q}`, heading: 'LGA view' },
+    { name: 'monitor', path: `/monitor?${Q}`, heading: 'Monitor' },
+    { name: 'visuals', path: `/visuals?${Q}`, heading: 'Visuals' },
+    { name: 'plan', path: `/plan?${Q}`, heading: 'Implementation plan' },
     { name: 'admin-sources', path: '/admin', heading: 'Data sources' }, // /admin opens the Data sources page
     { name: 'admin-data-issues', path: '/admin/data-issues', heading: 'Data issues' },
     { name: 'admin-rounds', path: '/admin/rounds', heading: 'Rounds' },
     { name: 'admin-facilities', path: '/admin/facilities', heading: 'Facility list' },
     { name: 'admin-scoring-rules', path: '/admin/scoring-rules', heading: 'Scoring rules' },
-    { name: 'security', path: '/settings/security', heading: 'Security' },
+    { name: 'security', path: '/admin/settings/security', heading: 'Security' },
 ];
 
 async function ready(page: Page, heading: string): Promise<void> {
@@ -124,7 +124,7 @@ test.describe('axe on every page', () => {
     }
 
     test('the facility drawer', async ({ page }, testInfo) => {
-        await page.goto(`/dashboard/facility?${Q}`);
+        await page.goto(`/facilities?${Q}`);
         await ready(page, 'Facility view');
         await page.getByRole('table', { name: /Facilities in view/ }).getByRole('rowheader').first().getByRole('button').click();
         await expect(page.getByRole('dialog').getByRole('heading', { level: 3 }).first()).toBeVisible({ timeout: 60_000 });
@@ -169,7 +169,7 @@ test.describe('forced colours and 200% zoom', () => {
 test.describe('reduced motion', () => {
     test('loading placeholders stop pulsing and nothing keeps animating', async ({ page }) => {
         await page.emulateMedia({ reducedMotion: 'reduce' });
-        await page.goto('/dev/components');
+        await page.goto('/admin/dev/components');
         const skeleton = page.locator('[aria-busy="true"]').first();
         await expect(skeleton).toBeVisible({ timeout: 60_000 });
         expect(await skeleton.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
@@ -182,7 +182,7 @@ test.describe('reduced motion', () => {
         }
 
         await page.emulateMedia({ reducedMotion: 'no-preference' });
-        await page.goto('/dev/components');
+        await page.goto('/admin/dev/components');
         expect(await page.locator('[aria-busy="true"]').first().evaluate((el) => getComputedStyle(el).animationName)).not.toBe('none');
     });
 });
@@ -194,8 +194,8 @@ test.describe('charts load after numbers', () => {
     // data. (On Visuals the figures come in that same deferred response, so React starts the lazy
     // import in the very render that paints them.)
     for (const [name, path, heading] of [
-        ['home', `/dashboard/home?${Q}`, 'Home'],
-        ['visuals', `/dashboard/visuals?${Q}`, 'Visuals'],
+        ['home', `/?${Q}`, 'Home'],
+        ['visuals', `/visuals?${Q}`, 'Visuals'],
     ] as const) {
         test(name, async ({ page }) => {
             await page.addInitScript(() => {
@@ -237,7 +237,7 @@ test.describe('charts load after numbers', () => {
 
 test.describe('keyboard only', () => {
     test('filter → LGA tile → facility → drawer → close', async ({ page }) => {
-        await page.goto(`/dashboard/home?${Q}`);
+        await page.goto(`/?${Q}`);
         await ready(page, 'Home');
 
         // Filter: the LGA select, changed with the arrow keys.
@@ -276,7 +276,7 @@ test.describe('keyboard only', () => {
     });
 
     test('sort and paginate the facility table', async ({ page }) => {
-        await page.goto(`/dashboard/facility?${Q}`);
+        await page.goto(`/facilities?${Q}`);
         await ready(page, 'Facility view');
 
         const ward = page.getByRole('table', { name: /Facilities in view/ }).getByRole('button', { name: 'Ward' });

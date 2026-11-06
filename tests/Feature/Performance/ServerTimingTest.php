@@ -29,7 +29,7 @@ it('answers every dashboard page and API endpoint within the p95 budget on five 
     $seedSeconds = (hrtime(true) - $seeded) / 1e9;
     expect($seeder->created)->toBeGreaterThan(40_000);
 
-    $admin = User::factory()->withTwoFactor()->create();
+    $admin = User::factory()->create();
     $this->actingAs($admin);
 
     $lgas = DB::table('lgas')->orderBy('name')->pluck('code')->all();
@@ -58,16 +58,17 @@ it('answers every dashboard page and API endpoint within the p95 budget on five 
         return $response;
     };
 
-    foreach (['home', 'facility', 'lga', 'monitor', 'visuals', 'plan'] as $page) {
+    $paths = ['home' => '/', 'facility' => '/facilities', 'lga' => '/lgas', 'monitor' => '/monitor', 'visuals' => '/visuals', 'plan' => '/plan'];
+    foreach ($paths as $page => $path) {
         // Warm-up: another filter, untimed.
-        $warm = $this->get("/dashboard/{$page}?year=".($last - 3))->assertOk();
+        $warm = $this->get("{$path}?year=".($last - 3))->assertOk();
         $deferred = $warm->viewData('page')['deferredProps'] ?? [];
         foreach ($deferred as $props) {
-            $this->get("/dashboard/{$page}?year=".($last - 3), inertiaReload($warm, $props))->assertOk();
+            $this->get("{$path}?year=".($last - 3), inertiaReload($warm, $props))->assertOk();
         }
 
         foreach ($filters as $i => $query) {
-            $url = "/dashboard/{$page}".($query === '' ? '?' : $query).($page === 'facility' ? $facilityExtras[$i] : '');
+            $url = $path.($query === '' ? '?' : $query).($page === 'facility' ? $facilityExtras[$i] : '');
             $url = rtrim($url, '?');
             $response = $time("{$page} (page)", $url)->assertOk();
             foreach ($response->viewData('page')['deferredProps'] ?? [] as $group => $props) {
@@ -78,23 +79,23 @@ it('answers every dashboard page and API endpoint within the p95 budget on five 
 
     // The drawer: ten facilities, each on the round the filters put in view.
     $facilityIds = DB::table('facilities')->where('is_active', true)->orderBy('id')->pluck('id')->all();
-    $this->getJson("/api/facilities/{$facilityIds[0]}")->assertOk();
+    $this->getJson("/admin/api/facilities/{$facilityIds[0]}")->assertOk();
     foreach ($filters as $i => $query) {
         $facility = $facilityIds[intdiv(count($facilityIds) * ($i + 1), 11)];
-        $time('api facilities/{id}', "/api/facilities/{$facility}{$query}", ['Accept' => 'application/json'])->assertOk();
+        $time('api facilities/{id}', "/admin/api/facilities/{$facility}{$query}", ['Accept' => 'application/json'])->assertOk();
     }
 
     $roundIds = DB::table('rounds')->orderBy('id')->pluck('id')->all();
     $api = [
-        'api rounds' => array_fill(0, 10, '/api/rounds'),
-        'api scoring-rules' => array_fill(0, 10, '/api/scoring-rules'),
+        'api rounds' => array_fill(0, 10, '/admin/api/rounds'),
+        'api scoring-rules' => array_fill(0, 10, '/admin/api/scoring-rules'),
         'api quarantine' => ['', '?group=rule', '?status=open', '?status=resolved', '?rule=UNKNOWN_FORM_VERSION', "?round={$roundIds[3]}",
             "?lga={$lgas[2]}", '?group=flat&page=2', "?group=rule&round={$roundIds[10]}", "?status=open&lga={$lgas[5]}"],
     ];
     foreach ($api as $name => $urls) {
-        $this->getJson(str_starts_with($urls[0], '/') ? $urls[0] : "/api/quarantine{$urls[0]}")->assertOk();
+        $this->getJson(str_starts_with($urls[0], '/') ? $urls[0] : "/admin/api/quarantine{$urls[0]}")->assertOk();
         foreach ($urls as $url) {
-            $time($name, str_starts_with($url, '/') ? $url : "/api/quarantine{$url}", ['Accept' => 'application/json'])->assertOk();
+            $time($name, str_starts_with($url, '/') ? $url : "/admin/api/quarantine{$url}", ['Accept' => 'application/json'])->assertOk();
         }
     }
 

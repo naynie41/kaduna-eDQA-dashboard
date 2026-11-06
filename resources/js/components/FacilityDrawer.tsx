@@ -4,7 +4,7 @@ import FacilityDetailView from '@/components/FacilityDetailView';
 import Skeleton from '@/components/Skeleton';
 import { ApiError, getJson } from '@/lib/api';
 import { useTranslate } from '@/lib/i18n';
-import { show } from '@/routes/api/facilities';
+import { show } from '@/routes/admin/api/facilities';
 import type { FacilityDetail } from '@/types/dashboard';
 
 export type FacilityDrawerProps = {

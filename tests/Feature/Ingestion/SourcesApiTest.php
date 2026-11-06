@@ -30,7 +30,7 @@ beforeEach(function (): void {
     $this->kobo = new FakeKoboSource;
     useSource('odk', $this->odk);
     useSource('kobo', $this->kobo);
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 // ---- POST /api/sources/{key}/pull
@@ -38,7 +38,7 @@ beforeEach(function (): void {
 it('starts a manual pull of the named source, audited with the source, and answers 202 with its run id', function (string $key): void {
     Queue::fake();
 
-    $response = $this->actingAs($this->admin)->postJson("/api/sources/{$key}/pull")->assertStatus(202)->assertJson(['already_running' => false]);
+    $response = $this->actingAs($this->admin)->postJson("/admin/api/sources/{$key}/pull")->assertStatus(202)->assertJson(['already_running' => false]);
 
     $run = PullRun::query()->sole();
     expect($response->json('run_id'))->toBe($run->id)
@@ -58,7 +58,7 @@ it('returns the source\'s running pull instead of queueing a second, and audits 
     Queue::fake();
     $running = PullRun::query()->create(['source_id' => Rows::sourceId('kobo'), 'trigger_type' => PullTrigger::Scheduled, 'started_at' => now()->subMinute()]);
 
-    $this->actingAs($this->admin)->postJson('/api/sources/kobo/pull')->assertStatus(202)->assertJson(['run_id' => $running->id, 'already_running' => true]);
+    $this->actingAs($this->admin)->postJson('/admin/api/sources/kobo/pull')->assertStatus(202)->assertJson(['run_id' => $running->id, 'already_running' => true]);
 
     expect(PullRun::query()->count())->toBe(1);
     Queue::assertNothingPushed();
@@ -72,7 +72,7 @@ it('does not count another source\'s pull, a backfill, a sweep or a run left ope
     PullRun::query()->create(['source_id' => Rows::sourceId('odk'), 'trigger_type' => PullTrigger::Reconcile, 'started_at' => now()->subMinute()]);
     PullRun::query()->create(['source_id' => Rows::sourceId('odk'), 'trigger_type' => PullTrigger::Scheduled, 'started_at' => now()->subHours(3)]);
 
-    $this->actingAs($this->admin)->postJson('/api/sources/odk/pull')->assertStatus(202)->assertJson(['already_running' => false]);
+    $this->actingAs($this->admin)->postJson('/admin/api/sources/odk/pull')->assertStatus(202)->assertJson(['already_running' => false]);
 
     Queue::assertPushed(PullSubmissionsJob::class, fn (PullSubmissionsJob $job): bool => $job->source === 'odk');
 });
@@ -81,7 +81,7 @@ it('carries the run it was given through the pull, without a second audit entry'
     $this->odk->add(json_decode((string) file_get_contents(base_path('tests/Fixtures/sources/odk/valid/clean-visit.json')), true));
 
     // The sync test queue runs the pull at once.
-    $runId = $this->actingAs($this->admin)->postJson('/api/sources/odk/pull')->assertStatus(202)->json('run_id');
+    $runId = $this->actingAs($this->admin)->postJson('/admin/api/sources/odk/pull')->assertStatus(202)->json('run_id');
 
     $run = PullRun::query()->sole();
     expect($run->id)->toBe($runId)
@@ -104,9 +104,9 @@ it('refuses a source not configured or switched off with 409, and queues nothing
     Queue::fake();
     $setup();
 
-    $this->actingAs($this->admin)->postJson('/api/sources/kobo/pull')->assertStatus(409)->assertJson(['code' => $code])
+    $this->actingAs($this->admin)->postJson('/admin/api/sources/kobo/pull')->assertStatus(409)->assertJson(['code' => $code])
         ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'KoboToolbox'));
-    $this->actingAs($this->admin)->postJson('/api/sources/kobo/reconcile')->assertStatus(409)->assertJson(['code' => $code]);
+    $this->actingAs($this->admin)->postJson('/admin/api/sources/kobo/reconcile')->assertStatus(409)->assertJson(['code' => $code]);
 
     expect(PullRun::query()->count())->toBe(0);
     Queue::assertNothingPushed();
@@ -119,8 +119,8 @@ it('refuses a source not configured or switched off with 409, and queues nothing
 it('answers 404 for a source not in config', function (string $key): void {
     Queue::fake();
 
-    $this->actingAs($this->admin)->postJson("/api/sources/{$key}/pull")->assertNotFound();
-    $this->actingAs($this->admin)->postJson("/api/sources/{$key}/reconcile")->assertNotFound();
+    $this->actingAs($this->admin)->postJson("/admin/api/sources/{$key}/pull")->assertNotFound();
+    $this->actingAs($this->admin)->postJson("/admin/api/sources/{$key}/reconcile")->assertNotFound();
 
     Queue::assertNothingPushed();
 })->with(['dhis2', 'ODK', 'odk-central']);
@@ -128,11 +128,11 @@ it('answers 404 for a source not in config', function (string $key): void {
 it('limits "Pull now" to six a minute per source, each source on its own', function (): void {
     Queue::fake();
     foreach (range(1, 6) as $i) {
-        $this->actingAs($this->admin)->postJson('/api/sources/odk/pull')->assertStatus(202);
+        $this->actingAs($this->admin)->postJson('/admin/api/sources/odk/pull')->assertStatus(202);
     }
 
-    $this->actingAs($this->admin)->postJson('/api/sources/odk/pull')->assertStatus(429);
-    $this->actingAs($this->admin)->postJson('/api/sources/kobo/pull')->assertStatus(202);
+    $this->actingAs($this->admin)->postJson('/admin/api/sources/odk/pull')->assertStatus(429);
+    $this->actingAs($this->admin)->postJson('/admin/api/sources/kobo/pull')->assertStatus(202);
 });
 
 // ---- POST /api/sources/pull-all
@@ -141,7 +141,7 @@ it('pulls every configured and enabled source, one run each, audited', function 
     Queue::fake();
     $running = PullRun::query()->create(['source_id' => Rows::sourceId('kobo'), 'trigger_type' => PullTrigger::Webhook, 'started_at' => now()]);
 
-    $runs = $this->actingAs($this->admin)->postJson('/api/sources/pull-all')->assertStatus(202)->json('runs');
+    $runs = $this->actingAs($this->admin)->postJson('/admin/api/sources/pull-all')->assertStatus(202)->json('runs');
 
     $odkRun = PullRun::query()->where('source_id', Rows::sourceId('odk'))->sole();
     expect($runs)->toBe([
@@ -156,10 +156,10 @@ it('leaves out a source switched off, and refuses with 409 when none is on', fun
     Queue::fake();
     config(['edqa.sources.kobo.enabled' => false]);
 
-    expect($this->actingAs($this->admin)->postJson('/api/sources/pull-all')->assertStatus(202)->json('runs.*.source'))->toBe(['odk']);
+    expect($this->actingAs($this->admin)->postJson('/admin/api/sources/pull-all')->assertStatus(202)->json('runs.*.source'))->toBe(['odk']);
 
     config(['edqa.sources.odk.url' => null]);
-    $this->actingAs($this->admin)->postJson('/api/sources/pull-all')->assertStatus(409)->assertJson(['code' => 'no_source_enabled']);
+    $this->actingAs($this->admin)->postJson('/admin/api/sources/pull-all')->assertStatus(409)->assertJson(['code' => 'no_source_enabled']);
 });
 
 // ---- POST /api/sources/{key}/reconcile
@@ -167,7 +167,7 @@ it('leaves out a source switched off, and refuses with 409 when none is on', fun
 it('starts a reconcile sweep of the named source, audited, and carries the run through', function (): void {
     Queue::fake();
 
-    $runId = $this->actingAs($this->admin)->postJson('/api/sources/kobo/reconcile')->assertStatus(202)->assertJson(['already_running' => false])->json('run_id');
+    $runId = $this->actingAs($this->admin)->postJson('/admin/api/sources/kobo/reconcile')->assertStatus(202)->assertJson(['already_running' => false])->json('run_id');
 
     $run = PullRun::query()->sole();
     expect($run->id)->toBe($runId)
@@ -181,7 +181,7 @@ it('starts a reconcile sweep of the named source, audited, and carries the run t
 it('runs the sweep on the run it was given', function (): void {
     Rows::round(['year' => 2026, 'quarter' => 4, 'window_start' => '2026-10-01', 'window_end' => '2026-12-31']);
 
-    $runId = $this->actingAs($this->admin)->postJson('/api/sources/kobo/reconcile')->assertStatus(202)->json('run_id');
+    $runId = $this->actingAs($this->admin)->postJson('/admin/api/sources/kobo/reconcile')->assertStatus(202)->json('run_id');
 
     $run = PullRun::query()->sole();
     expect($run->id)->toBe($runId)
@@ -193,7 +193,7 @@ it('returns the running sweep, not a running pull, for a second reconcile', func
     PullRun::query()->create(['source_id' => Rows::sourceId('odk'), 'trigger_type' => PullTrigger::Scheduled, 'started_at' => now()]);
     $sweep = PullRun::query()->create(['source_id' => Rows::sourceId('odk'), 'trigger_type' => PullTrigger::Reconcile, 'started_at' => now()]);
 
-    $this->actingAs($this->admin)->postJson('/api/sources/odk/reconcile')->assertStatus(202)->assertJson(['run_id' => $sweep->id, 'already_running' => true]);
+    $this->actingAs($this->admin)->postJson('/admin/api/sources/odk/reconcile')->assertStatus(202)->assertJson(['run_id' => $sweep->id, 'already_running' => true]);
 
     Queue::assertNothingPushed();
 });
@@ -212,15 +212,15 @@ it('closes the sweep\'s run when it never got the lock', function (): void {
 it('shows a run\'s progress with its source, and 404 for one that does not exist', function (): void {
     $run = PullRun::query()->create(['source_id' => Rows::sourceId('kobo'), 'trigger_type' => PullTrigger::Manual, 'started_at' => now(), 'fetched' => 500, 'duplicates' => 3, 'cross_source_duplicates' => 2, 'accepted' => 480, 'flagged' => 7, 'quarantined' => 10]);
 
-    $this->actingAs($this->admin)->getJson("/api/pulls/{$run->id}")->assertOk()->assertExactJson(['data' => [
+    $this->actingAs($this->admin)->getJson("/admin/api/pulls/{$run->id}")->assertOk()->assertExactJson(['data' => [
         'run_id' => $run->id, 'source' => 'kobo', 'trigger' => 'manual', 'status' => 'running', 'started_at' => $run->started_at->toIso8601String(), 'finished_at' => null,
         'fetched' => 500, 'parsed' => 0, 'duplicates' => 3, 'cross_source_duplicates' => 2, 'accepted' => 480, 'flagged' => 7, 'quarantined' => 10,
         'deletions_detected' => 0, 'error' => null,
     ]]);
     $run->update(['outcome' => PullOutcome::Failed, 'finished_at' => now(), 'error' => 'KoboUnreachable: KoboToolbox could not be reached']);
-    $this->actingAs($this->admin)->getJson("/api/pulls/{$run->id}")->assertJsonPath('data.status', 'failed')->assertJsonPath('data.error', 'KoboUnreachable: KoboToolbox could not be reached');
+    $this->actingAs($this->admin)->getJson("/admin/api/pulls/{$run->id}")->assertJsonPath('data.status', 'failed')->assertJsonPath('data.error', 'KoboUnreachable: KoboToolbox could not be reached');
 
-    $this->actingAs($this->admin)->getJson('/api/pulls/999999')->assertNotFound();
+    $this->actingAs($this->admin)->getJson('/admin/api/pulls/999999')->assertNotFound();
 });
 
 // ---- GET /api/sources
@@ -236,7 +236,7 @@ it('reports every source: configured, enabled, reachable, its state, cursor, run
     Rows::pullRun(['source_id' => Rows::sourceId('odk'), 'outcome' => 'succeeded', 'started_at' => now()->subMinutes(5), 'finished_at' => now()->subMinutes(4)]);
     $running = PullRun::query()->create(['source_id' => Rows::sourceId('kobo'), 'trigger_type' => PullTrigger::Scheduled, 'started_at' => now()]);
 
-    $data = $this->actingAs($this->admin)->getJson('/api/sources')->assertOk()->json('data');
+    $data = $this->actingAs($this->admin)->getJson('/admin/api/sources')->assertOk()->json('data');
 
     [$odk, $kobo] = $data['sources'];
     expect(array_column($data['sources'], 'key'))->toBe(['odk', 'kobo'])
@@ -258,8 +258,8 @@ it('asks each source whether it answers at most once a minute, each on its own',
     $kobo->shouldReceive('ping')->once()->andThrow(KoboUnreachable::connection(3));
     useSource('kobo', $kobo);
 
-    $first = $this->actingAs($this->admin)->getJson('/api/sources')->json('data.sources.1.reachable');
-    $second = $this->actingAs($this->admin)->getJson('/api/sources')->json('data.sources.1.reachable');
+    $first = $this->actingAs($this->admin)->getJson('/admin/api/sources')->json('data.sources.1.reachable');
+    $second = $this->actingAs($this->admin)->getJson('/admin/api/sources')->json('data.sources.1.reachable');
 
     expect($first)->toMatchArray(['ok' => false, 'status' => 'unreachable'])
         ->and($second)->toBe($first)
@@ -273,7 +273,7 @@ it('names a source\'s missing settings, never their values, and asks it nothing'
     $kobo->shouldNotReceive('ping');
     useSource('kobo', $kobo);
 
-    $response = $this->actingAs($this->admin)->getJson('/api/sources')->assertOk();
+    $response = $this->actingAs($this->admin)->getJson('/admin/api/sources')->assertOk();
 
     expect($response->json('data.sources.1.configured'))->toBeFalse()
         ->and($response->json('data.sources.1.problems'))->toContain('KOBO_BASE_URL')
@@ -289,11 +289,11 @@ it('keeps every sources endpoint behind the sign-in', function (string $method, 
 
     expect(PullRun::query()->count())->toBe(0);
     Queue::assertNothingPushed();
-})->with([['GET', '/api/sources'], ['POST', '/api/sources/odk/pull'], ['POST', '/api/sources/pull-all'], ['POST', '/api/sources/kobo/reconcile'], ['GET', '/api/pulls/1']]);
+})->with([['GET', '/admin/api/sources'], ['POST', '/admin/api/sources/odk/pull'], ['POST', '/admin/api/sources/pull-all'], ['POST', '/admin/api/sources/kobo/reconcile'], ['GET', '/admin/api/pulls/1']]);
 
 it('has no /api/odk endpoints any more', function (string $method, string $uri): void {
     $this->actingAs($this->admin)->json($method, $uri)->assertNotFound();
-})->with([['POST', '/api/odk/pull'], ['GET', '/api/odk/pull/1'], ['GET', '/api/odk/status']]);
+})->with([['POST', '/admin/api/odk/pull'], ['GET', '/admin/api/odk/pull/1'], ['GET', '/admin/api/odk/status']]);
 
 // ---- Each source's state (the status bar)
 
@@ -368,7 +368,7 @@ it('shares every source\'s state with the shell, worst first', function (): void
     Rows::pullRun(['source_id' => Rows::sourceId('odk'), 'outcome' => 'succeeded', 'started_at' => now()->subMinutes(5), 'finished_at' => now()->subMinutes(4)]);
     Rows::pullRun(['source_id' => Rows::sourceId('kobo'), 'outcome' => 'succeeded', 'started_at' => now()->subMinutes(50), 'finished_at' => now()->subMinutes(45)]);
 
-    $this->actingAs($this->admin)->get('/dashboard/home')->assertInertia(fn ($page) => $page
+    $this->actingAs($this->admin)->get('/')->assertInertia(fn ($page) => $page
         ->where('shell.sources.0.key', 'kobo')->where('shell.sources.0.state', 'stale')
         ->where('shell.sources.1.key', 'odk')->where('shell.sources.1.state', 'healthy')
         ->missing('shell.sync'));

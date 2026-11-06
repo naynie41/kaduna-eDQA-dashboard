@@ -43,7 +43,7 @@ beforeEach(function (): void {
     Storage::fake('attachments');
     $this->source = new FakeSubmissionSource;
     useSource('odk', $this->source);
-    $this->admin = User::factory()->withTwoFactor()->create();
+    $this->admin = User::factory()->create();
 });
 
 /**
@@ -244,7 +244,7 @@ function attServed(object $test): SubmissionAttachment
 it('streams a fetched file to an administrator, with safe headers, and audits the view', function (): void {
     $attachment = attServed($this);
 
-    $response = $this->actingAs($this->admin)->get("/attachments/{$attachment->submission_id}/register.png");
+    $response = $this->actingAs($this->admin)->get("/admin/attachments/{$attachment->submission_id}/register.png");
 
     $response->assertOk()
         ->assertHeader('Content-Type', 'image/png')
@@ -261,7 +261,7 @@ it('streams a fetched file to an administrator, with safe headers, and audits th
 it('downloads a file that is not an image', function (): void {
     $attachment = attServed($this);
 
-    $response = $this->actingAs($this->admin)->get("/attachments/{$attachment->submission_id}/trace.geojson");
+    $response = $this->actingAs($this->admin)->get("/admin/attachments/{$attachment->submission_id}/trace.geojson");
 
     $response->assertOk()->assertHeader('Content-Type', 'application/geo+json');
     expect($response->headers->get('Content-Disposition'))->toBe('attachment; filename=trace.geojson');
@@ -280,22 +280,22 @@ it('answers 404 to anything but a fetched file recorded for that submission', fu
         ->and($response->getContent())->not->toContain('top secret');
     expect(Activity::query()->where('event', 'viewed')->count())->toBe(0);
 })->with([
-    'another submission' => '/attachments/{other}/register.png',
-    'encoded traversal' => '/attachments/{id}/..%2Fsecret.txt',
-    'double-encoded traversal' => '/attachments/{id}/%252e%252e%252fsecret.txt',
-    'dot dot' => '/attachments/{id}/..',
-    'a file not recorded' => '/attachments/{id}/secret.txt',
-    'not fetched yet' => '/attachments/{id}/pending.png',
-    'different case' => '/attachments/{id}/REGISTER.PNG',
-    'backslash' => '/attachments/{id}/..%5Csecret.txt',
-    'not a number' => '/attachments/abc/register.png',
+    'another submission' => '/admin/attachments/{other}/register.png',
+    'encoded traversal' => '/admin/attachments/{id}/..%2Fsecret.txt',
+    'double-encoded traversal' => '/admin/attachments/{id}/%252e%252e%252fsecret.txt',
+    'dot dot' => '/admin/attachments/{id}/..',
+    'a file not recorded' => '/admin/attachments/{id}/secret.txt',
+    'not fetched yet' => '/admin/attachments/{id}/pending.png',
+    'different case' => '/admin/attachments/{id}/REGISTER.PNG',
+    'backslash' => '/admin/attachments/{id}/..%5Csecret.txt',
+    'not a number' => '/admin/attachments/abc/register.png',
 ]);
 
 it('refuses a request that is not signed in', function (): void {
     $attachment = attServed($this);
 
-    $this->get("/attachments/{$attachment->submission_id}/register.png")->assertRedirect('/login');
-    $this->getJson("/attachments/{$attachment->submission_id}/register.png")->assertUnauthorized();
+    $this->get("/admin/attachments/{$attachment->submission_id}/register.png")->assertRedirect('/login');
+    $this->getJson("/admin/attachments/{$attachment->submission_id}/register.png")->assertUnauthorized();
     expect(Activity::query()->where('event', 'viewed')->count())->toBe(0);
 });
 
@@ -303,5 +303,5 @@ it('answers 404 when the file is recorded but has gone from the disk', function 
     $attachment = attServed($this);
     Storage::disk('attachments')->delete((string) $attachment->path);
 
-    $this->actingAs($this->admin)->get("/attachments/{$attachment->submission_id}/register.png")->assertNotFound();
+    $this->actingAs($this->admin)->get("/admin/attachments/{$attachment->submission_id}/register.png")->assertNotFound();
 });

@@ -14,7 +14,8 @@ use function Laravel\Prompts\text;
 
 /**
  * The only way to create an administrator (SECURITY.md §2): no registration, no user-management
- * page. The account is verified and active; 2FA is set up at first sign-in. Audited through the
+ * page. The account is verified and active, and signs in with its password (no MFA, D-35). The
+ * password policy applies (SECURITY.md §2, Password::defaults). Audited through the
  * User model (source = console).
  */
 final class CreateAdmin extends Command
@@ -57,7 +58,7 @@ final class CreateAdmin extends Command
             'email_verified_at' => now(),
         ])->save();
 
-        $this->info("Administrator {$user->email} created. They set up two-factor authentication at first sign-in.");
+        $this->info("Administrator {$user->email} created. They can sign in at /login.");
 
         $active = User::query()->where('is_active', true)->count();
         if ($active > self::RECOMMENDED_MAXIMUM) {

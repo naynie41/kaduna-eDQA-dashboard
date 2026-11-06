@@ -113,7 +113,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             consequence: t('admin.issues.dialogs.reject_consequence'),
             confirm: t('admin.issues.dialogs.reject_confirm'),
             danger: true,
-            send: (reason) => send('POST', `/api/quarantine/${row.id}/resolve`, { action: 'reject', reason }, (data) => describeOne(data as Resolution)),
+            send: (reason) => send('POST', `/admin/api/quarantine/${row.id}/resolve`, { action: 'reject', reason }, (data) => describeOne(data as Resolution)),
         });
 
     const correct = (row: DataIssueRow, corrections: Partial<Record<CorrectableField, string | number | null>>) =>
@@ -122,7 +122,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             consequence: t('admin.issues.dialogs.correct_consequence'),
             confirm: t('admin.issues.dialogs.correct_confirm'),
             danger: false,
-            send: (reason) => send('POST', `/api/quarantine/${row.id}/resolve`, { action: 'correct', corrections, reason }, (data) => describeOne(data as Resolution)),
+            send: (reason) => send('POST', `/admin/api/quarantine/${row.id}/resolve`, { action: 'correct', corrections, reason }, (data) => describeOne(data as Resolution)),
         });
 
     // A cross-source duplicate (§5.8): keep the accepted assessment (this record is rejected), or
@@ -133,7 +133,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             consequence: t('admin.issues.dialogs.keep_existing_consequence', { source: row.duplicate_of?.source?.name ?? t('admin.issues.table.source_unknown') }),
             confirm: t('admin.issues.dialogs.keep_existing_confirm'),
             danger: false,
-            send: (reason) => send('POST', `/api/quarantine/${row.id}/resolve`, { action: 'reject', reason }, (data) => ({ ...describeOne(data as Resolution), text: t('admin.issues.outcomes.rejected') })),
+            send: (reason) => send('POST', `/admin/api/quarantine/${row.id}/resolve`, { action: 'reject', reason }, (data) => ({ ...describeOne(data as Resolution), text: t('admin.issues.outcomes.rejected') })),
         });
 
     const chooseThis = (row: DataIssueRow) =>
@@ -142,7 +142,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             consequence: t('admin.issues.dialogs.use_this_consequence', { source: row.duplicate_of?.source?.name ?? t('admin.issues.table.source_unknown') }),
             confirm: t('admin.issues.dialogs.use_this_confirm'),
             danger: false,
-            send: (reason) => send('POST', `/api/quarantine/${row.id}/resolve`, { action: 'replace', reason }, (data) => ({ text: t('admin.issues.outcomes.replaced'), rescore: (data as Resolution).rescore_round })),
+            send: (reason) => send('POST', `/admin/api/quarantine/${row.id}/resolve`, { action: 'replace', reason }, (data) => ({ text: t('admin.issues.outcomes.replaced'), rescore: (data as Resolution).rescore_round })),
         });
 
     // The Deleted at source tab (D-24).
@@ -153,7 +153,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             consequence: t('admin.issues.dialogs.keep_deletion_consequence', { source: row.source?.name ?? t('admin.issues.table.source_unknown'), facility: row.facility.name }),
             confirm: t('admin.issues.dialogs.keep_deletion_confirm'),
             danger: false,
-            send: (reason) => send('POST', `/api/submissions/${row.submission_id}/deletion-review`, { reason }, () => ({ text: t('admin.issues.outcomes.kept'), rescore: null })),
+            send: (reason) => send('POST', `/admin/api/submissions/${row.submission_id}/deletion-review`, { reason }, () => ({ text: t('admin.issues.outcomes.kept'), rescore: null })),
         });
     const withdraw = (row: DeletedAssessmentRow) =>
         setPending({
@@ -161,7 +161,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             consequence: t('admin.issues.dialogs.withdraw_consequence', { facility: row.facility.name, quarter: row.round.quarter, year: row.round.year }),
             confirm: t('admin.issues.dialogs.withdraw_confirm'),
             danger: true,
-            send: (reason) => send('POST', `/api/assessments/${row.assessment.id}/withdraw`, { reason }, () => ({ text: t('admin.issues.outcomes.withdrawn'), rescore: deletedRound(row) })),
+            send: (reason) => send('POST', `/admin/api/assessments/${row.assessment.id}/withdraw`, { reason }, () => ({ text: t('admin.issues.outcomes.withdrawn'), rescore: deletedRound(row) })),
         });
     const restore = (row: DeletedAssessmentRow) =>
         setPending({
@@ -169,7 +169,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             consequence: t('admin.issues.dialogs.restore_consequence', { facility: row.facility.name }),
             confirm: t('admin.issues.dialogs.restore_confirm'),
             danger: false,
-            send: (reason) => send('POST', `/api/assessments/${row.assessment.id}/restore`, { reason }, () => ({ text: t('admin.issues.outcomes.restored'), rescore: deletedRound(row) })),
+            send: (reason) => send('POST', `/admin/api/assessments/${row.assessment.id}/restore`, { reason }, () => ({ text: t('admin.issues.outcomes.restored'), rescore: deletedRound(row) })),
         });
 
     const override = (row: FlaggedRow, code: string, name: string) =>
@@ -178,7 +178,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             consequence: t('admin.issues.dialogs.override_consequence'),
             confirm: t('admin.issues.dialogs.override_confirm'),
             danger: false,
-            send: (reason) => send('POST', `/api/assessments/${row.id}/flags/${code}/override`, { reason }, () => ({ text: t('admin.issues.outcomes.overridden'), rescore: null })),
+            send: (reason) => send('POST', `/admin/api/assessments/${row.id}/flags/${code}/override`, { reason }, () => ({ text: t('admin.issues.outcomes.overridden'), rescore: null })),
         });
 
     const hardRows = filters.tab === 'hard' ? (records as Paginated<DataIssueRow>).data : [];
@@ -193,7 +193,7 @@ export default function AdminDataIssues({ issueFilters: filters, rules, records,
             confirm: action === 'reject' ? t('admin.issues.dialogs.reject_confirm') : t('admin.issues.dialogs.correct_confirm'),
             danger: action === 'reject',
             send: (reason) =>
-                send('POST', '/api/quarantine/bulk-resolve', { ids: chosen.map((row) => row.id), action, reason, ...(action === 'correct' ? { corrections } : {}) }, (data) => {
+                send('POST', '/admin/api/quarantine/bulk-resolve', { ids: chosen.map((row) => row.id), action, reason, ...(action === 'correct' ? { corrections } : {}) }, (data) => {
                     const list = data as Resolution[];
 
                     return { text: t('admin.issues.outcomes.bulk', { count: formatCount(list.filter((r) => r.record_status === 'resolved').length) }), rescore: list[0]?.rescore_round ?? null };

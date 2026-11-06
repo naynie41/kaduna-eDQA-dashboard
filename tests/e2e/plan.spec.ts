@@ -3,7 +3,7 @@ import { checkA11y } from './support/a11y';
 
 test.describe('Implementation plan', () => {
     test('lists actions weakest first with their owners and review points, the panels beside; axe finds nothing serious', async ({ page }) => {
-        await page.goto('/dashboard/plan?year=2026&quarter=2');
+        await page.goto('/plan?year=2026&quarter=2');
         await expect(page.getByRole('heading', { level: 1, name: 'Implementation plan' })).toBeVisible();
         await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 60_000 }); // deferred plan
 
