@@ -13,6 +13,7 @@ use App\Domain\Validation\Exceptions\QuarantineActionRefused;
 use App\Http\Middleware\EnforceAbsoluteSessionLifetime;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\NoIndex;
+use App\Http\Middleware\PublicCacheHeaders;
 use App\Http\Middleware\PublicReadOnly;
 use App\Http\Middleware\RestrictToAllowedIps;
 use App\Http\Middleware\SecurityHeaders;
@@ -41,7 +42,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(NoIndex::class);
 
         // Security headers first, so they are set on every web response.
-        $middleware->web(prepend: [SecurityHeaders::class]);
+        $middleware->web(prepend: [
+            // Outermost, so Inertia's Vary header is already set: public pages' Cache-Control (ARCHITECTURE.md §10).
+            PublicCacheHeaders::class,
+            SecurityHeaders::class,
+        ]);
         $middleware->web(append: [
             // SECURITY.md §2: signed out 12 hours after sign-in, however active.
             EnforceAbsoluteSessionLifetime::class,

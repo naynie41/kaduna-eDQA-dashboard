@@ -1,5 +1,5 @@
 // Bundle budget (ARCHITECTURE.md §10: ≤ 300 KB gzipped JS on first load). `npm run size` builds,
-// then walks the Vite manifest from what the first visit to /dashboard/home loads (the app entry
+// then walks the Vite manifest from what the first visit to the public Home (/) loads (the app entry
 // and the page, which app.blade.php names directly) through their static imports, and sums the
 // gzipped size of every JS file reached. Dynamic imports (lazy charts) are not counted: they load
 // later. Exits 1 over budget.
@@ -38,7 +38,7 @@ const rows = [...seen]
     .sort((a, b) => b.kb - a.kb);
 const total = rows.reduce((sum, row) => sum + row.kb, 0);
 
-console.log('\nFirst visit to /dashboard/home, gzipped JS:');
+console.log('\nFirst visit to the public Home (/), gzipped JS:');
 for (const row of rows) {
     console.log(`  ${row.kb.toFixed(1).padStart(7)} KB  ${row.file}`);
 }

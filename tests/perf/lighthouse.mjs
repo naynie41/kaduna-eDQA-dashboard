@@ -1,7 +1,6 @@
 // Lighthouse on throttled Slow 3G (ARCHITECTURE.md §10: first meaningful paint < 3 s), run by
 // `make lighthouse` inside the playwright service against a production build (Vite stopped, so
-// Laravel serves public/build). Signs in with the e2e administrator's saved session
-// (storage/e2e/admin.json, refreshed by the setup project first) and writes
+// Laravel serves public/build). The public pages, as an anonymous visitor (D-76); writes
 // storage/app/perf/lighthouse.md plus each full report as JSON.
 //
 // Slow 3G here is Lighthouse's simulated throttling at 400 ms RTT, 400 Kbps down and up, CPU
@@ -9,7 +8,7 @@
 // checks, config cached: see the Makefile). First Meaningful Paint left Lighthouse in v6, so the
 // table gives First and Largest Contentful Paint.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 import * as chromeLauncher from 'chrome-launcher';
 import lighthouse from 'lighthouse';
@@ -17,14 +16,12 @@ import lighthouse from 'lighthouse';
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8080';
 const OUT = 'storage/app/perf';
 const BUDGET_MS = 3000;
+// The public pages, with no filter: what a visitor lands on (the latest closed round).
 const PAGES = [
-    ['Home', '/dashboard/home?year=2026&quarter=2'],
-    ['Facility view', '/dashboard/facility?year=2026&quarter=2'],
-    ['Visuals', '/dashboard/visuals?year=2026&quarter=2'],
+    ['Home', '/'],
+    ['Facility view', '/facilities'],
+    ['Visuals', '/visuals'],
 ];
-
-const state = JSON.parse(readFileSync('storage/e2e/admin.json', 'utf8'));
-const cookie = state.cookies.map((c) => `${c.name}=${c.value}`).join('; ');
 
 const chrome = await chromeLauncher.launch({
     chromePath: chromium.executablePath(),
@@ -43,7 +40,6 @@ try {
                 output: 'json',
                 logLevel: 'error',
                 onlyCategories: ['performance'],
-                extraHeaders: { Cookie: cookie },
                 formFactor: 'mobile',
                 screenEmulation: { mobile: true, width: 360, height: 740, deviceScaleFactor: 2, disabled: false },
                 throttlingMethod: 'simulate',
@@ -91,9 +87,10 @@ const report = [
 writeFileSync(`${OUT}/lighthouse.md`, report);
 console.log(report);
 
-const signedOut = rows.filter((r) => !r.finalUrl.includes('/dashboard/'));
-if (signedOut.length > 0) {
-    console.error(`Not signed in for: ${signedOut.map((r) => r.name).join(', ')}`);
+// A public page never sends a visitor to /login (D-78).
+const redirected = rows.filter((r) => r.finalUrl.includes('/login'));
+if (redirected.length > 0) {
+    console.error(`Sent to /login: ${redirected.map((r) => r.name).join(', ')}`);
     process.exit(2);
 }
 process.exit(rows.every((r) => r.lcp < BUDGET_MS) ? 0 : 1);

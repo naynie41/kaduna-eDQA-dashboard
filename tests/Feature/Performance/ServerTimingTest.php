@@ -31,6 +31,9 @@ it('answers every dashboard page and API endpoint within the p95 budget on five 
 
     $admin = User::factory()->create();
     $this->actingAs($admin);
+    // Hundreds of timed requests from one address: the public rate limit (120 a minute, Phase P)
+    // would answer 429 part way. This measures server time, not the limiter (PublicHardeningTest).
+    config(['edqa.public.per_minute' => 100_000]);
 
     $lgas = DB::table('lgas')->orderBy('name')->pluck('code')->all();
     $years = DB::table('rounds')->distinct()->orderBy('year')->pluck('year')->all();

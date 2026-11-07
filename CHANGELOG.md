@@ -7,8 +7,51 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-07
+
+The public dashboard (Phase P, D-76–D-84): anyone can read the six dashboard pages without
+logging in, for closed rounds only; administrators work in a separate area under `/admin`,
+reached by typing `/login`. Still one role.
+- **Routes.** Public pages at `/`, `/facilities`, `/lgas`, `/monitor`, `/visuals`, `/plan`, plus
+  read-only JSON under `/api/public`: GET only, rate limited, `noindex`. The admin pages and JSON
+  live under `/admin`. Every route is classified by the route-guard test. Old `/dashboard/*` URLs
+  redirect permanently, keeping their filters.
+- **What the public sees.** Closed rounds only (`PublicScope` in Reporting), through
+  `Http\Resources\Public\*` only. There's no login link, and plan owners are shown as roles. The
+  status line says only "Figures last updated". A leak test over every public route and endpoint
+  runs in CI.
+- **Admins.** A preview of the public dashboard that includes the open round, and a full facility
+  view at `/admin/facilities/{id}`.
+- **BREAKING:**
+  - No MFA (D-84), with compensating controls (lockout, new-device login emails, optional IP
+    allow-list, a stronger password policy, a shorter idle timeout).
+  - `plan_actions.assigned_to` is now `owner_role` plus `owner_contact` (admin-only).
+- **Also in this release:** the admin shell and Data issues (Phase 5 steps 0–3: cross-source
+  duplicates, deletions at source, corrections, a source edit taking precedence over a portal
+  correction, Q-23) and the Duration filter (D-75).
+- **Docs** updated to match the build: ARCHITECTURE.md §4, §8, D-38, D-79 and D-81, and
+  SECURITY.md §3 and §8.
+- **Known gaps:**
+  - On the Windows dev host, Lighthouse and the 200-visitor load test are over budget (exception
+    E1, SSR still to come). The load test needs to be rerun on staging.
+
 ### Added
 
+- **Leak test, caching and load checks for the public dashboard (Phase P step 5, D-83).**
+  - `tests/Feature/Public/LeakTest.php` (in CI): private data seeded with markers (assessors,
+    devices, flags, attachments, quarantine, a cross-source duplicate, an edit, audit reasons, an
+    admin, a plan contact, coordinates, an open round). As a visitor, every public route found in
+    the router, with ten filter combinations, every deferred prop, and the drawer for 20
+    facilities. It fails on any SECURITY.md §3.1 key, marker, instance ID, email or open-round
+    figure.
+  - Public 404, 429 and 500 pages are checked with `APP_DEBUG=false`: no trace, path, class, ID or
+    secret.
+  - Visitors' public pages and JSON send `Cache-Control: private, max-age=60`
+    (`edqa.public.max_age`) with `Vary: X-Inertia, Cookie`; an administrator's get `no-store`.
+    Aggregator results stay cached per audience and filter until a round close or rescore.
+  - `make load`: 200 anonymous visitors for 60 s against a production-like build, each from its
+    own address; reports p50/p95, 5xx and 429s (`storage/app/perf/load.md`).
+  - `make lighthouse` now measures the public pages as a visitor.
 - **Public and admin layouts with the admin preview (Phase P step 4, D-76–D-81).**
   - `PublicLayout` for the six dashboard pages: the KD seal and "eDQA e-tool / Kaduna State", the
     filters and page tabs, and a footer with "Support: HSDF" and "Figures last updated {date}"

@@ -77,12 +77,14 @@ There are two audiences and still **one role** (decision D-76):
 Route groups (in `routes/web.php`, `routes/admin.php`, `routes/webhooks.php`):
 
 ```php
-// 1. Public, read-only — GET/HEAD only, rate limited, noindex
-Route::middleware(['web', 'public.readonly', 'throttle:public', 'noindex'])->group(...);
+// noindex is global (X-Robots-Tag on every response, §8), so no group names it.
+
+// 1. Public, read-only — GET/HEAD only, rate limited; pages public.*, JSON under /api/public
+Route::middleware(['web', 'public.readonly', 'throttle:public'])->name('public.')->group(...);
 
 // 2. Admin — everything that reads private data or changes anything
-Route::middleware(['web', 'admin.ip', 'auth', 'noindex'])   // admin.ip = optional allow-list
-    ->prefix('admin')->name('admin.')->group(...);
+Route::middleware(['web', 'admin.ip', 'auth'])   // admin.ip = optional allow-list
+    ->prefix('admin')->name('admin.')->group(...);   // /admin → /admin/sources
 
 // 3. Webhooks — signature/token verified per source (§6)
 // 4. GET /up — health only
@@ -244,7 +246,12 @@ HTTPS only, and webhooks that can only *trigger* a pull.
     `Permissions-Policy: camera=(), microphone=(), geolocation=()`
 - `X-Robots-Tag: noindex, nofollow` on every response and `<meta name="robots" content="noindex">`
   in the layout, plus `robots.txt` disallowing `/admin` and `/login` (D-82). Controlled by
-  `config('edqa.public.indexable')`, default false.
+  `config('edqa.public.indexable')`, default false. The header comes from a global middleware
+  (`NoIndex`), so it is on error pages, redirects and webhooks too, not only the route groups.
+- `Cache-Control` on public pages and public JSON (`PublicCacheHeaders`): `private, max-age=60`
+  for a visitor (`edqa.public.max_age`), `private, no-store` for a signed-in administrator, with
+  `Vary: X-Inertia, Cookie`. Never `public`: every response sets a session cookie, which a shared
+  cache must not store. Errors, `/login` and `/admin/*` get no max-age.
 - Public error pages (404/429/500) never show stack traces, IDs or source details.
 - Fonts are **self-hosted** (no Google Fonts CDN) — keeps the CSP tight and works on poor links.
 - `APP_DEBUG=false` in staging and production. Custom error pages; no stack traces to the browser.

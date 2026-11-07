@@ -41,6 +41,10 @@ return [
         // throttle:public, per IP, for the public pages (and the public JSON, Phase P step 3).
         'per_minute' => 120,
 
+        // public.cache: how long a visitor's browser may keep a public page or public JSON, in seconds
+        // (ARCHITECTURE.md §10). The figures change only at a round close or rescore.
+        'max_age' => 60,
+
         // D-77: the public sees closed rounds only (PublicScope). true also shows the open round
         // publicly, figures that may still move while data issues are resolved. Default false.
         'show_open_round' => false,

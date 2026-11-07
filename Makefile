@@ -11,7 +11,7 @@ APP_DB_USER     := edqa_app
 APP_DB_PASSWORD := edqa_app_dev
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e e2e-sources e2e-issues size lighthouse odk-mock-up odk-mock-seed sources-mock-up sources-mock-seed
+.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e e2e-sources e2e-issues size lighthouse load odk-mock-up odk-mock-seed sources-mock-up sources-mock-seed
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-13s %s\n", $$1, $$2}'
@@ -124,8 +124,7 @@ sources-mock-seed: ## Write n submissions on each mock, 10 of Kobo's also on ODK
 	$(EXEC) php artisan edqa:source-mock:generate odk --count=$(or $(n),200)
 	$(KOBO_MOCK_EXEC) php artisan edqa:source-mock:generate kobo --count=$(or $(n),200) --overlap=10
 
-lighthouse: ##Lighthouse on Slow 3G (Home, Facility view, Visuals) against a production build; Vite restarts after
-	$(EXEC) php artisan db:seed --class=E2eAdminSeeder --no-interaction
+lighthouse: ##Lighthouse on Slow 3G (public Home, Facility view, Visuals, as a visitor) against a production build; Vite restarts after
 	$(COMPOSE) stop vite
 	$(EXEC) rm -f public/hot  # vite runs under sh -c, so it never gets to remove it: Laravel would keep using the dev server
 	$(COMPOSE) run --rm --no-deps -e WAYFINDER_SKIP=1 vite npm run build
@@ -138,5 +137,16 @@ lighthouse: ##Lighthouse on Slow 3G (Home, Facility view, Visuals) against a pro
 	$(COMPOSE) exec -T -u root app sh -c 'rm -f /usr/local/etc/php/conf.d/zz-lighthouse.ini && kill -USR2 1'
 	$(COMPOSE) start vite
 
-size: ## Bundle budget: gzipped JS on first visit to /dashboard/home must stay under 300 KB
+load: ## 200 anonymous visitors on the public dashboard for 60 s against a production build (p95 < 1.5 s, no 5xx); Vite restarts after
+	$(COMPOSE) stop vite
+	$(EXEC) rm -f public/hot
+	$(COMPOSE) run --rm --no-deps -e WAYFINDER_SKIP=1 vite npm run build
+	$(COMPOSE) exec -T -u root app sh -c 'echo "opcache.validate_timestamps = 0" > /usr/local/etc/php/conf.d/zz-lighthouse.ini && kill -USR2 1'
+	$(EXEC) sh -c 'php artisan config:cache -q && php artisan route:cache -q'
+	-$(COMPOSE) --profile e2e run --rm --no-deps --entrypoint sh playwright tests/perf/run-load.sh
+	$(EXEC) sh -c 'php artisan config:clear -q && php artisan route:clear -q'
+	$(COMPOSE) exec -T -u root app sh -c 'rm -f /usr/local/etc/php/conf.d/zz-lighthouse.ini && kill -USR2 1'
+	$(COMPOSE) start vite
+
+size: ## Bundle budget: gzipped JS on first visit to the public Home (/) must stay under 300 KB
 	$(COMPOSE) exec -T vite npm run size
