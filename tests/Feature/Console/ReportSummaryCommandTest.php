@@ -6,6 +6,7 @@ use App\Domain\Reporting\Aggregators\DimensionAggregator;
 use App\Domain\Reporting\Aggregators\LgaTableAggregator;
 use App\Domain\Reporting\Aggregators\OwnerSplitAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Domain\Scoring\DTOs\ScoreValue;
 use Illuminate\Support\Facades\Artisan;
 use Tests\Support\ReportingFixture;
@@ -28,7 +29,7 @@ function cell(ScoreValue $score): string
 
 it('prints the latest round by default: state, owners and every LGA, as the aggregators give them', function (): void {
     $output = summary();
-    $filter = new ReportFilter(year: 2026, quarter: 2);
+    $filter = new ReportFilter(year: 2026, quarter: 2, audience: ReportAudience::Admin);
     $dimensions = app(DimensionAggregator::class)->dimensions($filter);
     $owners = app(OwnerSplitAggregator::class)->split($filter);
 

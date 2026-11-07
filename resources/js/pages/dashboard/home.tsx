@@ -12,7 +12,7 @@ import type { HomeProps, MonthSlotPoint } from '@/types/dashboard';
 
 /**
  * Home (ARCHITECTURE.md §9.2.1): the hero, Public vs Private, the quarter in view month by month
- * (D-75), the quarter trend and the weakest LGAs (or wards). The title, filters and tabs come from AppShell. Every number is the server's.
+ * (D-75), the quarter trend and the weakest LGAs (or wards). The title, filters and tabs come from PublicLayout. Every number is the server's.
  */
 export default function Home({ hero, dimensions, owners, trend, weakest, months }: HomeProps) {
     const t = useTranslate();

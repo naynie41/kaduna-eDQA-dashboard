@@ -390,3 +390,23 @@ export type Plan = {
 };
 
 export type PlanProps = { plan?: Plan };
+
+/**
+ * The public facility drawer (GET /api/public/facilities/{id}, SECURITY.md §3.1): the facility's
+ * name, place, level and ownership, the score card of a closed round, its item results and the
+ * round history. Nothing else: the server's whitelist (Http\Resources\Public\FacilityDetailResource).
+ */
+export type PublicFacilityDetail = {
+    facility: Pick<FacilityDetail['facility'], 'name' | 'lga' | 'ward' | 'level' | 'level_label' | 'ownership' | 'ownership_label'>;
+    round: { id: number; label: string; year: number; quarter: number } | null;
+    scores: FacilityDetail['scores'];
+    items: {
+        dimension: Dimension;
+        dimension_label: string;
+        slot: number;
+        month: string;
+        score: ScoreValue;
+        items: { code: string; label: string | null; result: ItemValue | null; checks: { passed: number; total: number } | null }[];
+    }[];
+    history: FacilityDetail['history'];
+};

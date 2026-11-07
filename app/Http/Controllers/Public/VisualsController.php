@@ -10,6 +10,9 @@ use App\Domain\Reporting\Aggregators\MonthSlotAggregator;
 use App\Domain\Reporting\Aggregators\QuarterTrendAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Public\LgaRowResource;
+use App\Http\Resources\Public\MonthSlotPointResource;
+use App\Http\Resources\Public\TrendPointResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -32,11 +35,11 @@ final class VisualsController extends Controller
             'monthSlots' => Inertia::defer(function () use ($months, $viewFilter): array {
                 $points = $months->series($viewFilter);
 
-                return ['points' => $points, 'takeaways' => $months->takeaways($points)];
+                return ['points' => MonthSlotPointResource::many($points), 'takeaways' => $months->takeaways($points)];
             }),
             // The quarterly view (D-75): each quarter's three dimensions and overall, every round.
-            'quarters' => Inertia::defer(fn () => $quarters->trend($viewFilter->withoutRound())),
-            'lgas' => Inertia::defer(fn () => $lgas->rows($viewFilter)),
+            'quarters' => Inertia::defer(fn () => TrendPointResource::many($quarters->trend($viewFilter->withoutRound()))),
+            'lgas' => Inertia::defer(fn () => LgaRowResource::many($lgas->rows($viewFilter))),
         ]);
     }
 }

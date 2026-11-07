@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import { usePage } from '@inertiajs/react';
 import Drawer from '@/components/Drawer';
-import FacilityDetailView from '@/components/FacilityDetailView';
+import PublicFacilityView from '@/components/PublicFacilityView';
 import Skeleton from '@/components/Skeleton';
 import { ApiError, getJson } from '@/lib/api';
 import { useTranslate } from '@/lib/i18n';
-import { show } from '@/routes/admin/api/facilities';
-import type { FacilityDetail } from '@/types/dashboard';
+import { show } from '@/routes/public/api/facilities';
+import type { PublicFacilityDetail } from '@/types/dashboard';
 
 export type FacilityDrawerProps = {
     facilityId: number;
@@ -17,14 +18,17 @@ export type FacilityDrawerProps = {
     onClose: () => void;
 };
 
-type Result = { key: string; detail: FacilityDetail } | { key: string; error: number };
+type Result = { key: string; detail: PublicFacilityDetail } | { key: string; error: number };
 
 /**
- * The facility detail drawer (ARCHITECTURE.md §9.2.7): fetches GET /api/facilities/{id} and shows
- * it in a Drawer. Loading and failure are said in words; a failure can be retried.
+ * The public facility drawer (ARCHITECTURE.md §9.2.7): fetches GET /api/public/facilities/{id},
+ * and only that (SECURITY.md §3.1), and shows it in a Drawer. Loading and failure are said in
+ * words; a failure can be retried. A signed-in administrator previewing the site also gets a link
+ * to the admin facility view, where flags, attachments, the audit trail and corrections are.
  */
 export default function FacilityDrawer({ facilityId, name, year, quarter, onClose }: FacilityDrawerProps) {
     const t = useTranslate();
+    const { user } = usePage().props.auth;
     const [attempt, setAttempt] = useState(0);
     const [result, setResult] = useState<Result | null>(null);
     const query: Record<string, string> = {};
@@ -39,7 +43,7 @@ export default function FacilityDrawer({ facilityId, name, year, quarter, onClos
 
     useEffect(() => {
         const controller = new AbortController();
-        getJson<{ data: FacilityDetail }>(url, controller.signal)
+        getJson<{ data: PublicFacilityDetail }>(url, controller.signal)
             .then((response) => setResult({ key, detail: response.data }))
             .catch((error: unknown) => {
                 if (!controller.signal.aborted) {
@@ -73,8 +77,16 @@ export default function FacilityDrawer({ facilityId, name, year, quarter, onClos
                     )}
                 </div>
             ) : (
-                // key: a reload after a correction starts correction mode afresh from the new values.
-                <FacilityDetailView key={key} detail={current.detail} onCorrected={() => setAttempt((n) => n + 1)} />
+                <>
+                    {user !== null && (
+                        <p className="mb-4 text-sm">
+                            <a href={`/admin/facilities/${facilityId}`} className="font-medium text-deep underline">
+                                {t('dashboard.drawer.admin_view')}
+                            </a>
+                        </p>
+                    )}
+                    <PublicFacilityView detail={current.detail} />
+                </>
             )}
         </Drawer>
     );

@@ -368,7 +368,8 @@ it('shares every source\'s state with the shell, worst first', function (): void
     Rows::pullRun(['source_id' => Rows::sourceId('odk'), 'outcome' => 'succeeded', 'started_at' => now()->subMinutes(5), 'finished_at' => now()->subMinutes(4)]);
     Rows::pullRun(['source_id' => Rows::sourceId('kobo'), 'outcome' => 'succeeded', 'started_at' => now()->subMinutes(50), 'finished_at' => now()->subMinutes(45)]);
 
-    $this->actingAs($this->admin)->get('/')->assertInertia(fn ($page) => $page
+    // The admin layout's status bar (admin pages only, never the public site).
+    $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn ($page) => $page
         ->where('shell.sources.0.key', 'kobo')->where('shell.sources.0.state', 'stale')
         ->where('shell.sources.1.key', 'odk')->where('shell.sources.1.state', 'healthy')
         ->missing('shell.sync'));

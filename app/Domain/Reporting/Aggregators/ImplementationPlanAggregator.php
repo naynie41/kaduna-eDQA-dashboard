@@ -127,12 +127,13 @@ final class ImplementationPlanAggregator
     {
         $byLga = [];
         $rows = DB::table('plan_actions')->where('round_id', $roundId)->orderBy('lga_id')->orderBy('dimension')
-            ->get(['lga_id', 'dimension', 'action_text', 'assigned_to', 'due_date']);
+            ->get(['lga_id', 'dimension', 'action_text', 'owner_role', 'due_date']);
         foreach ($rows as $row) {
             $byLga[(int) $row->lga_id][] = [
                 'dimension' => Dimension::from((string) $row->dimension),
                 'action' => (string) $row->action_text,
-                'owner' => (string) $row->assigned_to,
+                // The role's label (D-79). owner_contact is admin-only and never read here.
+                'owner' => (string) __('plan.owners.'.$row->owner_role),
                 'due' => substr((string) $row->due_date, 0, 10),
             ];
         }

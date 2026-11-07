@@ -116,11 +116,11 @@ it('breaks a tie between dimensions in alphabetical order', function (): void {
 
 it('shows a stored plan instead of the generated action, for that round only', function (): void {
     $alpha = $this->f->lgas['AAA'];
-    Rows::planAction(['round_id' => $this->f->q2, 'lga_id' => $alpha, 'dimension' => 'validity', 'action_text' => 'Peer review of tally sheets', 'assigned_to' => 'Dr A. Bello', 'due_date' => '2026-09-30']);
+    Rows::planAction(['round_id' => $this->f->q2, 'lga_id' => $alpha, 'dimension' => 'validity', 'action_text' => 'Peer review of tally sheets', 'owner_role' => 'programme_manager', 'owner_contact' => 'Dr A. Bello', 'due_date' => '2026-09-30']);
     // Charlie needs no action, but a stored row is the plan: it is listed.
-    Rows::planAction(['round_id' => $this->f->q2, 'lga_id' => $this->f->lgas['CCC'], 'dimension' => 'consistency', 'action_text' => 'Follow-up visit', 'assigned_to' => 'State M&E team', 'due_date' => '2026-08-15']);
+    Rows::planAction(['round_id' => $this->f->q2, 'lga_id' => $this->f->lgas['CCC'], 'dimension' => 'consistency', 'action_text' => 'Follow-up visit', 'owner_role' => 'state_me_team', 'due_date' => '2026-08-15']);
     // Another round's plan is not this round's.
-    Rows::planAction(['round_id' => $this->f->q1, 'lga_id' => $this->f->lgas['BBB'], 'dimension' => 'validity', 'action_text' => 'Old', 'assigned_to' => 'Nobody', 'due_date' => '2026-03-01']);
+    Rows::planAction(['round_id' => $this->f->q1, 'lga_id' => $this->f->lgas['BBB'], 'dimension' => 'validity', 'action_text' => 'Old', 'due_date' => '2026-03-01']);
 
     $plan = planFor($this);
     $byName = collect($plan['actions'])->keyBy('name');
@@ -130,7 +130,8 @@ it('shows a stored plan instead of the generated action, for that round only', f
         ['Alpha', 'validity', '85.0'],
         ['Charlie', 'consistency', '81.0'], // Charlie: consistency 81.0 (88, 74)
     ])
-        ->and($byName['Alpha'])->toMatchArray(['action' => 'Peer review of tally sheets', 'owner' => 'Dr A. Bello', 'reviewDate' => '2026-09-30', 'reviewRound' => null, 'stored' => true])
+        // The stored role is shown as its label; the personal contact stays admin-only (D-79).
+        ->and($byName['Alpha'])->toMatchArray(['action' => 'Peer review of tally sheets', 'owner' => 'Programme manager', 'reviewDate' => '2026-09-30', 'reviewRound' => null, 'stored' => true])
         ->and($byName['Bravo']['stored'])->toBe(false)
         ->and($plan['clear'])->toBe([])
         ->and(array_column($plan['summary'], 'count'))->toBe([1, 1, 1]);

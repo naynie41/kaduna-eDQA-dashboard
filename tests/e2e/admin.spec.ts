@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { checkA11y } from './support/a11y';
 
-// The administration shell (ARCHITECTURE.md §9.3, D-55): /admin opens the Data sources page; the five
-// pages share the admin tabs (no dashboard filters) and keep the sources' status bar.
+// The admin layout (ARCHITECTURE.md §9.0–9.1, §9.3): /admin opens the Data sources page; the rail
+// lists the five pages and "View public dashboard" (no dashboard filters), and the sources' status
+// bar stays.
 
 const PAGES = [
     { path: '/admin/sources', heading: 'Data sources' },
@@ -17,21 +18,30 @@ async function ready(page: Page, heading: string): Promise<void> {
 }
 
 test.describe('Administration shell', () => {
-    test('/admin opens the Data sources page, from the rail', async ({ page }) => {
+    test('/admin opens the Data sources page, from the admin preview of the public site', async ({ page }) => {
         await page.goto('/');
-        await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Administration' }).click();
+        await page.getByRole('region', { name: 'Admin preview' }).getByRole('link', { name: 'Back to admin' }).click();
 
         await ready(page, 'Data sources');
         await expect(page).toHaveURL(/\/admin\/sources$/);
-        await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Administration' })).toHaveAttribute('aria-current', 'page');
+        await expect(page.getByRole('navigation', { name: 'Administration pages' }).getByRole('link', { name: 'Data sources' })).toHaveAttribute('aria-current', 'page');
     });
 
-    test('the tabs reach every page, the dashboard filters are gone and the status bar stays', async ({ page }) => {
+    test('the rail leads back to the public dashboard', async ({ page }) => {
+        await page.goto('/admin/sources');
+        await ready(page, 'Data sources');
+        await page.getByRole('navigation', { name: 'Administration pages' }).getByRole('link', { name: 'View public dashboard' }).click();
+
+        await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByRole('region', { name: 'Admin preview' })).toBeVisible();
+    });
+
+    test('the rail reaches every page, the dashboard filters are gone and the status bar stays', async ({ page }) => {
         await page.goto('/admin/sources');
         await ready(page, 'Data sources');
         const tabs = page.getByRole('navigation', { name: 'Administration pages' });
 
-        await expect(tabs.getByRole('link')).toHaveCount(5);
+        await expect(tabs.getByRole('link')).toHaveCount(6); // five pages and the public dashboard
         await expect(tabs.getByRole('link', { name: /^Data issues, \d+ open$/ })).toBeVisible();
         await expect(page.getByLabel('Year')).toHaveCount(0); // the dashboard's filter bar
         await expect(page.getByRole('status').filter({ hasText: /ODK Central|pull/ })).toBeVisible();

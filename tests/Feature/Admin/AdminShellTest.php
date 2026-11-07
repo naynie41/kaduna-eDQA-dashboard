@@ -63,11 +63,12 @@ it('keeps every admin page behind the sign-in', function (string $path): void {
     $this->get("/admin/{$path}")->assertRedirect('/login');
 })->with(array_keys(ADMIN_PAGES));
 
-it('does not compute the admin props for a dashboard page', function (): void {
+it('does not compute the admin props or the source status for a public page, even in the admin preview', function (): void {
     $this->seed(LgaSeeder::class);
 
+    // The admin strings come along for the preview bar; the counts and the status do not.
     $this->actingAs($this->admin)->get('/')
-        ->assertInertia(fn (Assert $page) => $page->where('admin', null)->missing('translations.admin'));
+        ->assertInertia(fn (Assert $page) => $page->missing('admin')->missing('shell')->has('translations.admin.preview'));
 });
 
 it('shows the open quarantine count, cached, and forgets it when a record is quarantined or resolved', function (): void {

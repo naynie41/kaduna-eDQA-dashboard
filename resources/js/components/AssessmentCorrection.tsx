@@ -1,18 +1,14 @@
 import { useId, useState } from 'react';
 import { useAnnounce } from '@/components/Announcer';
 import ConfirmWithReasonDialog from '@/components/ConfirmWithReasonDialog';
+import { valueLabel } from '@/components/FacilityDetailParts';
 import { correctionBody, draftCorrection, offsetOf, toLocalInput, type CorrectionDraft } from '@/lib/corrections';
 import { formatTime } from '@/lib/format';
-import { useTranslate, type Translate } from '@/lib/i18n';
+import { useTranslate } from '@/lib/i18n';
 import { useApiAction } from '@/lib/useApiAction';
 import type { FacilityDetail, ItemResult, ItemValue } from '@/types/dashboard';
 
 const RESULTS: ItemResult[] = ['pass', 'fail', 'na'];
-
-/** A value in words: "Pass", "N/A", or for a question answered as several checks "2 of 3". */
-export function valueLabel(t: Translate, value: ItemValue, total: number | null): string {
-    return total !== null && value !== 'na' && /^\d+$/.test(value) ? t('dashboard.drawer.results.count', { passed: value, total: String(total) }) : t(`dashboard.drawer.results.${value}`);
-}
 
 export type Correction = {
     editing: boolean;
@@ -109,12 +105,12 @@ export default function CorrectionPanel({ detail, correction, onSaved }: Correct
         return null;
     }
     if (!round.open) {
-        return <p className="mt-3 text-xs text-ink-2">{t('dashboard.drawer.correct.closed', { round: round.label })}</p>;
+        return <p className="mt-3 text-xs text-ink-2">{t('admin.facility_view.correct.closed', { round: round.label })}</p>;
     }
     if (!correction.editing) {
         return (
             <button type="button" onClick={correction.begin} className="btn btn-secondary mt-3 min-h-11">
-                {t('dashboard.drawer.correct.start')}
+                {t('admin.facility_view.correct.start')}
             </button>
         );
     }
@@ -124,15 +120,15 @@ export default function CorrectionPanel({ detail, correction, onSaved }: Correct
     const label = (key: string, old: ItemValue, next: ItemValue) => {
         const total = totals.get(key) ?? null;
 
-        return t('dashboard.drawer.correct.change', { key, old: valueLabel(t, old, total), new: valueLabel(t, next, total) });
+        return t('admin.facility_view.correct.change', { key, old: valueLabel(t, old, total), new: valueLabel(t, next, total) });
     };
     const list = draft.changes.map((change) => label(change.key, change.old, change.new)).join('; ');
     const lines = [
-        ...(draft.changes.length === 1 ? [t('dashboard.drawer.correct.summary_item', { list })] : []),
-        ...(draft.changes.length > 1 ? [t('dashboard.drawer.correct.summary_items', { count: String(draft.changes.length), list })] : []),
+        ...(draft.changes.length === 1 ? [t('admin.facility_view.correct.summary_item', { list })] : []),
+        ...(draft.changes.length > 1 ? [t('admin.facility_view.correct.summary_items', { count: String(draft.changes.length), list })] : []),
         ...(draft.startedAt !== null || draft.endedAt !== null
             ? [
-                  t('dashboard.drawer.correct.summary_times', {
+                  t('admin.facility_view.correct.summary_times', {
                       old_start: formatTime(assessment.started_at),
                       old_end: formatTime(assessment.ended_at),
                       new_start: formatTime(draft.startedAt ?? assessment.started_at),
@@ -146,26 +142,26 @@ export default function CorrectionPanel({ detail, correction, onSaved }: Correct
     return (
         <section aria-labelledby={ids.title} className="mt-3 flex flex-col gap-3 rounded-md border border-deep bg-wash p-3 text-sm">
             <h4 id={ids.title} className="text-base font-semibold">
-                {t('dashboard.drawer.correct.title')}
+                {t('admin.facility_view.correct.title')}
             </h4>
-            <p className="text-ink">{t('dashboard.drawer.correct.intro')}</p>
+            <p className="text-ink">{t('admin.facility_view.correct.intro')}</p>
             <fieldset className="flex flex-wrap gap-3">
-                <legend className="mb-1 font-medium">{t('dashboard.drawer.correct.times')}</legend>
+                <legend className="mb-1 font-medium">{t('admin.facility_view.correct.times')}</legend>
                 <p id={ids.hint} className="w-full text-xs text-ink">
-                    {t('dashboard.drawer.correct.times_hint', { offset: offsetOf(assessment.started_at) })}
+                    {t('admin.facility_view.correct.times_hint', { offset: offsetOf(assessment.started_at) })}
                 </p>
                 <div className="flex flex-col gap-1">
-                    <label htmlFor={ids.start}>{t('dashboard.drawer.correct.started_at')}</label>
+                    <label htmlFor={ids.start}>{t('admin.facility_view.correct.started_at')}</label>
                     <input id={ids.start} type="datetime-local" aria-describedby={ids.hint} value={correction.start} onChange={(event) => correction.setStart(event.target.value)} className="control min-h-11" />
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label htmlFor={ids.end}>{t('dashboard.drawer.correct.ended_at')}</label>
+                    <label htmlFor={ids.end}>{t('admin.facility_view.correct.ended_at')}</label>
                     <input id={ids.end} type="datetime-local" aria-describedby={ids.hint} value={correction.end} onChange={(event) => correction.setEnd(event.target.value)} className="control min-h-11" />
                 </div>
             </fieldset>
             <div id={ids.summary} role="status" className="rounded-md bg-panel px-3 py-2">
                 {nothing ? (
-                    <p>{t('dashboard.drawer.correct.summary_none')}</p>
+                    <p>{t('admin.facility_view.correct.summary_none')}</p>
                 ) : (
                     lines.map((line) => (
                         <p key={line} className="break-words">
@@ -176,24 +172,24 @@ export default function CorrectionPanel({ detail, correction, onSaved }: Correct
             </div>
             <div className="flex flex-wrap gap-2">
                 <button type="button" disabled={nothing} aria-describedby={ids.summary} onClick={() => setReviewing(true)} className="btn btn-primary min-h-11">
-                    {t('dashboard.drawer.correct.review')}
+                    {t('admin.facility_view.correct.review')}
                 </button>
                 <button type="button" onClick={correction.cancel} className="btn btn-secondary min-h-11">
-                    {t('dashboard.drawer.correct.cancel')}
+                    {t('admin.facility_view.correct.cancel')}
                 </button>
             </div>
             <ConfirmWithReasonDialog
                 open={reviewing}
-                title={t('dashboard.drawer.correct.dialog_title')}
-                consequence={t('dashboard.drawer.correct.dialog_consequence', { summary: lines.join(' ') })}
-                confirmLabel={t('dashboard.drawer.correct.dialog_confirm')}
+                title={t('admin.facility_view.correct.dialog_title')}
+                consequence={t('admin.facility_view.correct.dialog_consequence', { summary: lines.join(' ') })}
+                confirmLabel={t('admin.facility_view.correct.dialog_confirm')}
                 onClose={() => setReviewing(false)}
                 onConfirm={async (reason) => {
                     const result = await api.run('POST', `/admin/api/assessments/${assessment.id}/corrections`, correctionBody(draft, reason));
                     if (!result.ok) {
                         return { ok: false, message: result.message, fieldError: result.fieldErrors.reason ?? null };
                     }
-                    announce(t('dashboard.drawer.correct.saved'));
+                    announce(t('admin.facility_view.correct.saved'));
                     correction.cancel();
                     onSaved();
 

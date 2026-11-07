@@ -7,6 +7,7 @@ use App\Domain\Reporting\Aggregators\OwnerSplitAggregator;
 use App\Domain\Reporting\Aggregators\StateSummaryAggregator;
 use App\Domain\Reporting\DTOs\LgaRow;
 use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Enums\ReportAudience;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoAssessmentSeeder;
 use Database\Seeders\DemoScoringSeeder;
@@ -144,7 +145,7 @@ it('seeds a demo dataset whose item responses approximate the published means', 
         ->and(DB::table('rescore_runs')->where('status', 'succeeded')->count())->toBe(4)
         ->and(DB::selectOne("select ispopulated from pg_matviews where matviewname = 'round_aggregates'")->ispopulated)->toBeTrue();
 
-    $open = new ReportFilter(year: 2026, quarter: 2);
+    $open = new ReportFilter(year: 2026, quarter: 2, audience: ReportAudience::Admin);
     $owners = app(OwnerSplitAggregator::class)->split($open);
     $published = [
         [$owners->public, [92, 79, 92], 3.0],

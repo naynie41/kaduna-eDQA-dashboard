@@ -7,6 +7,7 @@ use App\Domain\Ingestion\Actions\ProcessParsedBatch;
 use App\Domain\Reporting\Aggregators\LgaTableAggregator;
 use App\Domain\Reporting\Aggregators\StateSummaryAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
 use Illuminate\Support\Facades\DB;
@@ -27,13 +28,13 @@ beforeEach(function (): void {
 it('leaves a withdrawn assessment out of every aggregator', function (): void {
     DB::table('assessments')->where('id', $this->f5)->update(['status' => 'withdrawn']);
 
-    $summary = app(StateSummaryAggregator::class)->summary(ReportFilter::fromArray([]));
+    $summary = app(StateSummaryAggregator::class)->summary(ReportFilter::fromArray([], ReportAudience::Admin));
     expect($summary->facilitiesVisited)->toBe(6)
         // (80 + 70 + 86.6667 + 100 + 88 + 74) / 6: F5's 52 is gone.
         ->and($summary->overall->value)->toEqualWithDelta((550.666667 - 52) / 6, 0.0001)
         ->and($summary->facilitiesWeak)->toBe(0);
 
-    $bravo = collect(app(LgaTableAggregator::class)->rows(ReportFilter::fromArray([])))->firstWhere('name', 'Bravo');
+    $bravo = collect(app(LgaTableAggregator::class)->rows(ReportFilter::fromArray([], ReportAudience::Admin)))->firstWhere('name', 'Bravo');
     expect($bravo->facilities ?? $bravo['facilities'] ?? null)->toBe(1);
 });
 

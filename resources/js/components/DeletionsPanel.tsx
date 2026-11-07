@@ -127,7 +127,8 @@ function RecordLink({ row }: { row: DeletionRow }) {
     const t = useTranslate();
 
     if (row.assessment !== null && row.facility !== null && row.round !== null) {
-        const href = `/facilities?year=${row.round.year}&quarter=${row.round.quarter}&facility=${row.facility.id}`;
+        // The admin facility view (§9.2.7), on the assessment's round.
+        const href = `/admin/facilities/${row.facility.id}?round=${row.round.id}`;
 
         return (
             <span className="flex flex-col gap-0.5">

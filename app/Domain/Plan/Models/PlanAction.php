@@ -17,7 +17,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * An implementation-plan row: one action per round, LGA and dimension, with an editable owner,
- * due date and status (D-10).
+ * due date and status (D-10). The owner is a role (owner_role, config edqa.plan.roles, D-79); a
+ * personal contact (owner_contact) is admin-only and never shown on the public plan.
  */
 #[UseFactory(PlanActionFactory::class)]
 final class PlanAction extends Model
@@ -27,7 +28,7 @@ final class PlanAction extends Model
     /** @use HasFactory<PlanActionFactory> */
     use HasFactory;
 
-    protected $fillable = ['round_id', 'lga_id', 'dimension', 'action_text', 'assigned_to', 'due_date', 'status', 'notes'];
+    protected $fillable = ['round_id', 'lga_id', 'dimension', 'action_text', 'owner_role', 'owner_contact', 'due_date', 'status', 'notes'];
 
     /** Mirrors the column default, so a new model matches its stored row. */
     protected $attributes = ['status' => 'not_started'];
@@ -58,6 +59,6 @@ final class PlanAction extends Model
 
     protected function auditedAttributes(): array
     {
-        return ['action_text', 'assigned_to', 'due_date', 'status', 'notes'];
+        return ['action_text', 'owner_role', 'owner_contact', 'due_date', 'status', 'notes'];
     }
 }

@@ -12,6 +12,7 @@ use App\Domain\Reporting\Aggregators\OwnerSplitAggregator;
 use App\Domain\Reporting\Aggregators\QuarterTrendAggregator;
 use App\Domain\Reporting\Aggregators\WeakestLgasAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Domain\Reporting\Support\RoundAggregatesView;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -69,7 +70,7 @@ function viewCapableAnswers(ReportFilter $filter): array
 it('gives identical results from the view and from SQL', function (array $query): void {
     RandomReportingDataset::build(4242);
     DB::select('select refresh_round_aggregates()');
-    $filter = new ReportFilter(...$query);
+    $filter = new ReportFilter(...$query, audience: ReportAudience::Admin);
 
     config(['edqa.aggregation.read_view' => false]);
     $sql = viewCapableAnswers($filter);
@@ -93,7 +94,7 @@ it('really reads the view when it can', function (): void {
     DB::select('select refresh_round_aggregates()');
     // Change the source data without refreshing: only the view still has the old numbers.
     DB::table('assessment_scores')->update(['score' => 0]);
-    $filter = new ReportFilter(year: 2026, quarter: 2);
+    $filter = new ReportFilter(year: 2026, quarter: 2, audience: ReportAudience::Admin);
 
     config(['edqa.aggregation.read_view' => true]);
     Cache::flush();
@@ -112,5 +113,5 @@ it('falls back to SQL while the view has never been populated', function (): voi
     config(['edqa.aggregation.read_view' => true]);
 
     expect(app(RoundAggregatesView::class)->usable())->toBeFalse()
-        ->and(app(DimensionAggregator::class)->dimensions(new ReportFilter(year: 2026, quarter: 2))->overall->value)->not->toBeNull();
+        ->and(app(DimensionAggregator::class)->dimensions(new ReportFilter(year: 2026, quarter: 2, audience: ReportAudience::Admin))->overall->value)->not->toBeNull();
 });

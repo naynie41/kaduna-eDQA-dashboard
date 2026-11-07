@@ -41,49 +41,54 @@ final class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $adminPage = $user !== null && $request->routeIs('admin.*');
 
         return [
             ...parent::share($request),
             'name' => config('app.name'),
-            // Only what the shell displays; never the whole model.
+            // Only what the layouts display; never the whole model. Null for a visitor.
             'auth' => [
                 'user' => $user === null ? null : ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
             ],
-            // The shell's footer count and the sources' status bar, worst first (ARCHITECTURE.md §9.1);
-            // signed-in only.
-            'shell' => fn (): ?array => $user === null ? null : [
-                'assessments' => app(ShellStatusAggregator::class)->assessments(),
-                'sources' => app(SourceStatusAggregator::class)->all(),
-                'quarantined' => app(QuarantineQuery::class)->openCountCached(),
-            ],
-            // The admin pages' Data issues badge (open records + unreviewed deletions) and the
-            // stale-ingestion banner, per source (ARCHITECTURE.md §9.3, D-55, SECURITY.md §12).
-            'admin' => fn (): ?array => $user === null || ! $request->routeIs('admin.*') ? null : [
-                'openIssueCount' => app(QuarantineQuery::class)->openIssueCountCached(),
-                'staleIngestion' => app(SourceStatusAggregator::class)->staleIngestion(),
-            ],
-            // UI strings, read in React with t() (CONVENTION.md §7, CLAUDE.md hard rule 10).
-            'translations' => fn (): array => collect([...self::TRANSLATION_GROUPS, ...$this->pageGroups($request)])
+            // The admin layout only (ARCHITECTURE.md §9.0–9.1): the rail's assessment count and the
+            // per-source status bar, worst first; the Data issues badge (open records + unreviewed
+            // deletions) and the stale-ingestion banner (§9.3, D-55, SECURITY.md §12). A public page
+            // never carries them, not even in the admin preview (D-81).
+            ...($adminPage ? [
+                'shell' => fn (): array => [
+                    'assessments' => app(ShellStatusAggregator::class)->assessments(),
+                    'sources' => app(SourceStatusAggregator::class)->all(),
+                    'quarantined' => app(QuarantineQuery::class)->openCountCached(),
+                ],
+                'admin' => fn (): array => [
+                    'openIssueCount' => app(QuarantineQuery::class)->openIssueCountCached(),
+                    'staleIngestion' => app(SourceStatusAggregator::class)->staleIngestion(),
+                ],
+            ] : []),
+            // UI strings, read in React with t() (CONVENTION.md §7, CLAUDE.md hard rule 10): each page
+            // gets the groups it needs, so a visitor never receives the admin strings.
+            'translations' => fn (): array => collect(['common', ...$this->pageGroups($request)])
                 ->mapWithKeys(fn (string $group): array => [$group => __($group)])
                 ->all(),
         ];
     }
 
-    /** Language groups shared with every page. */
-    private const TRANSLATION_GROUPS = ['common', 'auth', 'dashboard'];
-
     /**
-     * Extra groups only some pages need.
+     * The language groups a page needs besides common.
      *
      * @return list<string>
      */
     private function pageGroups(Request $request): array
     {
         return match (true) {
-            $request->routeIs('admin.dev.*') => ['dev', 'enums'],
-            $request->routeIs('public.*') => ['enums'],
-            $request->routeIs('admin.*') => ['admin', 'enums'],
-            default => [],
+            // The public dashboard; the admin preview also gets the admin strings (its preview bar).
+            $request->routeIs('public.*') => [...['dashboard', 'enums'], ...($request->user() === null ? [] : ['admin'])],
+            $request->routeIs('admin.dev.*') => ['auth', 'dashboard', 'admin', 'dev', 'enums'],
+            // The password page reads the auth strings.
+            $request->routeIs('admin.security.*') => ['auth', 'admin'],
+            $request->routeIs('admin.*') => ['dashboard', 'admin', 'enums'],
+            // Sign-in, password reset and the like.
+            default => ['auth'],
         };
     }
 }

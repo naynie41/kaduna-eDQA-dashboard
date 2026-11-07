@@ -127,3 +127,31 @@ it('keeps every Domain Action out of the public controllers', function (): void 
         ->and(is_dir(dirname(__DIR__, 2).'/app/Http/Controllers/Public'))->toBeTrue();
     expect('App\Http\Controllers\Public')->not->toUse($actions);
 });
+
+// SECURITY.md §3.1, D-83: public output uses Http\Resources\Public only, each its own whitelist.
+// No public resource extends or calls an admin one, and no public controller reaches past them.
+arch('public resources never use an admin resource')
+    ->expect('App\Http\Resources\Public')
+    ->not->toUse([
+        'App\Http\Resources\Admin',
+        'App\Http\Resources\Assessments',
+        'App\Http\Resources\Facilities',
+        'App\Http\Resources\Quarantine',
+        'App\Http\Resources\Rounds',
+        'App\Http\Resources\Scoring',
+        'App\Http\Resources\Sources',
+        'App\Http\Resources\AssessmentFlagsResource',
+    ]);
+
+arch('public controllers use public resources only')
+    ->expect('App\Http\Controllers\Public')
+    ->not->toUse([
+        'App\Http\Resources\Admin',
+        'App\Http\Resources\Assessments',
+        'App\Http\Resources\Facilities',
+        'App\Http\Resources\Quarantine',
+        'App\Http\Resources\Rounds',
+        'App\Http\Resources\Scoring',
+        'App\Http\Resources\Sources',
+        'App\Http\Resources\AssessmentFlagsResource',
+    ]);

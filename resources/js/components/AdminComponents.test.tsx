@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import AdminTabs from '@/components/AdminTabs';
+import AdminRail from '@/components/AdminRail';
 import ConfirmWithReasonDialog, { type ConfirmOutcome } from '@/components/ConfirmWithReasonDialog';
 import ProgressPanel, { type ProgressStage } from '@/components/ProgressPanel';
 import SourceTag from '@/components/SourceTag';
@@ -280,6 +280,7 @@ const shellTranslations = {
     ...translations,
     admin: {
         tabs: { label: 'Administration pages', data_issues_open: ':label, :count open' },
+        rail: { view_public: 'View public dashboard' },
         pages: {
             sources: { title: 'Data sources' },
             data_issues: { title: 'Data issues' },
@@ -297,14 +298,15 @@ const shellTranslations = {
     },
 };
 
-describe('AdminTabs', () => {
-    it('lists the five pages, the current one marked, and says the open count in the Data issues name', async () => {
-        const { container } = renderUi(<AdminTabs current="rounds" openIssueCount={12} />, shellTranslations);
+describe('AdminRail', () => {
+    it('lists the five pages and the public dashboard, the current one marked, and says the open count in the Data issues name', async () => {
+        const { container } = renderUi(<AdminRail current="rounds" openIssueCount={12} assessments={2184} />, shellTranslations);
 
         const nav = screen.getByRole('navigation', { name: 'Administration pages' });
         expect(within(nav).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-            '/admin/sources', '/admin/data-issues', '/admin/rounds', '/admin/facilities', '/admin/scoring-rules',
+            '/admin/sources', '/admin/data-issues', '/admin/rounds', '/admin/facilities', '/admin/scoring-rules', '/',
         ]);
+        expect(screen.getByRole('link', { name: 'View public dashboard' })).toBeTruthy();
         expect(screen.getByRole('link', { name: 'Data issues, 12 open' })).toBeTruthy();
         expect(screen.getByRole('link', { name: 'Rounds' }).getAttribute('aria-current')).toBe('page');
         expect(await axeCheck(container)).toHaveNoViolations();

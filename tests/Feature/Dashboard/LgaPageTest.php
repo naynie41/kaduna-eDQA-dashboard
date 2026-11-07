@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domain\Facility\Enums\Ownership;
 use App\Domain\Reporting\Aggregators\LgaTableAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Models\User;
 use Database\Seeders\LgaSeeder;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -48,7 +49,7 @@ it('gives the grid every LGA whatever the LGA filter, and the table only the cho
 
 it('takes the rows from the LGA table aggregator, and lists the rounds in view for the month headings', function (): void {
     $f = ReportingFixture::build();
-    $rows = json_decode((string) json_encode(app(LgaTableAggregator::class)->rows(new ReportFilter(year: 2026, quarter: 2, owner: Ownership::Public))), true);
+    $rows = json_decode((string) json_encode(app(LgaTableAggregator::class)->rows(new ReportFilter(year: 2026, quarter: 2, owner: Ownership::Public, audience: ReportAudience::Admin))), true);
 
     $this->actingAs($this->admin)->get('/lgas?year=2026&quarter=2&owner=public')
         ->assertInertia(fn (Assert $page) => $page

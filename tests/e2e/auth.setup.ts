@@ -15,6 +15,7 @@ setup('sign in as the e2e administrator', async ({ page }) => {
     await page.getByRole('button', { name: 'Sign in' }).click();
 
     // After sign-in, the admin area (D-78): /admin opens Data sources.
-    await expect(page).toHaveURL(/\/admin\/sources/);
+    // The first load of the admin area on a cold dev server can take a while.
+    await expect(page).toHaveURL(/\/admin\/sources/, { timeout: 180_000 });
     await page.context().storageState({ path: AUTH_STATE });
 });

@@ -11,7 +11,9 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Which rounds a filter puts in view, in time order. Cached (rounds change rarely; saving one
- * flushes it).
+ * flushes it). Every aggregator, the facility query and the round_aggregates reads take their
+ * rounds from here, so this is where PublicScope holds the public to closed rounds (D-77); the
+ * scope is in every cache key.
  *
  * - current(): what the summaries cover. Year and quarter: that round. Year: its rounds. No
  *   filter: the latest round. (Q-28: across several rounds a facility's score is the mean of
@@ -29,8 +31,10 @@ final class RoundSelection
     public function current(ReportFilter $filter): array
     {
         if ($filter->year === null) {
-            return $this->load($this->cache->rememberGlobal('rounds:latest', fn (): array => self::rowsOf(
-                Round::query()->orderByDesc('year')->orderByDesc('quarter')->limit(1),
+            $scope = PublicScope::key($filter->audience);
+
+            return $this->load($this->cache->rememberGlobal("rounds:{$scope}:latest", fn (): array => self::rowsOf(
+                PublicScope::apply(Round::query(), $filter->audience)->orderByDesc('year')->orderByDesc('quarter')->limit(1),
             )));
         }
 
@@ -41,9 +45,10 @@ final class RoundSelection
     public function series(ReportFilter $filter, bool $withoutQuarter = false): array
     {
         $quarter = $withoutQuarter ? null : $filter->quarter;
+        $scope = PublicScope::key($filter->audience);
 
-        return $this->load($this->cache->rememberGlobal("rounds:{$filter->year}:{$quarter}", fn (): array => self::rowsOf(
-            Round::query()
+        return $this->load($this->cache->rememberGlobal("rounds:{$scope}:{$filter->year}:{$quarter}", fn (): array => self::rowsOf(
+            PublicScope::apply(Round::query(), $filter->audience)
                 ->when($filter->year !== null, fn ($q) => $q->where('year', $filter->year))
                 ->when($quarter !== null, fn ($q) => $q->where('quarter', $quarter))
                 ->orderBy('year')->orderBy('quarter'),

@@ -11,6 +11,7 @@ use App\Domain\Reporting\Enums\Metric;
 use App\Domain\Reporting\Support\RoundSelection;
 use App\Domain\Round\Models\Round;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Public\FacilityPageResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,11 +23,32 @@ use Inertia\Response;
  * request text never reaches SQL, and the page size is not the caller's to choose.
  *
  * One deferred prop, so a partial reload (only: ['facilities']) brings everything the table
- * needs: the page, the sort and metric actually applied, and the quarters in view.
+ * needs: the page, the sort and metric actually applied, and the quarters in view. Public output
+ * (D-83): the page goes through FacilityPageResource.
  */
 final class FacilityController extends Controller
 {
     public function __invoke(Request $request, ReportFilter $filter, RoundSelection $rounds, FacilityScoresQuery $facilities): Response
+    {
+        [$sort, $page] = self::sortAndPage($request);
+
+        return Inertia::render('dashboard/facility', [
+            'facilities' => Inertia::defer(fn (): array => [
+                'page' => FacilityPageResource::one($facilities->paginate($filter, $sort, $page)),
+                'metric' => $sort->metric->value,
+                'sort' => ['column' => $sort->column, 'direction' => $sort->direction],
+                'quarters' => array_values(array_unique(array_map(fn (Round $round): int => $round->quarter, $rounds->current($filter)))),
+            ]),
+        ]);
+    }
+
+    /**
+     * The sort and page a request asks for, the defaults where it asks for nothing valid. Shared
+     * with GET /api/public/facilities.
+     *
+     * @return array{0: FacilitySort, 1: int}
+     */
+    public static function sortAndPage(Request $request): array
     {
         $metric = Metric::tryFrom(self::param($request, 'metric')) ?? Metric::Overall;
         $column = self::param($request, 'sort');
@@ -34,19 +56,10 @@ final class FacilityController extends Controller
         $sort = in_array($column, FacilitySort::COLUMNS, true)
             ? new FacilitySort($metric, $column, in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc')
             : FacilitySort::default($metric);
-        $page = max(1, (int) self::param($request, 'page'));
 
-        return Inertia::render('dashboard/facility', [
-            'facilities' => Inertia::defer(fn (): array => [
-                'page' => $facilities->paginate($filter, $sort, $page),
-                'metric' => $metric->value,
-                'sort' => ['column' => $sort->column, 'direction' => $sort->direction],
-                'quarters' => array_values(array_unique(array_map(fn (Round $round): int => $round->quarter, $rounds->current($filter)))),
-            ]),
-        ]);
+        return [$sort, max(1, (int) self::param($request, 'page'))];
     }
 
-    /** A single string query value, or '' (arrays and anything else are ignored). */
     private static function param(Request $request, string $key): string
     {
         $value = $request->query($key);

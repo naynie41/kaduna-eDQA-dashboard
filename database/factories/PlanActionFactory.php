@@ -25,7 +25,7 @@ final class PlanActionFactory extends Factory
             'lga_id' => Lga::factory(),
             'dimension' => fake()->randomElement(Dimension::cases()),
             'action_text' => 'Supportive supervision on register completion',
-            'assigned_to' => 'LGA M&E officer',
+            'owner_role' => 'lga_me_officer',
             'due_date' => now()->addMonth()->toDateString(),
             'status' => PlanActionStatus::NotStarted,
         ];

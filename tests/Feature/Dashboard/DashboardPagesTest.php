@@ -95,8 +95,8 @@ it('lists only years and quarters that have rounds, the LGAs by name, and the en
             ->where('filterOptions.owners', [['value' => 'public', 'label' => 'Public'], ['value' => 'private', 'label' => 'Private']]));
 });
 
-it('shares the shell status with every signed-in page: assessments and each source\'s sync state', function (): void {
-    $this->actingAs($this->admin)->get('/')
+it('shares the shell status with every admin page: assessments and each source\'s sync state', function (): void {
+    $this->actingAs($this->admin)->get('/admin/sources')
         ->assertInertia(fn (Assert $page) => $page
             ->where('shell.assessments', 8) // seven Q2 visits and one Q1
             ->where('shell.sources', fn ($sources): bool => collect($sources)->pluck('state', 'key')->all() === ['odk' => 'not_configured', 'kobo' => 'not_configured'])

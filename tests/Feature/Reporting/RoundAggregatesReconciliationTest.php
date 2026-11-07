@@ -12,6 +12,7 @@ use App\Domain\Reporting\Aggregators\StateSummaryAggregator;
 use App\Domain\Reporting\DTOs\FacilitySort;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Domain\Reporting\Enums\Metric;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Domain\Reporting\Support\FacilityScoresSql;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\DTOs\ScoreValue;
@@ -56,7 +57,7 @@ it('agrees with the aggregators on every row', function (int $seed): void {
     foreach ([[$dataset->q1, 1], [$dataset->q2, 2]] as [$roundId, $quarter]) {
         foreach ([null, Ownership::Public, Ownership::Private] as $owner) {
             foreach ([null, FacilityLevel::Primary, FacilityLevel::Secondary, FacilityLevel::Tertiary] as $level) {
-                $filter = new ReportFilter(year: 2026, quarter: $quarter, level: $level, owner: $owner);
+                $filter = new ReportFilter(year: 2026, quarter: $quarter, level: $level, owner: $owner, audience: ReportAudience::Admin);
                 $ownerType = $owner->value ?? 'all';
                 $levelType = $level->value ?? 'all';
                 $at = "seed {$seed}, round Q{$quarter}, {$ownerType}/{$levelType}";
@@ -98,7 +99,7 @@ it('agrees with the aggregators on every row', function (int $seed): void {
                     foreach (['availability', 'consistency', 'validity', 'm1', 'm2', 'm3', 'overall'] as $measure) {
                         assertNear($row->{$measure}, $lga->{$measure}, "{$at} LGA {$lga->code} {$measure}");
                     }
-                    $lgaMonths = app(MonthSlotAggregator::class)->series(new ReportFilter(year: 2026, quarter: $quarter, lga: $lga->code, level: $level, owner: $owner));
+                    $lgaMonths = app(MonthSlotAggregator::class)->series(new ReportFilter(year: 2026, quarter: $quarter, lga: $lga->code, level: $level, owner: $owner, audience: ReportAudience::Admin));
                     foreach ([1, 2, 3] as $slot) {
                         foreach (['availability', 'consistency', 'validity'] as $dimension) {
                             assertNear($row->{"{$dimension}_m{$slot}"}, $lgaMonths[$slot - 1]->{$dimension}, "{$at} LGA {$lga->code} {$dimension}_m{$slot}");
@@ -126,7 +127,7 @@ it('agrees with the aggregators on every row', function (int $seed): void {
         }
 
         // Facilities (the view has them for owner 'all' and level 'all' only)
-        $filter = new ReportFilter(year: 2026, quarter: $quarter);
+        $filter = new ReportFilter(year: 2026, quarter: $quarter, audience: ReportAudience::Admin);
         $pages = [];
         foreach (Metric::cases() as $metric) {
             $pages[$metric->value] = collect(app(FacilityScoresQuery::class)->paginate($filter, FacilitySort::default($metric), perPage: 1000)->rows)->keyBy('facilityId');

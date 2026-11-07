@@ -17,6 +17,7 @@ use App\Domain\Reporting\Aggregators\WeakestLgasAggregator;
 use App\Domain\Reporting\DTOs\FacilitySort;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Domain\Reporting\Enums\Metric;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Domain\Reporting\Exceptions\UnsupportedWeighting;
 use App\Domain\Scoring\Enums\Band;
 use App\Domain\Scoring\Enums\Dimension;
@@ -34,7 +35,7 @@ beforeEach(function (): void {
 
 function filter(array $query = []): ReportFilter
 {
-    return ReportFilter::fromArray($query);
+    return ReportFilter::fromArray($query, ReportAudience::Admin);
 }
 
 // ---- State summary (Home hero)

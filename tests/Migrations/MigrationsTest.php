@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\Rows;
 
 // Migration tests run real DDL outside a test transaction, on the shared test database (no
 // database trait, so parallel testing gives them no database of their own). They live in this one
@@ -190,4 +191,46 @@ it('refuses to merge two ODK cursor rows rather than guess which one is current'
     expect(fn () => $this->artisan('migrate', ['--no-interaction' => true]))->toThrow(RuntimeException::class, 'odk_form_syncs');
     expect(Schema::hasTable('odk_form_syncs'))->toBeTrue()
         ->and(Schema::hasTable('submission_sources'))->toBeFalse();
+});
+
+// Phase P step 4 (D-79): plan_actions.assigned_to becomes owner_role, a role key the public plan
+// shows as its label. A stored role (by label or key) maps to its key; anything else is a person,
+// kept in the admin-only owner_contact, and the row gets the dimension's default role.
+
+const PLAN_OWNER_MIGRATION = '2026_11_07_000100_plan_actions_owner_role';
+
+it('turns stored plan owners into roles, keeping any personal name admin-only, and back', function (): void {
+    $this->artisan('migrate:fresh', ['--no-interaction' => true])->assertSuccessful();
+    $later = DB::table('migrations')->where('migration', '>', PLAN_OWNER_MIGRATION)->count();
+    $this->artisan('migrate:rollback', ['--step' => $later + 1, '--no-interaction' => true])->assertSuccessful();
+
+    $now = now();
+    $round = Rows::round(['status' => 'closed']);
+    $lga = Rows::lga();
+    $row = fn (string $dimension, string $owner): int => DB::table('plan_actions')->insertGetId([
+        'round_id' => $round, 'lga_id' => $lga, 'dimension' => $dimension, 'action_text' => 'Act',
+        'assigned_to' => $owner, 'due_date' => '2026-06-30', 'status' => 'not_started', 'created_at' => $now, 'updated_at' => $now,
+    ]);
+    $byLabel = $row('availability', 'State M&E team');
+    $byKey = $row('consistency', 'programme_manager');
+    $person = $row('validity', 'Dr A. Bello');
+
+    $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
+
+    $stored = DB::table('plan_actions')->get()->keyBy('id');
+    expect($stored[$byLabel]->owner_role)->toBe('state_me_team')->and($stored[$byLabel]->owner_contact)->toBeNull()
+        ->and($stored[$byKey]->owner_role)->toBe('programme_manager')->and($stored[$byKey]->owner_contact)->toBeNull()
+        ->and($stored[$person]->owner_role)->toBe('programme_manager')   // validity's default role
+        ->and($stored[$person]->owner_contact)->toBe('Dr A. Bello')
+        ->and(Schema::hasColumn('plan_actions', 'assigned_to'))->toBeFalse()
+        ->and(columnNullable('plan_actions', 'owner_role'))->toBeFalse();
+
+    $this->artisan('migrate:rollback', ['--step' => $later + 1, '--no-interaction' => true])->assertSuccessful();
+
+    $back = DB::table('plan_actions')->get()->keyBy('id');
+    expect($back[$byLabel]->assigned_to)->toBe('State M&E team')
+        ->and($back[$byKey]->assigned_to)->toBe('Programme manager')
+        ->and($back[$person]->assigned_to)->toBe('Dr A. Bello');
+
+    $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
 });

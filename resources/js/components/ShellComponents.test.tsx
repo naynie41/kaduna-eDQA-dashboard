@@ -15,8 +15,8 @@ vi.mock('@inertiajs/react', async (importOriginal) => {
 
 const translations = {
     ...testTranslations,
-    common: {
-        ...(testTranslations.common as Record<string, unknown>),
+    // The per-source status bar is the admin layout's (admin.sync).
+    admin: {
         sync: {
             label: 'Data sources',
             not_configured: ':source is not configured',

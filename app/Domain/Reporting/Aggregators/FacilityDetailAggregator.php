@@ -13,6 +13,7 @@ use App\Domain\Reporting\DTOs\FacilityDetail;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Domain\Reporting\Queries\FacilityRoundOverallsQuery;
 use App\Domain\Reporting\Support\FacilityScoresSql;
+use App\Domain\Reporting\Support\PublicScope;
 use App\Domain\Reporting\Support\RoundSelection;
 use App\Domain\Reporting\Support\Scores;
 use App\Domain\Round\Enums\RoundStatus;
@@ -42,6 +43,11 @@ use Illuminate\Support\Facades\DB;
  *
  * Only accepted assessments (accepted or flagged), each round read under its own rule version
  * (D-32), as every other aggregate. One facility, so not cached: a handful of indexed queries.
+ *
+ * For the Public audience (the public drawer, D-77) only closed rounds exist: an open round asked
+ * for is ignored, and the history leaves open rounds out. What only the admin facility view shows
+ * (flags, attachments, the audit trail, the source, corrections) is not even computed; the public
+ * resource is the whitelist on top (SECURITY.md §3.1).
  */
 final class FacilityDetailAggregator
 {
@@ -60,20 +66,25 @@ final class FacilityDetailAggregator
 
     public function forFacility(Facility $facility, ?Round $round = null, ReportFilter $filter = new ReportFilter): FacilityDetail
     {
+        $public = PublicScope::restricts($filter->audience);
         $facility->loadMissing(['lga:id,name', 'ward:id,name']);
         $assessments = Assessment::query()
             ->where('facility_id', $facility->id)
             ->whereIn('status', FacilityScoresSql::ACCEPTED)
+            ->when($public, fn ($q) => $q->whereHas('round', fn ($r) => $r->where('status', RoundStatus::Closed->value)))
             ->with('round')
             ->get();
 
+        if ($public && $round !== null && $round->status !== RoundStatus::Closed) {
+            $round = null;
+        }
         $round ??= $this->roundInView(array_map(intval(...), $assessments->pluck('round_id')->all()), $filter);
         $assessment = $round === null ? null : $assessments->first(fn (Assessment $a): bool => $a->round_id === $round->id);
         $rules = $round === null ? null : $this->sql->configFor($round);
         $versionId = $round === null ? null : $this->versionId($round);
         $slots = $assessment === null || $versionId === null ? [] : $this->slotScores($assessment->id, $versionId);
-        $source = $assessment === null ? null : $this->sources->forSubmission($assessment->submission_id);
-        $activity = $this->activity($assessments->modelKeys());
+        $source = $assessment === null || $public ? null : $this->sources->forSubmission($assessment->submission_id);
+        $activity = $public ? ['entries' => [], 'overrides' => []] : $this->activity($assessments->modelKeys());
 
         return new FacilityDetail(
             facility: [
@@ -105,12 +116,12 @@ final class FacilityDetailAggregator
                 'ended_at' => $assessment->ended_at->setTimezone((string) config('app.timezone'))->toIso8601String(),
                 // The latest portal correction the source has not since replaced (Q-23): the drawer
                 // says the portal differs from the source, which still shows the old answers.
-                'corrected' => $this->corrected($assessment),
+                'corrected' => $public ? null : $this->corrected($assessment),
             ],
             scores: $this->scoreCard($assessment?->id, $versionId, $rules),
             items: $assessment === null ? [] : $this->items($assessment->id, $round, $slots, $rules),
-            history: $this->history($facility->id, $round),
-            flags: $assessment === null ? [] : $this->flags($assessment, $activity['overrides']),
+            history: $this->history($facility->id, $round, $public),
+            flags: $assessment === null || $public ? [] : $this->flags($assessment, $activity['overrides']),
             attachments: $source === null ? [] : $source->attachments,
             activity: $activity['entries'],
             source: ['key' => $source?->sourceKey, 'name' => $source?->sourceName, 'instance_id' => $source?->instanceId, 'url' => $source?->url],
@@ -248,14 +259,17 @@ final class FacilityDetailAggregator
     }
 
     /**
-     * The facility's overall in every round it was assessed in, oldest first.
+     * The facility's overall in every round it was assessed in (closed ones only for the public),
+     * oldest first.
      *
      * @return list<array{round_id: int, label: string, overall: ScoreValue, selected: bool}>
      */
-    private function history(int $facilityId, ?Round $selected): array
+    private function history(int $facilityId, ?Round $selected, bool $closedOnly = false): array
     {
         $overalls = $this->overalls->forFacilities([$facilityId]);
-        $rounds = Round::query()->whereIn('id', array_column($overalls, 'round_id'))->get()->keyBy('id');
+        $rounds = Round::query()->whereIn('id', array_column($overalls, 'round_id'))
+            ->when($closedOnly, fn ($q) => $q->where('status', RoundStatus::Closed->value))
+            ->get()->keyBy('id');
 
         $points = [];
         foreach ($overalls as $row) {

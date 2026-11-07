@@ -8,6 +8,7 @@ use App\Domain\Reporting\Aggregators\OwnerSplitAggregator;
 use App\Domain\Reporting\Aggregators\StateSummaryAggregator;
 use App\Domain\Reporting\Aggregators\WeakestLgasAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Enums\ReportAudience;
 use Database\Seeders\LgaSeeder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -86,7 +87,7 @@ function bulkAssessments(int $round, int $version, string $ownership, int $count
 }
 
 it('reproduces the public figure: 87.67, shown 88', function (): void {
-    $public = app(OwnerSplitAggregator::class)->split(ReportFilter::fromArray([]))->public;
+    $public = app(OwnerSplitAggregator::class)->split(ReportFilter::fromArray([], ReportAudience::Admin))->public;
 
     expect($public->overall->value)->toEqualWithDelta(87.666667, 0.0001)
         ->and($public->overall->display)->toBe('87.7')
@@ -95,7 +96,7 @@ it('reproduces the public figure: 87.67, shown 88', function (): void {
 });
 
 it('reproduces the private figure: 73.67, shown 74 half-up and 73 truncated', function (): void {
-    $private = app(OwnerSplitAggregator::class)->split(ReportFilter::fromArray([]))->private;
+    $private = app(OwnerSplitAggregator::class)->split(ReportFilter::fromArray([], ReportAudience::Admin))->private;
 
     expect($private->overall->value)->toEqualWithDelta(73.666667, 0.0001)
         ->and($private->overall->headline)->toBe('74');
@@ -103,11 +104,11 @@ it('reproduces the private figure: 73.67, shown 74 half-up and 73 truncated', fu
     config(['edqa.presentation.rounding' => 'truncate']);
     Cache::flush();
 
-    expect(app(OwnerSplitAggregator::class)->split(ReportFilter::fromArray([]))->private->overall->headline)->toBe('73');
+    expect(app(OwnerSplitAggregator::class)->split(ReportFilter::fromArray([], ReportAudience::Admin))->private->overall->headline)->toBe('73');
 });
 
 it('reproduces the state figure: ≈ 86.29, shown 86, unweighted over 2,219 facilities', function (): void {
-    $state = app(StateSummaryAggregator::class)->summary(ReportFilter::fromArray([]));
+    $state = app(StateSummaryAggregator::class)->summary(ReportFilter::fromArray([], ReportAudience::Admin));
 
     expect($state->overall->value)->toEqualWithDelta((2000 * 263 / 3 + 219 * 221 / 3) / 2219, 0.0001)
         // Exactly 86.28496. §7's "≈ 86.29" comes from the rounded group means
@@ -119,7 +120,7 @@ it('reproduces the state figure: ≈ 86.29, shown 86, unweighted over 2,219 faci
 });
 
 it('never reports more than 23 LGAs, from any aggregator', function (): void {
-    $filter = ReportFilter::fromArray([]);
+    $filter = ReportFilter::fromArray([], ReportAudience::Admin);
 
     expect(count(app(LgaTableAggregator::class)->rows($filter)))->toBe(23)
         ->and(count(app(CoverageAggregator::class)->coverage($filter)->perLga))->toBeLessThanOrEqual(23)

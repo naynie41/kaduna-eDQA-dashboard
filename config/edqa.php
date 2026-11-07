@@ -40,6 +40,10 @@ return [
 
         // throttle:public, per IP, for the public pages (and the public JSON, Phase P step 3).
         'per_minute' => 120,
+
+        // D-77: the public sees closed rounds only (PublicScope). true also shows the open round
+        // publicly, figures that may still move while data issues are resolved. Default false.
+        'show_open_round' => false,
     ],
 
     'aggregation' => [
@@ -224,6 +228,11 @@ return [
 
         // The default owner of each dimension's standard action: a key of lang/en/plan.php
         // owners. Phase 6 makes the owner editable per row (plan_actions).
+        // D-79: who owns a plan action is a role (a unit), never a person: plan_actions.owner_role is
+        // one of these (a CHECK holds the same list), labelled in lang/en/plan.php owners. A personal
+        // contact, if any, is plan_actions.owner_contact: admin-only, never on the public plan.
+        'roles' => ['lga_me_officer', 'state_me_team', 'programme_manager'],
+
         'default_owners' => [
             'availability' => 'lga_me_officer',
             'consistency' => 'state_me_team',

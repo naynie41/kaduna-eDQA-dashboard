@@ -14,7 +14,7 @@ export default function Security({ status }: SecurityProps) {
 
     return (
         <>
-            {/* The title (h1 and <title>) comes from AppShell. */}
+            {/* The title (h1 and <title>) comes from AdminLayout. */}
             <div className="grid max-w-xl gap-8">
                 <section aria-labelledby="password-title" className="rounded-panel border border-rule bg-panel p-6">
                     <h2 id="password-title" className="mb-4 text-md font-semibold">

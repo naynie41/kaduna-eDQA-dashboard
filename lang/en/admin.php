@@ -7,6 +7,17 @@ declare(strict_types=1);
 
 return [
 
+    // The admin preview of the public site (ARCHITECTURE.md §9.0): signed-in administrators only.
+    'preview' => [
+        'label' => 'Admin preview',
+        'text' => 'Admin preview — includes the open round',
+        'back' => 'Back to admin',
+    ],
+
+    'rail' => [
+        'view_public' => 'View public dashboard',
+    ],
+
     'tabs' => [
         'label' => 'Administration pages',
         // A tab's accessible name with its badge: "Data issues, 12 open".
@@ -21,6 +32,10 @@ return [
         'data_issues' => [
             'title' => 'Data issues',
             'subtitle' => 'Submissions held back by validation, and the flags on accepted ones.',
+        ],
+        'facility' => [
+            'title' => 'Facility',
+            'subtitle' => 'Everything recorded for one facility: every round, flags, attachments, changes and its source.',
         ],
         'rounds' => [
             'title' => 'Rounds',
@@ -502,6 +517,112 @@ return [
         'source' => ':source: last successful pull at :time.',
         'source_never' => ':source: no pull has succeeded yet.',
         'link' => 'Go to the Data sources page',
+    ],
+
+    // The admin facility view's own strings (/admin/facilities/{id}, ARCHITECTURE.md §9.2.7): never
+    // sent with a public page (SECURITY.md §3.1). The parts it shares with the public drawer stay in
+    // dashboard.drawer.
+    'facility_view' => [
+        'code' => 'Code',
+        'status' => 'Status',
+        'active' => 'Active',
+        'inactive' => 'Inactive (no longer on the master list)',
+        'assessed' => 'Assessed :date by :assessor.',
+        'flags_title' => 'Flags',
+        'flags_none' => 'No flags on this assessment.',
+        'flag_open' => 'Open',
+        'flag_overridden' => 'Overridden',
+        'overridden_by' => 'Overridden by :by, :date.',
+        'reason' => 'Reason: :reason',
+        'someone' => 'an administrator',
+        'attachments_title' => 'Attachments',
+        'attachments_none' => 'No attachments for this assessment.',
+        // Alt text of a photo thumbnail: what it is and where it comes from.
+        'attachment_alt' => 'Photo :filename from :facility, :round',
+        'attachment_open' => 'Open :filename full size',
+        'attachment_download' => 'Download :filename',
+        'attachment_status' => [
+            'pending' => 'Not fetched from its source yet',
+            'failed' => 'Could not be fetched from its source; it will be tried again',
+            'rejected' => 'Refused, not stored',
+        ],
+        'attachment_reasons' => [
+            'unsafe_name' => 'its file name is not allowed',
+            'too_large' => 'it is larger than the size limit',
+            'type_not_allowed' => 'its file type is not allowed',
+        ],
+        'activity_title' => 'Changes',
+        'activity_none' => 'No changes recorded for this facility’s assessments.',
+        'system' => 'System',
+        'events' => [
+            'created' => 'Created',
+            'updated' => 'Updated',
+            'deleted' => 'Deleted',
+            'flag_overridden' => 'Flag overridden',
+            'corrected' => 'Corrected',
+            'source_edit_over_correction' => 'Edited at source over a correction',
+        ],
+        // "Correct this assessment" (D-58): item results and visit times; scores are recomputed.
+        'correct' => [
+            'start' => 'Correct this assessment',
+            'title' => 'Correcting this assessment',
+            'intro' => 'Change item results or the visit times. Scores are never typed in: they are worked out again from the items when you save.',
+            'closed' => 'Round :round is closed, so this assessment cannot be corrected. Reopen the round on the Rounds page first.',
+            'item_label' => ':item, :month',
+            'times' => 'Visit times',
+            'started_at' => 'Visit start',
+            'ended_at' => 'Visit end',
+            'times_hint' => 'Local time (:offset).',
+            'summary_none' => 'No changes yet.',
+            'summary_item' => '1 item changed: :list',
+            'summary_items' => ':count items changed: :list',
+            'summary_times' => 'Visit times: :old_start–:old_end → :new_start–:new_end',
+            'change' => ':key :old → :new',
+            'review' => 'Review and save',
+            'cancel' => 'Cancel',
+            'dialog_title' => 'Save this correction?',
+            'dialog_consequence' => ':summary The scores are worked out again from the items, the round is rescored, and the change is kept in the audit trail with your reason.',
+            'dialog_confirm' => 'Save correction',
+            'saved' => 'Correction saved. The scores have been worked out again.',
+            'results_label' => 'Result',
+        ],
+        'on_assessment' => 'Assessment',
+        'on_item' => 'Item :code',
+        'corrected_note' => 'Corrected in the portal by :by, :date. It differs from :source, which still shows the original answers.',
+        'corrected_note_system' => 'Corrected in the portal, :date. It differs from :source, which still shows the original answers.',
+        'its_source' => 'its source',
+        'change' => ':field: :old → :new',
+        'empty_value' => '(none)',
+        'source_title' => 'Source submission',
+        'source_none' => 'No submission for this round.',
+        'source' => 'Source',
+        'instance' => 'Instance ID',
+        'open_in_source' => 'Open in :source',
+        'new_tab' => '(opens in a new tab)',
+        'source_not_configured' => ':source is not connected yet, so there is no link.',
+    ],
+
+    // The admin layout's account menu and per-source status bar (ARCHITECTURE.md §9.1): never sent
+    // with a visitor's page.
+    'user_menu' => [
+        'label' => 'Account',
+        'signed_in_as' => 'Signed in as :name',
+        'security' => 'Security settings',
+        'log_out' => 'Log out',
+    ],
+    'sync' => [
+        'label' => 'Data sources',
+        'not_configured' => ':source is not configured',
+        'disabled' => ':source is switched off',
+        'not_connected' => ':source: no pull has finished yet',
+        'healthy' => ':source: last pull :minutes min ago',
+        'stale' => ':source: last successful pull :minutes min ago, more than :limit minutes',
+        'failed' => ':source: last pull failed at :time (:error); last success :success',
+        'failed_no_error' => ':source: last pull failed at :time; last success :success',
+        'auth_failed' => ':source refused the portal\'s credentials at :time; it is not pulling until they are fixed. Last success :success',
+        'never_succeeded' => 'never',
+        'counts' => ':assessments assessments · :quarantined in quarantine',
+        'none' => 'No data source is set up, so no submissions are being pulled. The dashboard shows the data already loaded.',
     ],
 
 ];

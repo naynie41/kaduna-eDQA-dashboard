@@ -16,7 +16,7 @@ import type { AssessmentWindow, Coverage, GroupScores, MonitorProps, SourceCount
  * Private (the Home component; D-75), facilities visited per
  * local government against the state mean, coverage by level, each round's assessment window, and
  * the selection's assessments by source (ODK Central, KoboToolbox). Every block is deferred; the
- * title, filters and tabs come from AppShell.
+ * title, filters and tabs come from PublicLayout.
  */
 export default function Monitor({ owners, coverage, windows, sources, overall }: MonitorProps) {
     const t = useTranslate();

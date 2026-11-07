@@ -49,6 +49,7 @@ return [
         'intro' => 'Follow the link we emailed you to verify your address.',
         'resend' => 'Send the link again',
         'sent' => 'A new verification link has been sent.',
+        'log_out' => 'Log out',
     ],
 
     // The new-device sign-in email (SECURITY.md §2, App\Notifications\NewDeviceLogin).

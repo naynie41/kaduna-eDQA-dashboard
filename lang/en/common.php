@@ -52,12 +52,6 @@ return [
         'administration' => 'Administration',
         'settings' => 'Settings',
     ],
-    'user_menu' => [
-        'label' => 'Account',
-        'signed_in_as' => 'Signed in as :name',
-        'security' => 'Security settings',
-        'log_out' => 'Log out',
-    ],
 
     // A record's field-collection source, when it cannot be told (SourceTag).
     'sources' => [
@@ -74,20 +68,6 @@ return [
         'title' => ':page · :app',
     ],
     // The status bar (ARCHITECTURE.md §9.1): one phrase per source, worst first, then the counts.
-    'sync' => [
-        'label' => 'Data sources',
-        'not_configured' => ':source is not configured',
-        'disabled' => ':source is switched off',
-        'not_connected' => ':source: no pull has finished yet',
-        'healthy' => ':source: last pull :minutes min ago',
-        'stale' => ':source: last successful pull :minutes min ago, more than :limit minutes',
-        'failed' => ':source: last pull failed at :time (:error); last success :success',
-        'failed_no_error' => ':source: last pull failed at :time; last success :success',
-        'auth_failed' => ':source refused the portal\'s credentials at :time; it is not pulling until they are fixed. Last success :success',
-        'never_succeeded' => 'never',
-        'counts' => ':assessments assessments · :quarantined in quarantine',
-        'none' => 'No data source is set up, so no submissions are being pulled. The dashboard shows the data already loaded.',
-    ],
 
     // Pages outside the dashboard, for the top bar's title.
     'pages' => [

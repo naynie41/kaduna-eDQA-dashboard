@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Public;
 use App\Domain\Reporting\Aggregators\ImplementationPlanAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Public\PlanResource;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,7 +21,8 @@ final class PlanController extends Controller
     public function __invoke(ReportFilter $filter, ImplementationPlanAggregator $plan): Response
     {
         return Inertia::render('dashboard/plan', [
-            'plan' => Inertia::defer(fn () => $plan->plan($filter)),
+            // Owners as roles only (D-79): PlanResource.
+            'plan' => Inertia::defer(fn () => PlanResource::one($plan->plan($filter))),
         ]);
     }
 }

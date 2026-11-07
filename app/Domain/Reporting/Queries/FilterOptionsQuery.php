@@ -6,12 +6,14 @@ namespace App\Domain\Reporting\Queries;
 
 use App\Domain\Facility\Enums\FacilityLevel;
 use App\Domain\Facility\Enums\Ownership;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Domain\Reporting\RoundCache;
+use App\Domain\Reporting\Support\PublicScope;
 use Illuminate\Support\Facades\DB;
 
 /**
- * What the filter bar offers (ARCHITECTURE.md §9.1): the year and quarter of every round, newest
- * first; the 23 LGAs by name; the levels and owner types with their labels. Lists, no
+ * What the filter bar offers (ARCHITECTURE.md §9.1): the year and quarter of every round the
+ * audience can see, newest first (the public: closed rounds only, D-77); the 23 LGAs by name; the levels and owner types with their labels. Lists, no
  * aggregates; the rounds and LGAs are cached until a round or LGA changes.
  */
 final class FilterOptionsQuery
@@ -28,11 +30,13 @@ final class FilterOptionsQuery
      *     owners: list<array{value: string, label: string}>,
      * }
      */
-    public function get(): array
+    public function get(ReportAudience $audience = ReportAudience::Public): array
     {
+        $scope = PublicScope::key($audience);
+
         /** @var array{rounds: list<array{year: int, quarter: int}>, lgas: list<array{code: string, name: string}>} $lists */
-        $lists = $this->cache->rememberGlobal('filter-options', fn (): array => [
-            'rounds' => array_values(DB::table('rounds')->orderByDesc('year')->orderByDesc('quarter')->get(['year', 'quarter'])
+        $lists = $this->cache->rememberGlobal("filter-options:{$scope}", fn (): array => [
+            'rounds' => array_values(PublicScope::apply(DB::table('rounds'), $audience)->orderByDesc('year')->orderByDesc('quarter')->get(['year', 'quarter'])
                 ->map(fn (object $r): array => ['year' => (int) $r->year, 'quarter' => (int) $r->quarter])->all()),
             'lgas' => array_values(DB::table('lgas')->orderBy('name')->get(['code', 'name'])
                 ->map(fn (object $l): array => ['code' => (string) $l->code, 'name' => (string) $l->name])->all()),

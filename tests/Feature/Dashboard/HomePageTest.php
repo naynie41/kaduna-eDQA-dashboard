@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domain\Reporting\Aggregators\DimensionAggregator;
 use App\Domain\Reporting\Aggregators\StateSummaryAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\ReportingFixture;
@@ -23,7 +24,7 @@ function asJson(mixed $value): array
 }
 
 it('takes the hero and the dimensions from the aggregators, with the rule version thresholds', function (): void {
-    $filter = new ReportFilter(year: 2026, quarter: 2, lga: 'AAA');
+    $filter = new ReportFilter(year: 2026, quarter: 2, lga: 'AAA', audience: ReportAudience::Admin);
     $hero = asJson(app(StateSummaryAggregator::class)->summary($filter));
     $dimensions = asJson(app(DimensionAggregator::class)->dimensions($filter));
 

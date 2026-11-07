@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domain\Reporting\Aggregators\AssessmentsBySourceAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Domain\Reporting\DTOs\SourceCount;
+use App\Domain\Reporting\Enums\ReportAudience;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\ReportingFixture;
 use Tests\Support\Rows;
@@ -25,12 +26,12 @@ beforeEach(function (): void {
 /** @return array<int, int> source id => assessments */
 function bySource(array $query = []): array
 {
-    return collect(app(AssessmentsBySourceAggregator::class)->counts(ReportFilter::fromArray($query)))
+    return collect(app(AssessmentsBySourceAggregator::class)->counts(ReportFilter::fromArray($query, ReportAudience::Admin)))
         ->mapWithKeys(fn (SourceCount $c): array => [$c->sourceId => $c->assessments])->all();
 }
 
 it('counts the selection\'s assessments per source, most first', function (): void {
-    $counts = app(AssessmentsBySourceAggregator::class)->counts(ReportFilter::fromArray(['year' => 2026, 'quarter' => 2]));
+    $counts = app(AssessmentsBySourceAggregator::class)->counts(ReportFilter::fromArray(['year' => 2026, 'quarter' => 2], ReportAudience::Admin));
 
     expect(array_map(fn (SourceCount $c): array => [$c->sourceId, $c->assessments], $counts))->toBe([[$this->odk, 5], [$this->kobo, 2]]);
 });

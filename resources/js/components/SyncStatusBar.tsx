@@ -31,12 +31,12 @@ export default function SyncStatusBar({ status }: SyncStatusBarProps) {
     const months = useTranslationList('common.months_short');
     const at = (value: string | null) => (value === null || months.length !== 12 ? '' : formatDateTime(value, months));
     const worst = status.sources[0]?.state ?? 'not_configured';
-    const counts = t('common.sync.counts', { assessments: formatCount(status.assessments), quarantined: formatCount(status.quarantined) });
+    const counts = t('admin.sync.counts', { assessments: formatCount(status.assessments), quarantined: formatCount(status.quarantined) });
 
     return (
-        <div role="status" aria-label={t('common.sync.label')} className={`flex flex-wrap items-center gap-x-5 gap-y-1 border-b px-4 py-1.5 text-xs rail:px-7 ${TONE[worst]}`}>
+        <div role="status" aria-label={t('admin.sync.label')} className={`flex flex-wrap items-center gap-x-5 gap-y-1 border-b px-4 py-1.5 text-xs rail:px-7 ${TONE[worst]}`}>
             {status.sources.length === 0 ? (
-                <span>{t('common.sync.none')}</span>
+                <span>{t('admin.sync.none')}</span>
             ) : (
                 status.sources.map((source) => (
                     <span key={source.key} className="inline-flex items-center gap-2">
@@ -53,22 +53,22 @@ export default function SyncStatusBar({ status }: SyncStatusBarProps) {
 function sentence(t: Translate, source: SyncStatus, at: (value: string | null) => string): string {
     const name = { source: source.name };
     const minutes = source.minutesSinceSuccess === null ? '' : formatCount(source.minutesSinceSuccess);
-    const success = source.lastSuccessAt === null ? t('common.sync.never_succeeded') : at(source.lastSuccessAt);
+    const success = source.lastSuccessAt === null ? t('admin.sync.never_succeeded') : at(source.lastSuccessAt);
 
     switch (source.state) {
         case 'not_configured':
         case 'disabled':
         case 'not_connected':
-            return t(`common.sync.${source.state}`, name);
+            return t(`admin.sync.${source.state}`, name);
         case 'healthy':
-            return t('common.sync.healthy', { ...name, minutes });
+            return t('admin.sync.healthy', { ...name, minutes });
         case 'stale':
-            return t('common.sync.stale', { ...name, minutes, limit: source.staleAfterMinutes });
+            return t('admin.sync.stale', { ...name, minutes, limit: source.staleAfterMinutes });
         case 'auth_failed':
-            return t('common.sync.auth_failed', { ...name, time: at(source.lastFailedAt), success });
+            return t('admin.sync.auth_failed', { ...name, time: at(source.lastFailedAt), success });
         case 'failed':
             return source.lastErrorClass === null
-                ? t('common.sync.failed_no_error', { ...name, time: at(source.lastFailedAt), success })
-                : t('common.sync.failed', { ...name, time: at(source.lastFailedAt), error: source.lastErrorClass, success });
+                ? t('admin.sync.failed_no_error', { ...name, time: at(source.lastFailedAt), success })
+                : t('admin.sync.failed', { ...name, time: at(source.lastFailedAt), error: source.lastErrorClass, success });
     }
 }

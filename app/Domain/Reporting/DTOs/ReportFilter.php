@@ -6,6 +6,8 @@ namespace App\Domain\Reporting\DTOs;
 
 use App\Domain\Facility\Enums\FacilityLevel;
 use App\Domain\Facility\Enums\Ownership;
+use App\Domain\Reporting\Enums\ReportAudience;
+use App\Domain\Reporting\Support\PublicScope;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -18,6 +20,10 @@ use Illuminate\Validation\ValidationException;
  * turns it back into one for links and exports. Every one is optional; a quarter or a month needs
  * a year. A month (1–12) also sets its quarter, so rounds are chosen as for the quarter, and
  * monthSlot() tells the figures to read that month only.
+ *
+ * It also says who the figures are for (ReportAudience, D-77): Public unless stated, so a filter
+ * built anywhere without thought shows closed rounds only (PublicScope). The audience is never in
+ * the URL, but it is in the cache key.
  */
 final readonly class ReportFilter
 {
@@ -32,6 +38,7 @@ final readonly class ReportFilter
         public ?FacilityLevel $level = null,
         public ?Ownership $owner = null,
         public ?int $month = null,
+        public ReportAudience $audience = ReportAudience::Public,
     ) {}
 
     /** The month's slot in its quarter (1–3), or null for a whole quarter (D-75). */
@@ -49,20 +56,21 @@ final readonly class ReportFilter
     /** The same filter for the whole quarter: what the quarterly trend reads. */
     public function withoutMonth(): self
     {
-        return new self($this->year, $this->quarter, $this->lga, $this->level, $this->owner);
+        return new self($this->year, $this->quarter, $this->lga, $this->level, $this->owner, audience: $this->audience);
     }
 
     /**
      * The dashboard's reading of a URL: each filter is kept only if it can be chosen in the filter
      * bar, and anything else falls back to "all" rather than erroring (a stale bookmark still
      * opens). A year needs a round; a quarter needs its year and a round in that quarter; an LGA
-     * must be one of the 23.
+     * must be one of the 23. For the public, a year or quarter it cannot see (an open round, D-77)
+     * or does not exist drops the whole round choice: the page opens on the latest closed round.
      *
      * @param  array<string, mixed>  $query
-     * @param  list<array{year: int, quarter: int}>  $rounds  every round there is
+     * @param  list<array{year: int, quarter: int}>  $rounds  every round the audience can see (FilterOptionsQuery)
      * @param  list<string>  $lgaCodes
      */
-    public static function resolve(array $query, array $rounds, array $lgaCodes): self
+    public static function resolve(array $query, array $rounds, array $lgaCodes, ReportAudience $audience = ReportAudience::Public): self
     {
         $int = fn (string $key): ?int => is_string($query[$key] ?? null) && ctype_digit($query[$key]) ? (int) $query[$key] : null;
         $string = fn (string $key): ?string => is_string($query[$key] ?? null) ? $query[$key] : null;
@@ -76,6 +84,9 @@ final readonly class ReportFilter
         $month = $month !== null && $month >= 1 && $month <= 12 ? $month : null;
         $quarter = $month === null ? $int('quarter') : self::quarterOf($month);
         if ($year === null || ! in_array(['year' => $year, 'quarter' => $quarter], $rounds, true)) {
+            if ($audience === ReportAudience::Public && ($quarter !== null || $int('quarter') !== null)) {
+                $year = null;
+            }
             $quarter = null;
             $month = null;
         }
@@ -88,19 +99,26 @@ final readonly class ReportFilter
             level: FacilityLevel::tryFrom((string) $string('level')),
             owner: Ownership::tryFrom((string) $string('owner')),
             month: $month,
+            audience: $audience,
         );
     }
 
     /** The same filter across every round: for trends, which show all rounds whatever is chosen. */
     public function withoutRound(): self
     {
-        return new self(lga: $this->lga, level: $this->level, owner: $this->owner);
+        return new self(lga: $this->lga, level: $this->level, owner: $this->owner, audience: $this->audience);
+    }
+
+    /** The same filter for every LGA: the LGA view's tiles, so another LGA can always be chosen. */
+    public function withoutLga(): self
+    {
+        return new self($this->year, $this->quarter, null, $this->level, $this->owner, audience: $this->audience);
     }
 
     /** The same filter for one owner type: the Visuals Overall / Public / Private view. */
     public function withOwner(?Ownership $owner): self
     {
-        return new self($this->year, $this->quarter, $this->lga, $this->level, $owner, $this->month);
+        return new self($this->year, $this->quarter, $this->lga, $this->level, $owner, $this->month, $this->audience);
     }
 
     /**
@@ -125,7 +143,7 @@ final readonly class ReportFilter
      *
      * @throws ValidationException
      */
-    public static function fromArray(array $query): self
+    public static function fromArray(array $query, ReportAudience $audience = ReportAudience::Public): self
     {
         $data = Validator::make(array_intersect_key($query, array_flip(self::KEYS)), [
             'year' => ['nullable', 'integer', 'between:2000,2100', 'required_with:quarter,month'],
@@ -146,13 +164,17 @@ final readonly class ReportFilter
             lga: isset($data['lga']) ? (string) $data['lga'] : null,
             level: isset($data['level']) ? FacilityLevel::from((string) $data['level']) : null,
             owner: isset($data['owner']) ? Ownership::from((string) $data['owner']) : null,
+            audience: $audience,
         );
     }
 
-    /** The same filters in any order give the same key. */
+    /**
+     * The same filters in any order give the same key. The audience's scope is part of it, so an
+     * administrator's preview (open rounds included) is never served to the public (D-77).
+     */
     public function cacheKey(): string
     {
-        return md5((string) json_encode($this->toQuery(), JSON_THROW_ON_ERROR));
+        return md5((string) json_encode([...$this->toQuery(), 'audience' => $this->audience->value, 'scope' => PublicScope::key($this->audience)], JSON_THROW_ON_ERROR));
     }
 
     /** @return array{year?: int, quarter?: int, month?: int, lga?: string, level?: string, owner?: string} */

@@ -27,6 +27,15 @@ Route::middleware(['public.readonly', 'throttle:public'])->name('public.')->grou
         Route::get('plan', Public\PlanController::class)->name('plan');
     });
 
+    // The public JSON (ARCHITECTURE.md §8): the same filters as the pages, closed rounds only for a
+    // visitor, public resources only (D-83).
+    Route::prefix('api/public')->name('api.')->group(function (): void {
+        Route::get('aggregates', Public\Api\AggregatesController::class)->name('aggregates');
+        Route::get('facilities', Public\Api\FacilitiesController::class)->name('facilities.index');
+        Route::get('facilities/{facility}', Public\Api\FacilityDetailController::class)->whereNumber('facility')->name('facilities.show');
+        Route::get('status', Public\Api\StatusController::class)->name('status');
+    });
+
     // The signed-in dashboard's old URLs: 301 to the public ones, filters kept.
     Route::get('dashboard', OldDashboardUrlController::class)->name('old');
     Route::get('dashboard/{page}', OldDashboardUrlController::class)

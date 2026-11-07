@@ -13,6 +13,7 @@ use App\Domain\Reporting\DTOs\GroupScores;
 use App\Domain\Reporting\DTOs\LgaRow;
 use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Domain\Reporting\DTOs\TrendPoint;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Domain\Round\Models\Round;
 use App\Domain\Scoring\DTOs\ScoreValue;
 use App\Domain\Scoring\Enums\Dimension;
@@ -60,11 +61,12 @@ final class ReportSummary extends Command
         }
 
         if ($this->option('round') === 'all') {
-            $this->trendTable($trend->trend(new ReportFilter(lga: $lga)));
+            $this->trendTable($trend->trend(new ReportFilter(lga: $lga, audience: ReportAudience::Admin)));
         }
 
         foreach ($rounds as $round) {
-            $filter = new ReportFilter(year: $round->year, quarter: $round->quarter, lga: $lga);
+            // An operator on the server: every round, open ones too (D-77 is about the public site).
+            $filter = new ReportFilter(year: $round->year, quarter: $round->quarter, lga: $lga, audience: ReportAudience::Admin);
             $summary = $state->summary($filter);
             $dims = $dimensions->dimensions($filter);
             $split = $owners->split($filter);

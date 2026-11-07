@@ -9,6 +9,7 @@ use App\Domain\Reporting\DTOs\ReportFilter;
 use App\Domain\Reporting\Support\RoundSelection;
 use App\Domain\Round\Models\Round;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Public\LgaRowResource;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,14 +23,14 @@ final class LgaController extends Controller
 {
     public function __invoke(ReportFilter $filter, RoundSelection $rounds, LgaTableAggregator $lgas): Response
     {
-        $everyLga = new ReportFilter(year: $filter->year, quarter: $filter->quarter, level: $filter->level, owner: $filter->owner);
+        $everyLga = $filter->withoutLga();
 
         return Inertia::render('dashboard/lga', [
             'rounds' => array_map(fn (Round $round): array => ['year' => $round->year, 'quarter' => $round->quarter], $rounds->current($filter)),
             // Not deferred: a deferred prop is dropped on every filter reload, which would unmount
             // the grid and lose the focused tile. 23 rows, read from round_aggregates.
-            'tiles' => $lgas->rows($everyLga),
-            'lgas' => Inertia::defer(fn () => $lgas->rows($filter)),
+            'tiles' => LgaRowResource::many($lgas->rows($everyLga)),
+            'lgas' => Inertia::defer(fn () => LgaRowResource::many($lgas->rows($filter))),
         ]);
     }
 }

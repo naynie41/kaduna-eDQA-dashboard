@@ -16,7 +16,7 @@ vi.mock('@/components/Announcer', async (original) => ({
 
 const score = (display: string): ScoreValue => ({ value: Number(display), display, headline: display, band: 'acceptable', bandLabel: 'Acceptable' });
 
-const translations = {
+const base = {
     ...testTranslations,
     common: {
         ...(testTranslations.common as Record<string, unknown>),
@@ -73,6 +73,9 @@ const translations = {
         },
     },
 };
+
+// The admin facility view reads its own strings from admin.facility_view (never sent publicly).
+const translations = { ...base, admin: { facility_view: base.dashboard.drawer } };
 
 const detail = (open = true): FacilityDetail => ({
     facility: { id: 5, code: 'KD-F1', name: 'Facility F1', lga: 'Alpha', ward: 'Ward F1', level: 'primary', level_label: 'Primary', ownership: 'public', ownership_label: 'Public', active: true },

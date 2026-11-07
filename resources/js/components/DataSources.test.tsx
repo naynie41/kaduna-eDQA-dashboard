@@ -441,7 +441,7 @@ describe('DeletionsPanel', () => {
         const rows = [deletion({}), deletion({ submission_id: 10, instance_id: 'uuid:del-2', facility: null, assessment: null, quarantined_record_id: 4, source_url: null })];
         const { container } = renderUi(<DeletionsPanel deletions={{ rows, total: 3 }} />, translations);
 
-        expect(screen.getByRole('link', { name: 'Open Kujama PHC' }).getAttribute('href')).toBe('/facilities?year=2026&quarter=4&facility=31');
+        expect(screen.getByRole('link', { name: 'Open Kujama PHC' }).getAttribute('href')).toBe('/admin/facilities/31?round=2');
         expect(screen.getByRole('link', { name: 'Check in KoboToolbox (opens in a new tab)' }).getAttribute('href')).toBe('https://kf.example.org/api/v2/assets/aX/data/12/');
         expect(screen.getByRole('link', { name: 'Open Data issues' }).getAttribute('href')).toBe('/admin/data-issues?round=2');
         expect(screen.getAllByRole('link', { name: /^Check in/ })).toHaveLength(1);

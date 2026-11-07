@@ -1,9 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { checkA11y } from './support/a11y';
 
-// Correcting an assessment from the facility drawer (ARCHITECTURE.md §9.2.7, D-58), keyboard
-// only. Q2 2026 is open in the seeded data. The first item's result is flipped each run, so the
-// journey can be repeated; the desktop project does it once.
+// Correcting an assessment in the admin facility view (ARCHITECTURE.md §9.2.7, D-58), keyboard
+// only: from the public drawer (admin preview) through its link to /admin/facilities/{id}. Q2 2026
+// is open in the seeded data. The first item's result is flipped each run, so the journey can be
+// repeated; the desktop project does it once.
 
 const PAGE = '/facilities?year=2026&quarter=2';
 
@@ -18,6 +19,7 @@ async function tabTo(page: Page, target: Locator, max = 200): Promise<void> {
     throw new Error('The target was never reached with Tab.');
 }
 
+/** Opens the first facility's public drawer, then follows its link to the admin facility view. */
 async function openFirstFacility(page: Page): Promise<Locator> {
     await page.goto(PAGE);
     await expect(page.getByRole('heading', { level: 1, name: 'Facility view' })).toBeVisible({ timeout: 60_000 });
@@ -30,10 +32,17 @@ async function openFirstFacility(page: Page): Promise<Locator> {
     const drawer = page.getByRole('dialog', { name });
     await expect(drawer.getByRole('heading', { level: 3, name: 'Scores, Q2 2026' })).toBeVisible({ timeout: 60_000 });
 
-    return drawer;
+    await tabTo(page, drawer.getByRole('link', { name: 'Open the admin facility view' }));
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/admin\/facilities\/\d+$/, { timeout: 60_000 });
+    const view = page.getByRole('main');
+    await expect(view.getByRole('heading', { level: 2, name })).toBeVisible({ timeout: 60_000 });
+    await expect(view.getByRole('heading', { level: 3, name: 'Scores, Q2 2026' })).toBeVisible();
+
+    return view;
 }
 
-test.describe('Correcting an assessment from the drawer', () => {
+test.describe('Correcting an assessment in the admin facility view', () => {
     test.describe.configure({ mode: 'serial' });
     test.beforeEach(({ page }) => {
         void page;
@@ -64,7 +73,7 @@ test.describe('Correcting an assessment from the drawer', () => {
         const key = ((await summary.textContent()) ?? '').match(/(avail|consist|valid)_m\d_[a-z0-9_]+/)?.[0] ?? '';
         expect(key).not.toBe('');
 
-        // Esc in the reason dialog closes the dialog only, not the drawer.
+        // Esc in the reason dialog closes the dialog only.
         await tabTo(page, panel.getByRole('button', { name: 'Review and save' }));
         await page.keyboard.press('Enter');
         let dialog = page.getByRole('dialog', { name: 'Save this correction?' });
@@ -84,7 +93,7 @@ test.describe('Correcting an assessment from the drawer', () => {
         await tabTo(page, dialog.getByRole('button', { name: 'Save correction' }));
         await page.keyboard.press('Enter');
 
-        // The drawer reloads: out of correction mode, the item shows its new result, and the
+        // The view reloads: out of correction mode, the item shows its new result, and the
         // correction is in the audit trail with the reason.
         await expect(dialog).toBeHidden({ timeout: 60_000 });
         await expect(drawer.getByRole('button', { name: 'Correct this assessment' })).toBeVisible({ timeout: 60_000 });
@@ -94,11 +103,8 @@ test.describe('Correcting an assessment from the drawer', () => {
         await expect(entry).toBeVisible();
         // The old side is the stored value, which may be the form's raw choice (yes / no).
         await expect(entry).toContainText(`→ ${after}`);
-        // The source still shows the old answer (Q-23): the drawer says the portal differs from it.
+        // The source still shows the old answer (Q-23): the view says the portal differs from it.
         await expect(drawer.getByText(/^Corrected in the portal by .+ It differs from .+, which still shows the original answers\.$/)).toBeVisible();
         await checkA11y(page);
-
-        await page.keyboard.press('Escape');
-        await expect(drawer).toBeHidden();
     });
 });

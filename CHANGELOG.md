@@ -7,6 +7,55 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Public and admin layouts with the admin preview (Phase P step 4, D-76–D-81).**
+  - `PublicLayout` for the six dashboard pages: the KD seal and "eDQA e-tool / Kaduna State", the
+    filters and page tabs, and a footer with "Support: HSDF" and "Figures last updated {date}"
+    (the latest round close, or a later rescore of a closed round's scores). No Administration
+    link, no login link, no export button.
+  - `AdminLayout` for everything under `/admin`: the rail with the five admin pages (Data issues
+    with its open count) and "View public dashboard", the per-source status bar, the account menu
+    (security settings, log out). It replaces the shared shell and the admin tabs.
+  - The admin preview: a signed-in administrator on a public page sees a labelled "Admin preview,
+    includes the open round · Back to admin" region before the main content.
+  - Shared props split: a visitor's page gets no signed-in user, no source status, no admin counts
+    and no admin strings. The account-menu and sync-status strings moved from `common` to `admin`.
+
+### Changed
+
+- **BREAKING (schema): plan owners are roles (D-79).** `plan_actions.assigned_to` became
+  `owner_role`, one of `edqa.plan.roles` (a CHECK holds the list); a stored personal name moved to
+  the admin-only `owner_contact`, and the row took its dimension's default role. Reversible.
+
+- **Public resources, public API and the admin facility view (Phase P step 3, D-83).**
+  - `Http\Resources\Public\*`: every public page prop and public JSON response goes through an
+    explicit field whitelist. An arch test keeps admin resources out of the public ones and out of
+    the public controllers.
+  - Public JSON, GET only and rate limited: `/api/public/aggregates`, `/api/public/facilities`,
+    `/api/public/facilities/{id}` and `/api/public/status` ("Figures last updated", D-81).
+  - The public facility drawer uses only `/api/public/facilities/{id}`: name, LGA, ward, level and
+    ownership, the score card of a closed round, item results and round history. No assessor,
+    flags, attachments, audit, source, instance ID or coordinates (Q-20). `?facility=` deep links
+    still open it. A signed-in administrator also gets a link to the admin view.
+  - The admin facility view at `/admin/facilities/{id}` (`?round=`): the full detail for every
+    round, with "Correct this assessment". The Data sources deletions list links there.
+  - Monitor's counts by source are shown to the admin preview only (D-81). Plan owners are shown
+    as roles, never a stored personal name (D-79).
+  - The admin-only facility strings moved from `dashboard.drawer` to `admin.facility_view`, so
+    public pages no longer carry them.
+- **Public scope (Phase P step 2, D-77):** anyone who is not a signed-in administrator sees closed
+  rounds only, on every dashboard page and in every aggregator.
+  - `ReportAudience` (Public | Admin) is decided once per request (`ShareDashboardContext`) and
+    carried by `ReportFilter`. A filter built without one is Public.
+  - `PublicScope` applies where rounds are chosen (`RoundSelection`, `FilterOptionsQuery`), which
+    every aggregator, the facility query and the `round_aggregates` reads go through.
+    `config('edqa.public.show_open_round')` (default false) widens it.
+  - The public filter bar lists closed rounds only. A public URL naming an open, unknown or invalid
+    round falls back to the latest closed round.
+  - Cache keys carry the audience and the scope, so the admin preview is never served publicly.
+  - A visitor's page says "No published results yet." while no round is closed.
+
 ### Changed
 
 - **BREAKING: public dashboard routes and a separate admin area (Phase P step 1, D-76–D-78).**

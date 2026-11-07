@@ -8,6 +8,7 @@ use App\Domain\Reporting\Aggregators\MonthSlotAggregator;
 use App\Domain\Reporting\Aggregators\QuarterTrendAggregator;
 use App\Domain\Reporting\Aggregators\StateSummaryAggregator;
 use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Enums\ReportAudience;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\ReportingFixture;
@@ -26,14 +27,14 @@ beforeEach(function (): void {
 });
 
 it('reads a month from the URL: it needs a year, implies its quarter and slot, and links back as the month', function (): void {
-    $june = ReportFilter::fromArray(['year' => '2026', 'month' => '6']);
+    $june = ReportFilter::fromArray(['year' => '2026', 'month' => '6'], ReportAudience::Admin);
     expect([$june->year, $june->quarter, $june->month, $june->monthSlot()])->toBe([2026, 2, 6, 3])
         ->and($june->toQuery())->toBe(['year' => 2026, 'month' => 6])
-        ->and($june->cacheKey())->not->toBe(ReportFilter::fromArray(['year' => '2026', 'quarter' => '2'])->cacheKey())
-        ->and(ReportFilter::fromArray(['year' => '2026', 'quarter' => '2'])->monthSlot())->toBeNull();
+        ->and($june->cacheKey())->not->toBe(ReportFilter::fromArray(['year' => '2026', 'quarter' => '2'], ReportAudience::Admin)->cacheKey())
+        ->and(ReportFilter::fromArray(['year' => '2026', 'quarter' => '2'], ReportAudience::Admin)->monthSlot())->toBeNull();
 
-    expect(fn () => ReportFilter::fromArray(['month' => '6']))->toThrow(ValidationException::class)
-        ->and(fn () => ReportFilter::fromArray(['year' => '2026', 'month' => '13']))->toThrow(ValidationException::class);
+    expect(fn () => ReportFilter::fromArray(['month' => '6'], ReportAudience::Admin))->toThrow(ValidationException::class)
+        ->and(fn () => ReportFilter::fromArray(['year' => '2026', 'month' => '13'], ReportAudience::Admin))->toThrow(ValidationException::class);
 
     // A bookmark with a month of a quarter that has no round falls back to all, like a quarter.
     $rounds = [['year' => 2026, 'quarter' => 1], ['year' => 2026, 'quarter' => 2]];
@@ -43,7 +44,7 @@ it('reads a month from the URL: it needs a year, implies its quarter and slot, a
 });
 
 it('switches the dimensions and overall to the month: June', function (): void {
-    $june = ReportFilter::fromArray(['year' => '2026', 'month' => '6']);
+    $june = ReportFilter::fromArray(['year' => '2026', 'month' => '6'], ReportAudience::Admin);
     $dimensions = app(DimensionAggregator::class)->dimensions($june);
     $summary = app(StateSummaryAggregator::class)->summary($june);
 
@@ -55,14 +56,14 @@ it('switches the dimensions and overall to the month: June', function (): void {
 });
 
 it('keeps the quarter as before when no month is chosen', function (): void {
-    $q2 = ReportFilter::fromArray(['year' => '2026', 'quarter' => '2']);
+    $q2 = ReportFilter::fromArray(['year' => '2026', 'quarter' => '2'], ReportAudience::Admin);
 
     expect(app(DimensionAggregator::class)->dimensions($q2)->availability->value)->toEqualWithDelta(525 / 7, MONTH_DELTA)
         ->and(app(StateSummaryAggregator::class)->summary($q2)->overall->value)->toEqualWithDelta(550.666667 / 7, MONTH_DELTA);
 });
 
 it('switches the LGA table to the month too: Alpha in April', function (): void {
-    $april = ReportFilter::fromArray(['year' => '2026', 'month' => '4']);
+    $april = ReportFilter::fromArray(['year' => '2026', 'month' => '4'], ReportAudience::Admin);
     $alpha = collect(app(LgaTableAggregator::class)->rows($april))->firstWhere('name', 'Alpha');
 
     // F1 80, F2 70, F3 (95 + 90 + 85) / 3 = 90.
@@ -71,7 +72,7 @@ it('switches the LGA table to the month too: Alpha in April', function (): void 
 
 it('breaks the quarter down month by month, each with its three dimensions and overall', function (): void {
     $points = array_values(array_filter(
-        app(MonthSlotAggregator::class)->series(ReportFilter::fromArray(['year' => '2026', 'quarter' => '2'])),
+        app(MonthSlotAggregator::class)->series(ReportFilter::fromArray(['year' => '2026', 'quarter' => '2'], ReportAudience::Admin)),
         fn ($p): bool => $p->roundId === $this->f->q2,
     ));
 
@@ -82,7 +83,7 @@ it('breaks the quarter down month by month, each with its three dimensions and o
 });
 
 it('keeps the trend quarterly, with each quarter\'s dimensions, whatever month is chosen', function (): void {
-    $points = app(QuarterTrendAggregator::class)->trend(ReportFilter::fromArray(['year' => '2026', 'month' => '6']));
+    $points = app(QuarterTrendAggregator::class)->trend(ReportFilter::fromArray(['year' => '2026', 'month' => '6'], ReportAudience::Admin));
     $q2 = collect($points)->firstWhere('roundId', $this->f->q2);
 
     expect($q2->availability->value)->toEqualWithDelta(525 / 7, MONTH_DELTA)

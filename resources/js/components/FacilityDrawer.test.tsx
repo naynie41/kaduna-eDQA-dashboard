@@ -17,7 +17,7 @@ const score = (display: string, band: ScoreValue['band'] = 'acceptable', bandLab
     bandLabel,
 });
 
-const translations = {
+const base = {
     ...testTranslations,
     enums: { dimension: { availability: 'Availability', consistency: 'Consistency', validity: 'Validity' } },
     dashboard: {
@@ -70,6 +70,9 @@ const translations = {
         },
     },
 };
+
+// The admin facility view reads its own strings from admin.facility_view (never sent publicly).
+const translations = { ...base, admin: { facility_view: base.dashboard.drawer } };
 
 const detail: FacilityDetail = {
     facility: { id: 5, code: 'KD-F1', name: 'Facility F1', lga: 'Alpha', ward: 'Ward F1', level: 'primary', level_label: 'Primary', ownership: 'public', ownership_label: 'Public', active: true },

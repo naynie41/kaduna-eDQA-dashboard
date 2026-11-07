@@ -11,7 +11,7 @@ import type { FilterOptions, Filters, Summary } from '@/types/shell';
 
 /**
  * LGA view (ARCHITECTURE.md §9.2.3): the tile grid (every LGA; a tile toggles the LGA filter) and
- * "All four reports by local government". The title, filters and tabs come from AppShell.
+ * "All four reports by local government". The title, filters and tabs come from PublicLayout.
  */
 export default function Lga({ rounds, tiles, lgas }: LgaProps) {
     const t = useTranslate();

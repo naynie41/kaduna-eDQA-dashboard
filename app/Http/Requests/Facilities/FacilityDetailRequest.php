@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Facilities;
 
 use App\Domain\Reporting\DTOs\ReportFilter;
+use App\Domain\Reporting\Enums\ReportAudience;
 use App\Domain\Round\Models\Round;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -39,6 +40,8 @@ final class FacilityDetailRequest extends FormRequest
         return new ReportFilter(
             year: $this->filled('year') ? $this->integer('year') : null,
             quarter: $this->filled('year') && $this->filled('quarter') ? $this->integer('quarter') : null,
+            // The admin facility view (/admin/api): every round.
+            audience: ReportAudience::Admin,
         );
     }
 }

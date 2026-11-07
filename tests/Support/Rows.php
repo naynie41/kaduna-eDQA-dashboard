@@ -209,7 +209,7 @@ final class Rows
             'lga_id' => $overrides['lga_id'] ?? self::lga(),
             'dimension' => 'availability',
             'action_text' => 'Supportive supervision on NHMIS summary forms',
-            'assigned_to' => 'LGA M&E officer',
+            'owner_role' => 'lga_me_officer',
             'due_date' => '2026-07-31',
             'status' => 'not_started',
             'created_at' => now(),

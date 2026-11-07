@@ -33,7 +33,7 @@ export default function VerifyEmail({ status }: VerifyEmailProps) {
                             {t('auth.verify_email.resend')}
                         </button>
                         <Link href={logout()} as="button" className="text-deep underline underline-offset-2">
-                            {t('common.user_menu.log_out')}
+                            {t('auth.verify_email.log_out')}
                         </Link>
                     </>
                 )}

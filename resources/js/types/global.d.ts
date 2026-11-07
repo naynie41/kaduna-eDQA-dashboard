@@ -8,14 +8,18 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             translations: Translations;
-            /** Null for a guest. */
-            shell: ShellStatus | null;
-            /** Administration pages only; null elsewhere and for a guest. */
-            admin?: AdminShell | null;
+            /** The admin layout's status bar and count: admin pages only, never a public page. */
+            shell?: ShellStatus;
+            /** The admin pages' badge and stale-ingestion banner: admin pages only. */
+            admin?: AdminShell;
             /** Dashboard pages only (ShareDashboardContext). */
             filters?: Filters;
             filterOptions?: FilterOptions;
             summary?: Summary;
+            /** A visitor's dashboard page while no round is closed yet (D-77). */
+            unpublished?: boolean;
+            /** The public footer's "Figures last updated" (D-81); null while nothing is published. */
+            figuresUpdatedAt?: string | null;
             [key: string]: unknown;
         };
     }

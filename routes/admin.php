@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\AdminFacilityController;
 use App\Http\Controllers\Admin\AdminSourcesController;
 use App\Http\Controllers\Assessments\AssessmentStatusController;
 use App\Http\Controllers\Assessments\CorrectAssessmentController;
@@ -43,6 +44,9 @@ Route::permanentRedirect('odk', '/admin/sources')->name('odk');
 Route::get('data-issues', DataIssuesPageController::class)->name('data-issues');
 Route::inertia('rounds', 'admin/rounds')->name('rounds');
 Route::inertia('facilities', 'admin/facilities')->name('facilities');
+// The admin facility view (ARCHITECTURE.md §9.2.7): every round, flags, attachments, the audit
+// trail, the source and its link, and corrections. ?round= picks the round.
+Route::get('facilities/{facility}', AdminFacilityController::class)->whereNumber('facility')->name('facilities.show');
 Route::inertia('scoring-rules', 'admin/scoring-rules')->name('scoring-rules');
 
 // Password change (SECURITY.md §2): accounts themselves are managed by artisan commands.

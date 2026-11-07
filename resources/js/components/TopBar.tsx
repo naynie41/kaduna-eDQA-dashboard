@@ -1,8 +1,4 @@
 import type { ReactNode, Ref } from 'react';
-import { Link, usePage } from '@inertiajs/react';
-import { useTranslate } from '@/lib/i18n';
-import { logout } from '@/routes';
-import { edit as securityEdit } from '@/routes/admin/security';
 
 export type TopBarProps = {
     /** The header itself, so the shell can measure it for scroll-padding-top. */
@@ -13,13 +9,12 @@ export type TopBarProps = {
     titleRef?: Ref<HTMLHeadingElement>;
     /** The filter bar and the page tabs, on dashboard pages. */
     children?: ReactNode;
+    /** Beside the title: the account menu, in the admin layout only (the public site has none, D-78). */
+    actions?: ReactNode;
 };
 
-/** The top bar (sticky from 760px; on a phone it would cover most of the screen): the page's h1 and subtitle, the account links (signed in only: the public site has none, D-78), then filters and tabs. */
-export default function TopBar({ title, subtitle, titleRef, headerRef, children }: TopBarProps) {
-    const t = useTranslate();
-    const { user } = usePage().props.auth;
-
+/** The top bar (sticky from 760px; on a phone it would cover most of the screen): the page's h1 and subtitle, any actions beside them, then filters and tabs. */
+export default function TopBar({ title, subtitle, titleRef, headerRef, children, actions }: TopBarProps) {
     return (
         <header ref={headerRef} className="z-20 border-b border-rule-strong bg-panel px-4 pt-4 rail:sticky rail:top-0 rail:px-7 rail:pt-5">
             <div className="flex flex-wrap items-start gap-x-6 gap-y-3 pb-4">
@@ -31,17 +26,7 @@ export default function TopBar({ title, subtitle, titleRef, headerRef, children 
                     )}
                     {subtitle !== undefined && subtitle !== null && <p className="mt-1 max-w-[72ch] text-sm text-ink-2">{subtitle}</p>}
                 </div>
-                {user && (
-                    <nav aria-label={t('common.user_menu.label')} className="flex items-center gap-1 text-xs">
-                        <span className="mr-2 hidden text-ink-2 sm:inline">{t('common.user_menu.signed_in_as', { name: user.name })}</span>
-                        <Link href={securityEdit()} className="btn btn-quiet btn-sm">
-                            {t('common.user_menu.security')}
-                        </Link>
-                        <Link href={logout()} as="button" className="btn btn-secondary btn-sm">
-                            {t('common.user_menu.log_out')}
-                        </Link>
-                    </nav>
-                )}
+                {actions}
             </div>
             {children}
         </header>

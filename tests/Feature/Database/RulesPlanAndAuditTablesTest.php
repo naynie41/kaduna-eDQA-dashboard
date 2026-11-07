@@ -37,6 +37,26 @@ it('rejects an unknown dimension on plan actions', function (): void {
     expectCheckViolation(fn () => Rows::planAction(['dimension' => 'timeliness']), 'plan_actions_dimension_valid');
 });
 
+it('stores an owner as one of the configured roles, never free text (D-79)', function (string $role): void {
+    expect(Rows::planAction(['owner_role' => $role]))->toBeInt();
+})->with(['lga_me_officer', 'state_me_team', 'programme_manager']);
+
+it('lists the same roles in config as the CHECK holds', function (): void {
+    expect(config('edqa.plan.roles'))->toBe(['lga_me_officer', 'state_me_team', 'programme_manager'])
+        ->and(array_keys((array) __('plan.owners')))->toBe(config('edqa.plan.roles'));
+});
+
+it('rejects an owner role that is not a role', function (): void {
+    expectCheckViolation(fn () => Rows::planAction(['owner_role' => 'Dr A. Bello']), 'plan_actions_owner_role_valid');
+});
+
+it('keeps a personal contact apart, optional and admin-only', function (): void {
+    $id = Rows::planAction(['owner_contact' => 'Dr A. Bello, 0803 000 0000']);
+
+    expect(DB::table('plan_actions')->where('id', $id)->value('owner_contact'))->toBe('Dr A. Bello, 0803 000 0000')
+        ->and(DB::table('plan_actions')->where('id', Rows::planAction(['lga_id' => Rows::lga()]))->value('owner_contact'))->toBeNull();
+});
+
 it('rejects a second action for the same round, LGA and dimension', function (): void {
     $roundId = Rows::round();
     $lgaId = Rows::lga();
