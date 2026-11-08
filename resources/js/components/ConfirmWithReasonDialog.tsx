@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import PublicImpactNote from '@/components/PublicImpactNote';
 import { useTranslate } from '@/lib/i18n';
 
 export const REASON_MIN_LENGTH = 10;
@@ -18,6 +19,12 @@ export type ConfirmWithReasonDialogProps = {
     /** The confirm button in the danger style (reject, deactivate). */
     danger?: boolean;
     minLength?: number;
+    /**
+     * The action changes what the public dashboard shows (close or reopen a round, publish a rule
+     * version): a PublicImpactNote under the consequence, read with it. `true` for the general
+     * line, or the specific line itself.
+     */
+    publicImpact?: boolean | ReactNode;
 };
 
 const FOCUSABLE = 'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
@@ -41,9 +48,11 @@ export default function ConfirmWithReasonDialog({
     onClose,
     danger = false,
     minLength = REASON_MIN_LENGTH,
+    publicImpact = false,
 }: ConfirmWithReasonDialogProps) {
     const t = useTranslate();
-    const ids = { title: useId(), consequence: useId(), reason: useId(), hint: useId(), error: useId() };
+    const ids = { title: useId(), consequence: useId(), impact: useId(), reason: useId(), hint: useId(), error: useId() };
+    const hasImpact = publicImpact !== false && publicImpact !== null && publicImpact !== undefined;
     const dialogRef = useRef<HTMLDialogElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const openerRef = useRef<HTMLElement | null>(null);
@@ -153,7 +162,7 @@ export default function ConfirmWithReasonDialog({
         <dialog
             ref={dialogRef}
             aria-labelledby={ids.title}
-            aria-describedby={ids.consequence}
+            aria-describedby={hasImpact ? `${ids.consequence} ${ids.impact}` : ids.consequence}
             className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-panel border border-rule bg-panel p-0 text-ink shadow-overlay backdrop:bg-ink/45"
         >
             {open && (
@@ -164,6 +173,7 @@ export default function ConfirmWithReasonDialog({
                     <div id={ids.consequence} className="text-sm">
                         {consequence}
                     </div>
+                    {hasImpact && <PublicImpactNote id={ids.impact}>{publicImpact === true ? undefined : publicImpact}</PublicImpactNote>}
 
                     <div className="flex flex-col gap-1">
                         <label htmlFor={ids.reason} className="text-sm font-medium">

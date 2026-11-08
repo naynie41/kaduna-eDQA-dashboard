@@ -21,6 +21,7 @@ const META: Record<string, PageMeta> = {
     'admin/facilities': { title: 'admin.pages.facilities.title', subtitle: 'admin.pages.facilities.subtitle', dashboard: false },
     'admin/facility': { title: 'admin.pages.facility.title', subtitle: 'admin.pages.facility.subtitle', dashboard: false },
     'admin/scoring-rules': { title: 'admin.pages.scoring_rules.title', subtitle: 'admin.pages.scoring_rules.subtitle', dashboard: false },
+    'admin/audit': { title: 'admin.pages.audit.title', subtitle: 'admin.pages.audit.subtitle', dashboard: false },
     'settings/security': { title: 'auth.settings.title', dashboard: false },
     'dev/components': { title: 'common.pages.dev.title', dashboard: false },
 };
@@ -36,9 +37,13 @@ export const ADMIN_PAGES = [
     { page: 'rounds', key: 'rounds' },
     { page: 'facilities', key: 'facilities' },
     { page: 'scoring-rules', key: 'scoring_rules' },
+    { page: 'audit', key: 'audit' },
 ] as const;
 
 export type AdminPage = (typeof ADMIN_PAGES)[number]['page'];
+
+/** What the rail marks as current: an admin page, or My account (the security settings). */
+export type AdminRailCurrent = AdminPage | 'account';
 
 /** The dashboard pages in tab order. */
 export const DASHBOARD_PAGES = ['home', 'facility', 'lga', 'monitor', 'visuals', 'plan'] as const;

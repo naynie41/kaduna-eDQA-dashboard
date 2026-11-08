@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { checkA11y } from './support/a11y';
 
 // The admin layout (ARCHITECTURE.md §9.0–9.1, §9.3): /admin opens the Data sources page; the rail
-// lists the five pages and "View public dashboard" (no dashboard filters), and the sources' status
-// bar stays.
+// lists the six pages, My account and "View public dashboard", then Log out (no dashboard filters),
+// and the sources' status bar stays. Axe runs on each page at both viewports (360 and 1280).
 
 const PAGES = [
     { path: '/admin/sources', heading: 'Data sources' },
@@ -11,6 +11,7 @@ const PAGES = [
     { path: '/admin/rounds', heading: 'Rounds' },
     { path: '/admin/facilities', heading: 'Facility list' },
     { path: '/admin/scoring-rules', heading: 'Scoring rules' },
+    { path: '/admin/audit', heading: 'Audit log' },
 ];
 
 async function ready(page: Page, heading: string): Promise<void> {
@@ -41,7 +42,9 @@ test.describe('Administration shell', () => {
         await ready(page, 'Data sources');
         const tabs = page.getByRole('navigation', { name: 'Administration pages' });
 
-        await expect(tabs.getByRole('link')).toHaveCount(6); // five pages and the public dashboard
+        await expect(tabs.getByRole('link')).toHaveCount(8); // six pages, My account and the public dashboard
+        await expect(tabs.getByRole('link', { name: 'My account' })).toHaveAttribute('href', '/admin/settings/security');
+        await expect(tabs.getByRole('button', { name: 'Log out' })).toBeVisible(); // not pressed: the session is shared
         await expect(tabs.getByRole('link', { name: /^Data issues, \d+ open$/ })).toBeVisible();
         await expect(page.getByLabel('Year')).toHaveCount(0); // the dashboard's filter bar
         await expect(page.getByRole('status').filter({ hasText: /ODK Central|pull/ })).toBeVisible();

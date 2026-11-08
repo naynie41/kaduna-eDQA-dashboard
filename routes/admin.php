@@ -48,6 +48,8 @@ Route::inertia('facilities', 'admin/facilities')->name('facilities');
 // trail, the source and its link, and corrections. ?round= picks the round.
 Route::get('facilities/{facility}', AdminFacilityController::class)->whereNumber('facility')->name('facilities.show');
 Route::inertia('scoring-rules', 'admin/scoring-rules')->name('scoring-rules');
+// Audit log: a placeholder until its step builds it (every write is already in activity_log).
+Route::inertia('audit', 'admin/audit')->name('audit');
 
 // Password change (SECURITY.md §2): accounts themselves are managed by artisan commands.
 Route::redirect('settings', '/admin/settings/security')->name('settings');

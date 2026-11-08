@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 import { sendJson, type ApiErrorBody } from '@/lib/api';
 import { useTranslate } from '@/lib/i18n';
+import { goTo } from '@/lib/navigate';
+
+/** Where a 401/419 sends the administrator: the sign-in page, which then says the session expired. */
+export const SESSION_EXPIRED_URL = '/login?expired=1';
 
 export type ApiActionResult<T> =
     | { ok: true; data: T }
@@ -24,7 +28,8 @@ export type ApiAction<T> = {
  *
  * - 422: the field errors, and a summary line;
  * - 409: the domain refusal's message (written in the lang files on the server: `{ code, message }`);
- * - 419 / 401 / 403: the session ended or the action is not allowed;
+ * - 401 / 419: the session ended: a full load of /login?expired=1, which says so;
+ * - 403: the action is not allowed;
  * - 429: too many requests;
  * - anything else, or no answer: a general message.
  */
@@ -68,6 +73,10 @@ export function useApiAction<T = unknown>(): ApiAction<T> {
                     const response = await sendJson<T>(method, url, body);
                     if (response.ok) {
                         return { ok: true, data: response.data };
+                    }
+                    if (response.status === 401 || response.status === 419) {
+                        // The session ended (or its CSRF token went with it): sign in again, told why.
+                        goTo(SESSION_EXPIRED_URL);
                     }
                     const fields = Object.fromEntries(
                         Object.entries(response.body.errors ?? {}).flatMap(([field, messages]) => (messages[0] === undefined ? [] : [[field, messages[0]]])),

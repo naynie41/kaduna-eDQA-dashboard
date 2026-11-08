@@ -5,8 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminRail from '@/components/AdminRail';
 import ConfirmWithReasonDialog, { type ConfirmOutcome } from '@/components/ConfirmWithReasonDialog';
 import ProgressPanel, { type ProgressStage } from '@/components/ProgressPanel';
+import PublicImpactNote from '@/components/PublicImpactNote';
 import SourceTag from '@/components/SourceTag';
 import StaleIngestionBanner from '@/components/StaleIngestionBanner';
+import { goTo } from '@/lib/navigate';
+import { useApiAction } from '@/lib/useApiAction';
 import { axeCheck, renderUi, testTranslations } from '@/test/render';
 
 const announce = vi.fn();
@@ -14,6 +17,7 @@ vi.mock('@/components/Announcer', async (original) => ({
     ...(await original<typeof import('@/components/Announcer')>()),
     useAnnounce: () => announce,
 }));
+vi.mock('@/lib/navigate', () => ({ goTo: vi.fn() }));
 
 const translations = {
     ...testTranslations,
@@ -280,13 +284,15 @@ const shellTranslations = {
     ...translations,
     admin: {
         tabs: { label: 'Administration pages', data_issues_open: ':label, :count open' },
-        rail: { view_public: 'View public dashboard' },
+        rail: { view_public: 'View public dashboard', account: 'My account', log_out: 'Log out' },
+        public_impact: { label: 'Public dashboard:', text: 'this changes what the public dashboard shows.' },
         pages: {
             sources: { title: 'Data sources' },
             data_issues: { title: 'Data issues' },
             rounds: { title: 'Rounds' },
             facilities: { title: 'Facility list' },
             scoring_rules: { title: 'Scoring rules' },
+            audit: { title: 'Audit log' },
         },
         stale: {
             title: 'No successful pull for over :hours hours',
@@ -299,17 +305,110 @@ const shellTranslations = {
 };
 
 describe('AdminRail', () => {
-    it('lists the five pages and the public dashboard, the current one marked, and says the open count in the Data issues name', async () => {
+    it('lists the six pages, My account and the public dashboard, then Log out; the current one marked, the open count in the Data issues name', async () => {
         const { container } = renderUi(<AdminRail current="rounds" openIssueCount={12} assessments={2184} />, shellTranslations);
 
         const nav = screen.getByRole('navigation', { name: 'Administration pages' });
         expect(within(nav).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-            '/admin/sources', '/admin/data-issues', '/admin/rounds', '/admin/facilities', '/admin/scoring-rules', '/',
+            '/admin/sources', '/admin/data-issues', '/admin/rounds', '/admin/facilities', '/admin/scoring-rules', '/admin/audit',
+            '/admin/settings/security', '/',
         ]);
-        expect(screen.getByRole('link', { name: 'View public dashboard' })).toBeTruthy();
+        expect(within(nav).getByRole('link', { name: 'Audit log' })).toBeTruthy();
+        expect(within(nav).getByRole('link', { name: 'My account' })).toBeTruthy();
+        expect(within(nav).getByRole('link', { name: 'View public dashboard' })).toBeTruthy();
+        expect(within(nav).getByRole('button', { name: 'Log out' })).toBeTruthy();
         expect(screen.getByRole('link', { name: 'Data issues, 12 open' })).toBeTruthy();
         expect(screen.getByRole('link', { name: 'Rounds' }).getAttribute('aria-current')).toBe('page');
         expect(await axeCheck(container)).toHaveNoViolations();
+    });
+
+    it('marks My account as the current page on the security settings', () => {
+        renderUi(<AdminRail current="account" openIssueCount={0} assessments={null} />, shellTranslations);
+
+        expect(screen.getByRole('link', { name: 'My account' }).getAttribute('aria-current')).toBe('page');
+        expect(screen.getByRole('link', { name: 'Rounds' }).getAttribute('aria-current')).toBeNull();
+    });
+});
+
+describe('PublicImpactNote', () => {
+    it('says in words, with a mark, that the action changes the public dashboard', async () => {
+        const { container } = renderUi(<PublicImpactNote />, shellTranslations);
+
+        expect(container.textContent).toBe('Public dashboard: this changes what the public dashboard shows.');
+        // The mark is decoration: the words carry the meaning.
+        expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull();
+        expect(await axeCheck(container)).toHaveNoViolations();
+    });
+
+    it('takes a more specific line when the action needs one', () => {
+        const { container } = renderUi(<PublicImpactNote>Closing Q3 2026 publishes its figures.</PublicImpactNote>, shellTranslations);
+
+        expect(container.textContent).toBe('Public dashboard: Closing Q3 2026 publishes its figures.');
+    });
+
+    it('is read with the dialog it sits in, after the consequence', async () => {
+        const { container } = renderUi(
+            <ConfirmWithReasonDialog
+                open
+                title="Close Q3 2026?"
+                consequence="Its scores are fixed."
+                confirmLabel="Close round"
+                publicImpact
+                onConfirm={async () => ({ ok: true })}
+                onClose={() => undefined}
+            />,
+            shellTranslations,
+        );
+
+        const dialog = screen.getByRole('dialog', { name: 'Close Q3 2026?' });
+        expect(description(dialog)).toBe('Its scores are fixed. Public dashboard: this changes what the public dashboard shows.');
+        expect(await axeCheck(container)).toHaveNoViolations();
+    });
+
+    it('is left out of a dialog whose action the public never sees', () => {
+        renderUi(<Harness onConfirm={async () => ({ ok: true })} />, shellTranslations);
+
+        expect(screen.queryByText(/public dashboard shows/)).toBeNull();
+    });
+});
+
+describe('useApiAction', () => {
+    function Probe({ url }: { url: string }) {
+        const action = useApiAction();
+
+        return (
+            <>
+                <button type="button" onClick={() => void action.run('POST', url)} disabled={action.pending}>
+                    Send
+                </button>
+                {action.error !== null && <p role="alert">{action.error}</p>}
+            </>
+        );
+    }
+
+    const answer = (status: number, message: string) =>
+        vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message }), { status, headers: { 'Content-Type': 'application/json' } })));
+
+    beforeEach(() => vi.mocked(goTo).mockClear());
+    afterEach(() => vi.unstubAllGlobals());
+
+    it.each([401, 419])('sends the administrator to /login saying the session expired, on %i', async (status) => {
+        answer(status, 'Unauthenticated.');
+        renderUi(<Probe url="/admin/api/rounds/1/close" />, translations);
+
+        await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+        await waitFor(() => expect(goTo).toHaveBeenCalledWith('/login?expired=1'));
+    });
+
+    it('keeps a 403 on the page, as a refusal, without leaving it', async () => {
+        answer(403, 'Forbidden');
+        renderUi(<Probe url="/admin/api/rounds/1/close" />, { ...translations, common: { ...translations.common, api: { forbidden: 'You cannot do this.' } } });
+
+        await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+        expect((await screen.findByRole('alert')).textContent).toBe('You cannot do this.');
+        expect(goTo).not.toHaveBeenCalled();
     });
 });
 

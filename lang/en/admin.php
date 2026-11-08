@@ -16,6 +16,15 @@ return [
 
     'rail' => [
         'view_public' => 'View public dashboard',
+        'account' => 'My account',
+        'log_out' => 'Log out',
+    ],
+
+    // PublicImpactNote: one line in a dialog whose action changes what the public dashboard shows
+    // (close or reopen a round, publish a rule version). The label is the text's lead, not a colour.
+    'public_impact' => [
+        'label' => 'Public dashboard:',
+        'text' => 'this changes what the public dashboard shows.',
     ],
 
     'tabs' => [
@@ -48,6 +57,10 @@ return [
         'scoring_rules' => [
             'title' => 'Scoring rules',
             'subtitle' => 'Bands, item weights and the N/A policy, versioned.',
+        ],
+        'audit' => [
+            'title' => 'Audit log',
+            'subtitle' => 'Every change made in the portal: who, when, what it was before and after, and why.',
         ],
     ],
 
@@ -602,14 +615,8 @@ return [
         'source_not_configured' => ':source is not connected yet, so there is no link.',
     ],
 
-    // The admin layout's account menu and per-source status bar (ARCHITECTURE.md §9.1): never sent
-    // with a visitor's page.
-    'user_menu' => [
-        'label' => 'Account',
-        'signed_in_as' => 'Signed in as :name',
-        'security' => 'Security settings',
-        'log_out' => 'Log out',
-    ],
+    // The admin layout's per-source status bar (ARCHITECTURE.md §9.1): never sent with a visitor's
+    // page. (My account and Log out are in the rail.)
     'sync' => [
         'label' => 'Data sources',
         'not_configured' => ':source is not configured',

@@ -6,7 +6,7 @@ export type PublicFooterProps = {
     updatedAt: string | null;
 };
 
-/** The public site's footer (ARCHITECTURE.md §9.1): "Support: HSDF" and "Figures last updated {date}". */
+/** The public site's footer (ARCHITECTURE.md §9.1): "Support: LAFIYA" and "Figures last updated {date}". */
 export default function PublicFooter({ updatedAt }: PublicFooterProps) {
     const t = useTranslate();
     const months = useTranslationList('common.months_short');

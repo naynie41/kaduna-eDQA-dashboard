@@ -23,6 +23,7 @@ return [
         'intro' => 'Sign in with your administrator account.',
         'submit' => 'Sign in',
         'forgot' => 'Forgotten your password?',
+        'session_expired' => 'Your session has expired. Sign in again to carry on.',
     ],
 
     'forgot' => [

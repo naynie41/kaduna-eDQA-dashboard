@@ -43,6 +43,21 @@ it('sends no source status, admin counts or admin strings to a visitor', functio
         ->not->toContain('"facility_view"')->not->toContain('"user_menu"');
 });
 
+it('never shares the open-issue count or the admin props with an anonymous request', function (string $path): void {
+    $response = $this->get($path);
+
+    expect((string) $response->getContent())->not->toContain('openIssueCount')->not->toContain('staleIngestion')->not->toContain('"admin":');
+})->with(['/', '/facilities', '/lgas', '/monitor', '/visuals', '/plan', '/api/public/aggregates', '/api/public/facilities', '/api/public/status', '/login', '/forgot-password', '/no-such-page']);
+
+it('does not share the count with a partial reload of a public page either', function (): void {
+    $first = $this->get('/monitor')->assertOk();
+    $version = (string) ($first->viewData('page')['version'] ?? '');
+
+    $partial = $this->get('/monitor', ['X-Inertia' => 'true', 'X-Inertia-Version' => $version, 'X-Inertia-Partial-Component' => 'dashboard/monitor', 'X-Inertia-Partial-Data' => 'admin,shell']);
+
+    expect($partial->json('props'))->not->toHaveKey('admin')->not->toHaveKey('shell');
+});
+
 it('gives the admin preview the administrator, but not the source status', function (): void {
     $admin = User::factory()->create(['name' => 'Amina Bello']);
 

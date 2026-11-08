@@ -31,7 +31,7 @@ test.describe('As a visitor', () => {
             await expect(page.getByRole('navigation', { name: 'Account' })).toHaveCount(0);
             const hrefs = await page.locator('a[href]').evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''));
             expect(hrefs.filter((href) => /^\/(login|admin)(\/|$|\?)/.test(href))).toEqual([]);
-            await expect(page.getByRole('contentinfo')).toContainText('Support: HSDF');
+            await expect(page.getByRole('contentinfo')).toContainText('Support: LAFIYA');
             await checkA11y(page);
         });
     }

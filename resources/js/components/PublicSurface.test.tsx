@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react';
 import { screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import AccountMenu from '@/components/AccountMenu';
 import PublicLayout from '@/layouts/PublicLayout';
 import Login from '@/pages/auth/login';
+import Monitor from '@/pages/dashboard/monitor';
 import { axeCheck, renderUi, testTranslations } from '@/test/render';
 import type { Translations } from '@/lib/i18n';
 
@@ -17,7 +18,7 @@ const translations: Translations = {
     common: {
         ...(testTranslations.common as Record<string, unknown>),
         skip_to_content: 'Skip to content',
-        shell: { seal: 'KD', brand: 'eDQA e-tool', brand_place: 'Kaduna State', assessments_label: 'assessments', support: 'Support: HSDF' },
+        shell: { seal: 'KD', brand: 'eDQA e-tool', brand_place: 'Kaduna State', assessments_label: 'assessments', support: 'Support: LAFIYA' },
     },
     dashboard: {
         pages: { home: { title: 'Home', subtitle: ':count facilities' }, facility: { title: 'Facility view' }, lga: { title: 'LGA view' }, monitor: { title: 'Monitor' }, visuals: { title: 'Visuals' }, plan: { title: 'Implementation plan' } },
@@ -33,7 +34,6 @@ const translations: Translations = {
     },
     admin: {
         preview: { label: 'Admin preview', text: 'Admin preview — includes the open round', back: 'Back to admin' },
-        user_menu: { label: 'Account', signed_in_as: 'Signed in as :name', security: 'Security settings', log_out: 'Log out' },
     },
     auth: {
         fields: { email: 'Email address', password: 'Password' },
@@ -58,7 +58,8 @@ const page = vi.hoisted(() => ({
 vi.mock('@inertiajs/react', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@inertiajs/react')>();
 
-    return { ...actual, Head: () => null, usePage: () => page };
+    // Deferred blocks show their loading fallback: what matters here is which blocks exist.
+    return { ...actual, Head: () => null, usePage: () => page, Deferred: ({ fallback }: { fallback: ReactNode }) => fallback };
 });
 
 function signIn(): void {
@@ -90,7 +91,7 @@ describe('PublicLayout', () => {
         expect(screen.getByRole('navigation', { name: 'Dashboard pages' })).toBeTruthy();
         expect(screen.getByRole('main').textContent).toContain('Page body');
         const footer = screen.getByRole('contentinfo');
-        expect(footer.textContent).toContain('Support: HSDF');
+        expect(footer.textContent).toContain('Support: LAFIYA');
         expect(footer.textContent).toContain('Figures last updated 3 Apr 2026');
         expect(screen.queryByRole('region', { name: 'Admin preview' })).toBeNull();
         expect(hrefs().some((href) => href.startsWith('/admin') || href.startsWith('/login'))).toBe(false);
@@ -119,28 +120,33 @@ describe('PublicLayout', () => {
     });
 });
 
-describe('AccountMenu', () => {
-    it('shows nothing to a visitor', () => {
-        const { container } = renderUi(<AccountMenu />, translations);
-
-        expect(container.textContent).toBe('');
-    });
-
-    it('offers a signed-in administrator the security settings and log out', () => {
-        signIn();
-        renderUi(<AccountMenu />, translations);
-
-        const account = screen.getByRole('navigation', { name: 'Account' });
-        expect(within(account).getByRole('link', { name: 'Security settings' }).getAttribute('href')).toBe('/admin/settings/security');
-        expect(within(account).getByRole('button', { name: 'Log out' })).toBeTruthy();
-    });
-});
-
 describe('Login page', () => {
     it('links to nothing but "Forgot password"', () => {
         renderUi(<Login />, translations);
 
         expect(hrefs()).toEqual(['/forgot-password']);
         expect(screen.getByRole('link', { name: 'Forgotten your password?' })).toBeTruthy();
+    });
+});
+
+describe('Monitor', () => {
+    const monitorTranslations: Translations = {
+        ...translations,
+        dashboard: { ...(translations.dashboard as Record<string, unknown>), monitor: { sources_title: 'Counts by source', sources_description: 'Assessments in view by source.' } },
+    };
+
+    // D-81: the counts by source are the admin preview's only; the server never sends them to a
+    // visitor, so a visitor's page must not show the panel (it would wait for them for ever).
+    it('shows a visitor no counts-by-source panel, and nothing left loading for it', () => {
+        renderUi(<Monitor />, monitorTranslations);
+
+        expect(screen.queryByRole('heading', { name: 'Counts by source' })).toBeNull();
+    });
+
+    it('shows the admin preview the counts-by-source panel', () => {
+        signIn();
+        renderUi(<Monitor />, monitorTranslations);
+
+        expect(screen.getByRole('heading', { name: 'Counts by source' })).toBeTruthy();
     });
 });

@@ -14,7 +14,8 @@ const TONE: Record<Band, string> = {
     needs_action: 'bg-bad-bg text-bad',
 };
 
-const NO_DATA_TONE = 'bg-wash text-ink-2';
+// Ink, not ink-2: ink-2 on wash is about 4.3:1, under AA's 4.5:1 for this small text.
+const NO_DATA_TONE = 'bg-wash text-ink';
 
 /** A score with its band, both as text. Renders the server's values as they are. */
 export default function ScoreTag({ score }: ScoreTagProps) {

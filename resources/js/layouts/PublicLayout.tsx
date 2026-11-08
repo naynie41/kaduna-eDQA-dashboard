@@ -20,7 +20,7 @@ export type PublicLayoutProps = {
 /**
  * The public dashboard's layout (ARCHITECTURE.md §9.0–9.1): skip link, the header with the KD seal
  * and "eDQA e-tool / Kaduna State", for a signed-in administrator the admin preview bar, the sticky
- * top bar (title, filters, page tabs), <main id="main">, and the footer ("Support: HSDF", figures
+ * top bar (title, filters, page tabs), <main id="main">, and the footer ("Support: LAFIYA", figures
  * last updated). No Administration link, no login link, no export button (D-78, D-80).
  */
 export default function PublicLayout({ children }: PublicLayoutProps) {

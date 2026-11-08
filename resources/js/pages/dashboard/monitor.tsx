@@ -20,7 +20,11 @@ import type { AssessmentWindow, Coverage, GroupScores, MonitorProps, SourceCount
  */
 export default function Monitor({ owners, coverage, windows, sources, overall }: MonitorProps) {
     const t = useTranslate();
-    const owner = usePage().props.filters?.owner ?? null;
+    const { filters, auth } = usePage().props;
+    const owner = filters?.owner ?? null;
+    // The counts by source are the admin preview's only (D-81): the server sends them to a
+    // signed-in administrator alone, so a visitor's page has no panel waiting for them.
+    const showSources = auth.user !== null;
     // All facilities in view, public and private together; the Owner filter narrows it to one.
     const all: GroupScores | undefined =
         overall === undefined
@@ -73,14 +77,16 @@ export default function Monitor({ owners, coverage, windows, sources, overall }:
                         </div>
                     </Panel>
 
-                    <Panel labelledBy="monitor-sources" className="overflow-hidden">
-                        <PanelHeader id="monitor-sources" title={t('dashboard.monitor.sources_title')} description={t('dashboard.monitor.sources_description')} />
-                        <div className="mt-2">
-                            <Deferred data="sources" fallback={<Skeleton className="m-5 h-[80px]" />}>
-                                {sources !== undefined && <SourceTable sources={sources} />}
-                            </Deferred>
-                        </div>
-                    </Panel>
+                    {showSources && (
+                        <Panel labelledBy="monitor-sources" className="overflow-hidden">
+                            <PanelHeader id="monitor-sources" title={t('dashboard.monitor.sources_title')} description={t('dashboard.monitor.sources_description')} />
+                            <div className="mt-2">
+                                <Deferred data="sources" fallback={<Skeleton className="m-5 h-[80px]" />}>
+                                    {sources !== undefined && <SourceTable sources={sources} />}
+                                </Deferred>
+                            </div>
+                        </Panel>
+                    )}
                 </div>
             </div>
         </div>

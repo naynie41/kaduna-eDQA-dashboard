@@ -7,6 +7,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Admin shell, extended (Phase 5 step 0, D-85).**
+  - The rail now has **Audit log** (a placeholder page until it is built), **My account** (the
+    password page) and **Log out**, after the five pages and before "View public dashboard". The
+    top-bar account menu is gone.
+  - When an admin action answers 401 or 419, the administrator is sent to `/login`, which says the
+    session has expired.
+  - `PublicImpactNote`: a one-line notice ("Public dashboard: this changes what the public
+    dashboard shows.") that `ConfirmWithReasonDialog` shows with `publicImpact`. Closing and
+    reopening rounds and publishing rule versions will use it.
+  - Tests: the open-issue count is never shared with an anonymous request (public pages, public
+    JSON, sign-in screens, a 404, a partial reload). Playwright runs axe on the Audit log page at
+    360 and 1280 px.
+
+### Changed
+
+- The footer now reads "Support: LAFIYA" (was HSDF), on the public site and in the admin rail.
+
+### Fixed
+
+- **Monitor, public:** a visitor's page no longer shows a "Counts by source" panel that loads for
+  ever. The counts are the admin preview's only (D-81), so the panel now appears only there.
+- **Contrast:** the "No data" score tag (Visuals rankings, LGA tables) and an overridden flag's tag
+  used grey text on the wash background at about 4.3:1, under WCAG AA's 4.5:1. They now use the body
+  ink colour. Both showed up once a closed round had data.
+
 ## [0.7.0] - 2026-11-07
 
 The public dashboard (Phase P, D-76–D-84): anyone can read the six dashboard pages without

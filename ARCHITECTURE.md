@@ -849,7 +849,7 @@ Visual design tokens are in `CONVENTION.md` §6; accessibility rules in `ACCESSI
 ### 9.1 Layout shell
 
 - **Public shell:** header with KD seal and "eDQA e-tool / Kaduna State"; footer with
-  "Support: HSDF" and the figures-last-updated line. No Administration or login link.
+  "Support: LAFIYA" and the figures-last-updated line. No Administration or login link.
 - **Admin shell:** left **rail** (210px, `--color-rail`) with the admin pages and "View public
   dashboard". Collapses to a horizontal bar under 760px.
 - **Admin status bar** above the top bar: sync state across sources (worst state wins; each source named) — green "Last pull 4 min ago · 2,184
@@ -924,7 +924,7 @@ round-over-round sparkline. Nothing from SECURITY.md §3.1.
 flags, attachments (admin URLs), correction audit trail, the source (ODK Central or
 KoboToolbox), instance ID and deep link, and "Correct this assessment".
 
-### 9.3 Administration pages (five)
+### 9.3 Administration pages (five, plus the Audit log)
 
 | Page | Replaces prototype tab | Content |
 |---|---|---|
@@ -933,8 +933,11 @@ KoboToolbox), instance ID and deep link, and "Correct this assessment".
 | **Rounds** | — (new) | List, create (year, quarter, window), close, reopen with reason |
 | **Facility list** | "Facility list" | Search, inline edit, deactivate (not delete), **Regenerate facility media file** (attach to the form on both sources) |
 | **Scoring rules** | "Scoring rules" | Band thresholds, item weights, N/A policy; draft → preview band changes → publish with reason |
+| **Audit log** | — (new) | Every audited write (SECURITY.md §4). A placeholder page until its step builds it (D-85) |
 
-The admin tab shows a red badge with the open quarantine count.
+The rail lists these six pages, then **My account** (the password page, `/admin/settings/security`),
+"View public dashboard" and **Log out** (D-85). The Data issues tab shows a badge with the open
+issues: open quarantine records plus deletions at source not yet reviewed ("Data issues, 12 open").
 
 
 ---
@@ -1053,6 +1056,7 @@ blocks use Inertia 2 deferred props; charts are `React.lazy`; fonts self-hosted 
 | D-82 | `noindex` everywhere until the client decides | Avoid search exposure before sign-off |
 | D-83 | Separate public resources + a leak test over every public route | The main new risk is private fields leaking through shared resources |
 | D-84 | **No multi-factor authentication anywhere** (client decision). Compensating controls: stronger passwords, progressive lockout, new-device login emails, optional IP allow-list, shorter idle timeout (SECURITY.md §2) | Client decision; the remaining controls are documented so the residual risk is visible |
+| D-85 | **Admin shell, extended (Phase 5 step 0, after Phase P).** Amends D-55. The rail adds **Audit log** (`/admin/audit`, a placeholder until built: D-55 had held the tab back) and **My account** (the existing password page), and takes **Log out**; the top-bar account menu goes, so there is one place for each. **`useApiAction`**: a 401 or 419 is a full page load of `/login?expired=1`, and the sign-in page then says "Your session has expired" (a fixed line from `lang/en/auth.php`; the query value is never echoed). A 403 stays on the page as a refusal. **`PublicImpactNote`**: one line ("Public dashboard: this changes what the public dashboard shows."), its words carrying it and the mark decorative, shown by `ConfirmWithReasonDialog` with `publicImpact` and read in the dialog's description after the consequence. No current dialog sets it: corrections, withdrawals and replacements are refused in a closed round (D-32), so they never change public figures. Closing and reopening a round and publishing a rule version will set it when those pages are built. The badge and the stale-ingestion banner stand as built: the badge counts open quarantine plus unreviewed deletions, flushed on `SubmissionQuarantined`, `QuarantineResolved`, `SourceDeletionDetected` and `DeletionReviewed`; the banner names every enabled source with no successful pull in 24 h while a round is open, whether ODK Central or KoboToolbox | Prompt for Phase 5 step 0 after the public split; one shell (D-76) |
 
 Add new decisions here with the next ID. Any new Composer/npm package needs a line.
 

@@ -29,6 +29,7 @@ const ADMIN_PAGES = [
     'rounds' => 'admin/rounds',
     'facilities' => 'admin/facilities',
     'scoring-rules' => 'admin/scoring-rules',
+    'audit' => 'admin/audit',
 ];
 
 function configureOdk(): void
@@ -45,6 +46,15 @@ function shellConfigureKobo(): void
 
 it('redirects /admin to the Data sources page', function (): void {
     $this->actingAs($this->admin)->get('/admin')->assertRedirect('/admin/sources');
+});
+
+it('tells an administrator sent back to sign in that the session expired, and nothing otherwise', function (): void {
+    $this->get('/login?expired=1')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('auth/login')
+        ->where('status', 'Your session has expired. Sign in again to carry on.'));
+
+    $this->get('/login')->assertInertia(fn (Assert $page) => $page->where('status', null));
+    $this->get('/login?expired=<script>')->assertInertia(fn (Assert $page) => $page->where('status', null));
 });
 
 it('serves each admin page with the admin props and strings, and no dashboard filters', function (string $path, string $component): void {

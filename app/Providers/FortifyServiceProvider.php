@@ -68,8 +68,10 @@ final class FortifyServiceProvider extends ServiceProvider
 
     private function configureViews(): void
     {
+        // ?expired=1: an admin action answered 401/419 and useApiAction sent the administrator here.
+        // A fixed line from the lang file; the query value itself is never shown.
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/login', [
-            'status' => $request->session()->get('status'),
+            'status' => $request->query('expired') === '1' ? __('auth.login.session_expired') : $request->session()->get('status'),
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [

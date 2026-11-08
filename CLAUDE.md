@@ -33,7 +33,7 @@ A Laravel + PostgreSQL application replacing the Kaduna State eDQA Looker Studio
    login) and a **separate admin area** under `/admin`, reached only by typing `/login`.
 
 ~2,200 facilities, 23 LGAs, quarterly rounds, three dimensions (Availability, Consistency,
-Validity) × three month slots. Publication support from HSDF.
+Validity) × three month slots. Publication support from LAFIYA.
 
 > **A score that cannot be true never reaches a chart.**
 > Validation is the ingestion gate, not a report feature.

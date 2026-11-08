@@ -64,7 +64,7 @@ return [
         'brand' => 'eDQA e-tool',
         'brand_place' => 'Kaduna State',
         'assessments_label' => 'assessments recorded',
-        'support' => 'Support: HSDF',
+        'support' => 'Support: LAFIYA',
         'title' => ':page · :app',
     ],
     // The status bar (ARCHITECTURE.md §9.1): one phrase per source, worst first, then the counts.

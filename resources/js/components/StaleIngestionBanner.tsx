@@ -9,9 +9,10 @@ export type StaleIngestionBannerProps = {
 };
 
 /**
- * SECURITY.md §12 on every admin page: a round is open and no ODK pull has succeeded for a day
- * (or ever). It says so in words and links to the ODK pull page; the shape and the words carry
- * it, not the colour alone. Nothing renders while ingestion is current.
+ * SECURITY.md §12 on every admin page: a round is open and an enabled source (ODK Central or
+ * KoboToolbox) has had no successful pull for a day, or ever. It names each such source and links
+ * to the Data sources page; the shape and the words carry it, not the colour alone. Nothing
+ * renders while ingestion is current.
  */
 export default function StaleIngestionBanner({ stale }: StaleIngestionBannerProps) {
     const t = useTranslate();

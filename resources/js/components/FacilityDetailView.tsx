@@ -122,7 +122,7 @@ export default function FacilityDetailView({ detail, onCorrected }: FacilityDeta
                             <li key={flag.code} className="rounded-md border border-rule bg-panel px-3 py-2 text-sm">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="font-medium">{flag.label}</span>
-                                    <span className={`rounded-full px-2 py-0.5 text-2xs font-semibold ${flag.overridden === null ? 'bg-warn-bg text-warn' : 'bg-wash text-ink-2'}`}>
+                                    <span className={`rounded-full px-2 py-0.5 text-2xs font-semibold ${flag.overridden === null ? 'bg-warn-bg text-warn' : 'bg-wash text-ink'}`}>
                                         {flag.overridden === null ? t('admin.facility_view.flag_open') : t('admin.facility_view.flag_overridden')}
                                     </span>
                                 </div>
