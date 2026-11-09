@@ -17,7 +17,7 @@ use RuntimeException;
  * Writes the data of the two local mocks (docker/odk-mock, docker/kobo-mock) for
  * edqa:source-mock:generate. Local development and tests only.
  *
- * - ODK Central: MockSubmissionGenerator's OData entries, as edqa:odk-mock:generate writes them.
+ * - ODK Central: MockSubmissionGenerator's OData entries; --quarters spreads them over a span.
  * - KoboToolbox: the same mix (MockSubmissionGenerator, then each entry rewritten as a KPI v2 data
  *   row: flat "group/question" keys, every answer as text, the XForms geopoint text, _id,
  *   _submission_time with no zone, __version__ the deployment uid mapped to the same field map,
@@ -54,6 +54,17 @@ final class SourceMockGenerator
         $this->writeOverlap($source, $overlapRows, $seed);
 
         return $written;
+    }
+
+    /**
+     * The ODK mock spread over several quarters, each with its form version (the backfill, §5.6).
+     *
+     * @param  list<array{0: Round, 1: string}>  $periods
+     * @return array<string, int> entries written, by kind
+     */
+    public function generateOdkSpan(int $count, int $broken, array $periods, int $seed): array
+    {
+        return (new MockSubmissionGenerator($this->odkDir, $this->facilityCodes('kobo')))->generateSpan($count, $broken, $periods, $seed);
     }
 
     public function applyEdits(string $source): void

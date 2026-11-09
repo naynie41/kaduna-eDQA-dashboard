@@ -10,7 +10,7 @@ use App\Http\Requests\Submissions\ReviewDeletionRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 
-/** "Withdraw assessment" and "Restore" on the Data issues page's Deleted at source tab (D-24): a reason each. */
+/** "Withdraw assessment" and "Restore" on the Data issues page's Deleted at source tab (D-62): a reason each. */
 final class AssessmentStatusController extends Controller
 {
     public function withdraw(ReviewDeletionRequest $request, int $assessment, WithdrawAssessment $action): JsonResponse

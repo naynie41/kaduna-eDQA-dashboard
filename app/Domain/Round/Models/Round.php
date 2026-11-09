@@ -7,6 +7,7 @@ namespace App\Domain\Round\Models;
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Plan\Models\PlanAction;
 use App\Domain\Round\Enums\RoundStatus;
+use App\Domain\Round\Support\RoundLabel;
 use App\Domain\Scoring\Models\ScoringRuleVersion;
 use App\Domain\Validation\Models\QuarantinedRecord;
 use App\Support\Audit\Audited;
@@ -58,6 +59,12 @@ final class Round extends Model
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
+    }
+
+    /** "Q2 2026" (RoundLabel). */
+    public function label(): string
+    {
+        return RoundLabel::of($this->year, $this->quarter);
     }
 
     /**

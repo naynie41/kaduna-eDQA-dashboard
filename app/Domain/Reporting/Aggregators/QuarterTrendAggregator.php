@@ -51,7 +51,7 @@ final class QuarterTrendAggregator
                     roundId: $round->id,
                     year: $round->year,
                     quarter: $round->quarter,
-                    label: (string) __('reporting.round_label', ['quarter' => (string) $round->quarter, 'year' => (string) $round->year]),
+                    label: $round->label(),
                     overall: Scores::of($row?->overall, $rules),
                     public: Scores::of($row?->public, $rules),
                     private: Scores::of($row?->private, $rules),

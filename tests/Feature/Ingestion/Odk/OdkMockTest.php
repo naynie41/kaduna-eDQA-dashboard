@@ -65,7 +65,7 @@ afterEach(function (): void {
 });
 
 it('writes the mix asked for: broken, flagged, edits and photos, for facilities not yet visited', function (): void {
-    $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 10])
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--count' => 60, '--broken' => 10])
         ->expectsOutputToContain('Wrote 47 valid, 2 to be flagged and 10 to be quarantined, plus 1 edits (staged) and 2 photo(s)')
         ->assertSuccessful();
 
@@ -76,7 +76,7 @@ it('writes the mix asked for: broken, flagged, edits and photos, for facilities 
 });
 
 it('serves them through the real source, and the pipeline holds exactly the broken ones', function (): void {
-    $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 10])->assertSuccessful();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--count' => 60, '--broken' => 10])->assertSuccessful();
     $source = app(SourceRegistry::class)->adapter('odk');
     $parser = app(SubmissionParser::class);
 
@@ -105,7 +105,7 @@ it('serves them through the real source, and the pipeline holds exactly the brok
 });
 
 it('answers ping, the versions and the attachments like Central', function (): void {
-    $this->artisan('edqa:odk-mock:generate', ['--count' => 30, '--broken' => 0])->assertSuccessful();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--count' => 30, '--broken' => 0])->assertSuccessful();
     $source = app(SourceRegistry::class)->adapter('odk');
 
     $ping = $source->ping();
@@ -124,7 +124,7 @@ it('answers ping, the versions and the attachments like Central', function (): v
 });
 
 it('filters on submissionDate, pages, and refuses a wrong password or form', function (): void {
-    $this->artisan('edqa:odk-mock:generate', ['--count' => 40, '--broken' => 0])->assertSuccessful();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--count' => 40, '--broken' => 0])->assertSuccessful();
     $source = app(SourceRegistry::class)->adapter('odk');
     $all = $source->submissionsPage(null, 100, 0)->rows;
     $dates = array_map(fn (array $r): string => $r['__system']['submissionDate'], $all);
@@ -144,12 +144,12 @@ it('filters on submissionDate, pages, and refuses a wrong password or form', fun
 });
 
 it('shows an edit only once applied: same __id, a new instance ID that deprecates the old one', function (): void {
-    $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 0])->assertSuccessful();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--count' => 60, '--broken' => 0])->assertSuccessful();
     $source = app(SourceRegistry::class)->adapter('odk');
     $edit = json_decode((string) file_get_contents(glob($this->mock.'/edits/*.json')[0]), true);
 
     $before = collect($source->submissionsPage(null, 100, 0)->rows)->firstWhere('__id', $edit['__id']);
-    $this->artisan('edqa:odk-mock:generate', ['--apply-edits' => true])->expectsOutputToContain('Edits applied')->assertSuccessful();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--edits' => true])->expectsOutputToContain('The staged edits are now visible')->assertSuccessful();
     $after = collect($source->submissionsPage(null, 100, 0)->rows)->firstWhere('__id', $edit['__id']);
 
     expect($before['meta'])->toBe(['instanceID' => $edit['__id']])
@@ -173,7 +173,7 @@ it('gives the same data for the same seed', function (): void {
 });
 
 it('writes an older version through its own field map, and the parser reads it back', function (): void {
-    $this->artisan('edqa:odk-mock:generate', ['--count' => 5, '--broken' => 0, '--form-version' => '2025.2'])->assertSuccessful();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--count' => 5, '--broken' => 0, '--form-version' => '2025.2'])->assertSuccessful();
     $raw = json_decode((string) file_get_contents(glob($this->mock.'/submissions/*.json')[0]), true);
 
     expect($raw)->toHaveKey('fac')->not->toHaveKey('facility')
@@ -182,16 +182,16 @@ it('writes an older version through its own field map, and the parser reads it b
 });
 
 it('refuses outside local and testing, and a round it cannot read', function (): void {
-    $this->artisan('edqa:odk-mock:generate', ['--round' => 'Q2-2026'])->expectsOutputToContain('Give the round as 2026Q2')->assertFailed();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--round' => 'Q2-2026'])->expectsOutputToContain('Give the round as 2026Q2')->assertFailed();
 
     app()->detectEnvironment(fn (): string => 'production');
-    $this->artisan('edqa:odk-mock:generate')->assertFailed();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk'])->assertFailed();
     expect(is_dir($this->mock))->toBeFalse();
 });
 
 it('is pulled end to end: three pages, the broken ones quarantined, an edit applied in place, nothing twice', function (): void {
     config(['edqa.sources.odk.page_size' => 25]);
-    $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 10])->assertSuccessful();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--count' => 60, '--broken' => 10])->assertSuccessful();
     $pull = fn () => app(PullSubmissions::class)->execute('odk', PullTrigger::Scheduled)->refresh();
 
     $first = $pull();
@@ -208,7 +208,7 @@ it('is pulled end to end: three pages, the broken ones quarantined, an edit appl
     }
     $assessments = Assessment::query()->count();
 
-    $this->artisan('edqa:odk-mock:generate', ['--apply-edits' => true])->assertSuccessful();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--edits' => true])->assertSuccessful();
     $second = $pull();
     expect($second->accepted)->toBe(1)
         ->and(Assessment::query()->count())->toBe($assessments)
@@ -220,7 +220,7 @@ it('is pulled end to end: three pages, the broken ones quarantined, an edit appl
 });
 
 it('spreads the data over a span of quarters, the oldest in an older version, before their rounds exist', function (): void {
-    $this->artisan('edqa:odk-mock:generate', ['--count' => 60, '--broken' => 6, '--quarters' => '2025Q1-2025Q3', '--older-quarters' => 1])
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--count' => 60, '--broken' => 6, '--quarters' => '2025Q1-2025Q3', '--older-quarters' => 1])
         ->assertSuccessful();
 
     $byQuarter = [];
@@ -236,5 +236,14 @@ it('spreads the data over a span of quarters, the oldest in an older version, be
         ->and(array_keys($byQuarter['2025Q1']))->toBe(['2025.2'])
         ->and(array_keys($byQuarter['2025Q2']))->toBe(['2026.1'])
         ->and(array_sum(array_map('array_sum', $byQuarter)))->toBe(glob($this->mock.'/submissions/*.json') === false ? 0 : count(glob($this->mock.'/submissions/*.json')));
-    $this->artisan('edqa:odk-mock:generate', ['--quarters' => '2025Q3-2025Q1'])->expectsOutputToContain('Give the quarters as 2024Q1-2025Q2')->assertFailed();
+    $this->artisan('edqa:source-mock:generate', ['source' => 'odk', '--quarters' => '2025Q3-2025Q1'])->expectsOutputToContain('Give the quarters as 2024Q1-2025Q2')->assertFailed();
+});
+
+it('spreads only the ODK mock over quarters, and says so for Kobo', function (): void {
+    config(['edqa.kobo.mock_path' => $this->mock.'-kobo']);
+
+    $this->artisan('edqa:source-mock:generate', ['source' => 'kobo', '--quarters' => '2025Q1-2025Q2'])
+        ->expectsOutputToContain('--quarters is for the ODK Central mock only')
+        ->assertFailed();
+    expect(is_dir($this->mock.'-kobo'))->toBeFalse();
 });

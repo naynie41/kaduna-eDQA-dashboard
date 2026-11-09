@@ -72,13 +72,13 @@ services:
     depends_on: [app]
 
   # A mock ODK Central for local development and e2e (docker/odk-mock/README.md), opt-in:
-  # `make odk-mock-up`, then `make odk-mock-seed n=200`. PHP's built-in server on the app image,
-  # serving storage/app/odk-mock. Plain http: the app accepts it only with
+  # `make sources-mock-up`, then `make sources-mock-seed n=200`. PHP's built-in server on the app
+  # image, serving storage/app/odk-mock. Plain http: the app accepts it only with
   # ODK_ALLOW_INSECURE_LOCAL=true and APP_ENV=local.
   odk-mock:
     <<: *php
     command: ["php", "-S", "0.0.0.0:8080", "docker/odk-mock/router.php"]
-    profiles: [odk, sources]
+    profiles: [sources]
     environment:
       ODK_MOCK_DATA: /var/www/html/storage/app/odk-mock
     ports: ["127.0.0.1:8090:8080"]   # local only: curl it from the host

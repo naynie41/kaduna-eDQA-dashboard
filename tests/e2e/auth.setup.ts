@@ -3,7 +3,7 @@ import { AUTH_STATE } from '../../playwright.config';
 import { E2E_EMAIL, E2E_PASSWORD } from './support/credentials';
 
 /**
- * Signs in once as the e2e administrator (email and password; no MFA, D-35) and saves the session
+ * Signs in once as the e2e administrator (email and password; no MFA, D-84) and saves the session
  * for every other test.
  */
 setup('sign in as the e2e administrator', async ({ page }) => {

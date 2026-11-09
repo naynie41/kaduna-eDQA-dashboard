@@ -9,7 +9,7 @@ use App\Support\Config\EnvNumber;
 return [
 
     'auth' => [
-        // SECURITY.md §2: no MFA (D-35), so these compensating controls are mandatory.
+        // SECURITY.md §2: no MFA (D-84), so these compensating controls are mandatory.
 
         // Optional allow-list (CIDRs or addresses, comma-separated). When set, sign-in, password
         // reset and every signed-in page answer 404 to any other address. Empty = off.
@@ -181,11 +181,11 @@ return [
         'token_refresh_minutes' => 30,
 
         // Local development only: lets ODK_CENTRAL_URL be plain http, for the mock server
-        // (docker/odk-mock, `make odk-mock-up`). Honoured only when APP_ENV=local; set in any other
+        // (docker/odk-mock, `make sources-mock-up`). Honoured only when APP_ENV=local; set in any other
         // environment it is refused and ODK counts as not configured (SECURITY.md §6: https only).
         'allow_insecure_local' => filter_var(env('ODK_ALLOW_INSECURE_LOCAL', false), FILTER_VALIDATE_BOOL),
 
-        // Where edqa:odk-mock:generate writes the mock's data (the odk-mock service reads it).
+        // Where edqa:source-mock:generate odk writes the mock's data (the odk-mock service reads it).
         'mock_path' => storage_path('app/odk-mock'),
 
         // The webhook (§5.4, SECURITY.md §6, D-54): off (404) until ODK_WEBHOOK_SECRET is set. A request
@@ -201,8 +201,7 @@ return [
         // file over max_bytes, or whose sniffed type is not in allowed_mimes, is rejected and
         // deleted.
         'attachments' => [
-            // storage/app/attachments/{source}/{instance}/ (ARCHITECTURE.md §5.3); the old odk disk is
-            // read only by edqa:attachments:relocate.
+            // storage/app/attachments/{source}/{instance}/ (ARCHITECTURE.md §5.3).
             'disk' => 'attachments',
             'max_bytes' => 10 * 1024 * 1024,
             'allowed_mimes' => ['image/jpeg', 'image/png', 'application/geo+json', 'text/csv', 'application/xml'],

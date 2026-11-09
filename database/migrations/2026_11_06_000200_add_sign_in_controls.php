@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * SECURITY.md §2, the controls that stand in for MFA (D-35):
+ * SECURITY.md §2, the controls that stand in for MFA (D-84):
  * - users.failed_login_count / locked_until / locked_out_at: the progressive lockout (locked_out_at
  *   = locked until `edqa:admin:unlock`);
  * - password_histories: the last 5 password hashes, so none is reused;

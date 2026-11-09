@@ -6,7 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * D-24 / Phase 5 step 2: an assessment whose submission was deleted at source can be withdrawn by an
+ * D-62 / Phase 5 step 2: an assessment whose submission was deleted at source can be withdrawn by an
  * administrator. Its status becomes 'withdrawn' (a CHECK on the statuses, which had none), it
  * counts in no aggregator or round_aggregates (they read accepted and flagged only), and the
  * facility may be assessed again in that round: one live assessment per facility and round, so the

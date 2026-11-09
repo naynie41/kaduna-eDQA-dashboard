@@ -24,7 +24,7 @@ export type SourceEntry = {
     open_rounds: OpenRoundCounts[];
 };
 
-/** The Deleted at source tab (D-24): an assessment whose submission its source no longer returns. */
+/** The Deleted at source tab (D-62): an assessment whose submission its source no longer returns. */
 export type DeletedAssessmentRow = {
     submission_id: number;
     source: { key: string; name: string } | null;
@@ -127,7 +127,7 @@ export type CascadeExport = {
 };
 
 /** The Data issues page (D-57). */
-/** hard: quarantined records; soft: flagged accepted assessments; deleted: assessments deleted at source (D-24). */
+/** hard: quarantined records; soft: flagged accepted assessments; deleted: assessments deleted at source (D-62). */
 export type IssueTab = 'hard' | 'soft' | 'deleted';
 export type IssueState = 'open' | 'resolved' | 'rejected' | 'superseded';
 

@@ -5,7 +5,7 @@ import DeletedAtSourceTable from '@/components/DeletedAtSourceTable';
 import { axeCheck, renderUi, testTranslations } from '@/test/render';
 import type { DeletedAssessmentRow } from '@/types/admin';
 
-// The Data issues page's Deleted at source tab (D-24): each assessment whose submission its source
+// The Data issues page's Deleted at source tab (D-62): each assessment whose submission its source
 // no longer returns, and what can be done with it.
 const translations = {
     ...testTranslations,

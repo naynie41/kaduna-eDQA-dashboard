@@ -329,7 +329,7 @@ it('shows both sides of a DUPLICATE_ASSESSMENT: the accepted one from its source
     $this->actingAs($this->admin)->get('/admin/data-issues?rule=LGA_UNKNOWN')->assertInertia(fn (Assert $page) => $page->where('records.data.0.duplicate_of', null));
 });
 
-// ---- The Deleted at source tab (D-24)
+// ---- The Deleted at source tab (D-62)
 
 it('lists each assessment deleted at source on its own tab, open while unreviewed, with what can be done', function (): void {
     $gone = Submission::factory()->accepted()->create(['source_id' => Rows::sourceId('kobo'), 'instance_id' => 'uuid:gone-1', 'deleted_at_source' => now()->subDay()]);

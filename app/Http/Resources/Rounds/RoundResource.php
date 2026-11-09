@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources\Rounds;
 
 use App\Domain\Round\Models\Round;
-use App\Domain\Round\Support\RoundWindowCheck;
+use App\Domain\Round\Support\RoundLabel;
 use App\Domain\Scoring\Exceptions\NoPublishedRuleVersion;
 use App\Domain\Scoring\RuleVersionForRound;
 use Illuminate\Http\Request;
@@ -27,7 +27,7 @@ final class RoundResource extends JsonResource
             'id' => $this->id,
             'year' => $this->year,
             'quarter' => $this->quarter,
-            'label' => RoundWindowCheck::label($this->year, $this->quarter),
+            'label' => RoundLabel::of($this->year, $this->quarter),
             'window_start' => $this->window_start->toDateString(),
             'window_end' => $this->window_end->toDateString(),
             'status' => $this->status->value,

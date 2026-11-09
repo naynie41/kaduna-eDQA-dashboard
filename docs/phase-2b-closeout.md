@@ -1,5 +1,8 @@
 # Phase 2B close-out: ODK ingestion (v0.5.0)
 
+> Historical record of v0.5.0. Since then `edqa:odk:check` is `edqa:source:check odk`, and
+> `edqa:odk-mock:generate` / `make odk-mock-seed` are `edqa:source-mock:generate odk` (D-87).
+
 Build step 8 of `CLAUDE.md` §6: *ODK client, field maps, pull job, lock, idempotency, edits,
 backfill, attachments, `odk_pull_runs`. Acceptance: real submission lands end to end; old form
 version parses; broken one quarantines.*

@@ -17,7 +17,7 @@ use Inertia\Inertia;
 use Laravel\Fortify\Fortify;
 
 /**
- * Authentication (SECURITY.md §2): email + password, no MFA (D-35), with a progressive lockout
+ * Authentication (SECURITY.md §2): email + password, no MFA (D-84), with a progressive lockout
  * per account, password reset and password confirmation. No registration: accounts are created
  * by `edqa:admin:create` only.
  */
@@ -80,10 +80,6 @@ final class FortifyServiceProvider extends ServiceProvider
         ]));
 
         Fortify::requestPasswordResetLinkView(fn (Request $request) => Inertia::render('auth/forgot-password', [
-            'status' => $request->session()->get('status'),
-        ]));
-
-        Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/verify-email', [
             'status' => $request->session()->get('status'),
         ]));
 

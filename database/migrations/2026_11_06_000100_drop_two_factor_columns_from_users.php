@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * D-35: no multi-factor authentication. The two-factor columns go; down() puts them back empty
+ * D-84: no multi-factor authentication. The two-factor columns go; down() puts them back empty
  * (nullable), since the secrets they held are gone for good.
  */
 return new class extends Migration

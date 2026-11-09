@@ -6,7 +6,6 @@ namespace App\Domain\Ingestion\Queries;
 
 use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
-use App\Domain\Ingestion\Exceptions\SourceRefused;
 use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Ingestion\SourceRegistry;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -41,7 +40,7 @@ final class PullHistoryQuery
 
         $query = PullRun::query()->with('triggeredBy:id,name')->orderByDesc('started_at')->orderByDesc('id');
         if (is_string($source)) {
-            $query->where('source_id', $this->sourceId($source));
+            $query->where('source_id', $this->sources->idOrNull($source) ?? 0);
         }
         if ($trigger !== null) {
             $query->where('trigger_type', $trigger);
@@ -76,15 +75,5 @@ final class PullHistoryQuery
                 'error' => $run->error,
             ];
         });
-    }
-
-    /** The source's row id; 0 (no run) for a configured source edqa:sources:sync has not registered. */
-    private function sourceId(string $key): int
-    {
-        try {
-            return $this->sources->id($key);
-        } catch (SourceRefused) {
-            return 0;
-        }
     }
 }

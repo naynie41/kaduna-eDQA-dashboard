@@ -8,7 +8,7 @@ use App\Domain\Ingestion\Actions\ProcessParsedSubmission;
 use App\Domain\Ingestion\DTOs\ProcessOutcome;
 use App\Domain\Ingestion\Enums\SubmissionStatus;
 use App\Domain\Round\Enums\RoundStatus;
-use App\Domain\Round\Support\RoundWindowCheck;
+use App\Domain\Round\Support\RoundLabel;
 use App\Domain\Validation\Enums\QuarantineResolution;
 use App\Domain\Validation\Enums\QuarantineStatus;
 use App\Domain\Validation\Events\QuarantineResolved;
@@ -63,7 +63,7 @@ final class ReplaceAssessmentFromSubmission
                 throw QuarantineActionRefused::notADuplicate();
             }
             if ($round->status === RoundStatus::Closed) {
-                throw QuarantineActionRefused::roundClosed(RoundWindowCheck::label($round->year, $round->quarter));
+                throw QuarantineActionRefused::roundClosed(RoundLabel::of($round->year, $round->quarter));
             }
             $replaced = $context->duplicateOf($parsed, $round->id, $facility->id) ?? throw QuarantineActionRefused::notADuplicate();
 

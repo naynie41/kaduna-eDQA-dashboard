@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Ingestion\Reports;
 
 use App\Domain\Ingestion\DTOs\BackfillReport;
+use App\Domain\Round\Support\RoundLabel;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 
@@ -161,7 +162,7 @@ final class BackfillReportWriter
 
     private function roundLabel(?int $year, ?int $quarter): string
     {
-        return $year === null || $quarter === null ? (string) __('backfill.report.no_round') : "Q{$quarter} {$year}";
+        return $year === null || $quarter === null ? (string) __('backfill.report.no_round') : RoundLabel::of($year, $quarter);
     }
 
     /** @param  list<string>  $cells */

@@ -29,6 +29,8 @@ discovery/.env
 discovery/data/*
 !discovery/data/.gitkeep
 discovery/out/*.json
+# Draft config the discovery scripts write; the live copies are config/edqa_*.php.
+discovery/out/*.draft.php
 data/**/*.xlsx
 
 # Python (discovery/)

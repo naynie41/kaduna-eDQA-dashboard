@@ -159,7 +159,7 @@ final class ValidationContextFactory
             ->join('submissions', 'submissions.id', '=', 'assessments.submission_id')
             ->leftJoin('submission_sources', 'submission_sources.id', '=', 'submissions.source_id')
             ->whereIn('assessments.facility_id', $facilityIds)
-            ->where('assessments.status', '!=', 'withdrawn') // a withdrawn visit may be submitted again (D-24)
+            ->where('assessments.status', '!=', 'withdrawn') // a withdrawn visit may be submitted again (D-62)
             ->get(['assessments.round_id', 'assessments.facility_id', 'submissions.instance_id', 'submission_sources.key as source']);
 
         foreach ($rows as $row) {

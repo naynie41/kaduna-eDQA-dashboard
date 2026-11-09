@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /*
  * `make e2e-sources` only: makes one accepted KoboToolbox submission disappear from the Kobo mock,
- * so the next `edqa:reconcile kobo` finds it deleted at source (D-24), or puts it back. The mock
+ * so the next `edqa:reconcile kobo` finds it deleted at source (D-62), or puts it back. The mock
  * serves whatever is in storage/app/kobo-mock/submissions (docker/kobo-mock/handler.php), so the
  * file is moved aside, never deleted.
  *

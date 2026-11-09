@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 // (`make e2e c="screenshots"`).
 
 const DIR = 'storage/e2e/screenshots';
-const PROTOTYPE = `file://${process.cwd()}/docs/${encodeURIComponent('kaduna-edqa-prototype-v4 (1).html')}`;
+const PROTOTYPE = `file://${process.cwd()}/docs/kaduna-edqa-prototype-v4.html`;
 
 /** Each page: its path, how to tell it has loaded, and the prototype tab that matches it. */
 const PAGES = [

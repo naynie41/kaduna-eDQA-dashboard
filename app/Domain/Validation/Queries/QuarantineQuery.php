@@ -53,7 +53,7 @@ final class QuarantineQuery
         return (int) Cache::remember(self::OPEN_COUNT_KEY, 60, fn (): int => $this->openCount());
     }
 
-    /** The Deleted at source tab's count (D-24): assessments whose deletion at source is not reviewed yet. */
+    /** The Deleted at source tab's count (D-62): assessments whose deletion at source is not reviewed yet. */
     public function unreviewedDeletedAssessments(): int
     {
         return DB::table('submissions')->join('assessments', 'assessments.submission_id', '=', 'submissions.id')

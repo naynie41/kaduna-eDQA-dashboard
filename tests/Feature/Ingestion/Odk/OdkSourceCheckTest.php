@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 
-// edqa:odk:check: the first command when credentials arrive. No network.
+// edqa:source:check odk: the first command when ODK credentials arrive. No network.
 
 const CHECK_URL = 'https://central.example.org';
 
@@ -37,7 +37,7 @@ function fakeCentral(): void
 /** @return array<string, mixed> */
 function checkJson(): array
 {
-    Artisan::call('edqa:odk:check', ['--json' => true]);
+    Artisan::call('edqa:source:check', ['source' => 'odk', '--json' => true]);
 
     return json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 }
@@ -45,7 +45,7 @@ function checkJson(): array
 it('connects, names the account, project and form, and marks the versions with no field map', function (): void {
     fakeCentral();
 
-    $this->artisan('edqa:odk:check')
+    $this->artisan('edqa:source:check', ['source' => 'odk'])
         ->expectsOutputToContain('Connected as eDQA portal (read-only). Project "Kaduna DQA", form "Data Quality Assessment", current version 2026.1.')
         ->expectsOutputToContain('2026.1  published 2026-01-05T09:00:00+00:00  field map: yes')
         ->expectsOutputToContain('2021.3  published 2021-08-01T09:00:00+00:00  field map: NO')
@@ -69,7 +69,7 @@ it('says plainly what is missing when not configured, sends nothing and fails', 
     config(['edqa.sources.odk.password' => null, 'edqa.sources.odk.form_id' => null]);
     Http::fake();
 
-    $this->artisan('edqa:odk:check')
+    $this->artisan('edqa:source:check', ['source' => 'odk'])
         ->expectsOutputToContain('Not configured. Set in .env: ODK_CENTRAL_PASSWORD, ODK_FORM_ID')
         ->assertFailed();
     expect(checkJson())->toMatchArray(['configured' => false, 'status' => 'not_configured', 'problems' => ['ODK_CENTRAL_PASSWORD', 'ODK_FORM_ID']]);
@@ -82,7 +82,7 @@ it('reports each failure by kind, never printing the password or the token', fun
         CHECK_URL.'/*' => Http::response([], $status),
     ]);
 
-    $exit = Artisan::call('edqa:odk:check');
+    $exit = Artisan::call('edqa:source:check', ['source' => 'odk']);
     $output = Artisan::output();
 
     expect($exit)->toBe(1)

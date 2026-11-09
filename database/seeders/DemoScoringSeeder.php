@@ -61,6 +61,12 @@ final class DemoScoringSeeder extends Seeder
             config(['queue.default' => $queue]);
         }
 
+        // Fresh statistics first, as PerformanceSeeder does: rows inserted in an open transaction
+        // (every test) are invisible to autovacuum, so the refresh would be planned for empty
+        // tables and could run for an hour on the demo data.
+        foreach (['facilities', 'rounds', 'submissions', 'assessments', 'item_responses', 'assessment_scores'] as $table) {
+            DB::statement("ANALYZE {$table}");
+        }
         DB::select('SELECT refresh_round_aggregates()');
         $cache->flushAll();
     }

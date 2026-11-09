@@ -320,7 +320,7 @@ it('says who reviewed a deletion at source, and when; an unreviewed one has no r
         ->where('deletions.rows.1.reviewed', ['at' => now()->subDay()->toIso8601String(), 'by' => 'Amina Bello']));
 });
 
-it('sends the old ODK pull address, and /admin, to the Data sources page', function (): void {
-    $this->actingAs($this->admin)->get('/admin/odk')->assertRedirect('/admin/sources')->assertStatus(301);
+it('sends /admin to the Data sources page, and no longer answers the old ODK pull address', function (): void {
     $this->actingAs($this->admin)->get('/admin')->assertRedirect('/admin/sources');
+    $this->actingAs($this->admin)->get('/admin/odk')->assertNotFound();
 });

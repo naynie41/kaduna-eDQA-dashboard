@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Quarantine;
 
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Facility\Models\Lga;
-use App\Domain\Ingestion\Exceptions\SourceRefused;
 use App\Domain\Ingestion\Queries\DeletionsAtSourceQuery;
 use App\Domain\Ingestion\SourceRegistry;
 use App\Domain\Reporting\Aggregators\SoftFlagAggregator;
@@ -100,10 +99,7 @@ final class DataIssuesPageController extends Controller
         if ($key === null) {
             return null;
         }
-        try {
-            return $sources->id($key);
-        } catch (SourceRefused) {
-            return -1;
-        }
+
+        return $sources->idOrNull($key) ?? -1;
     }
 }

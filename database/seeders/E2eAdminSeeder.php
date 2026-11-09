@@ -10,7 +10,7 @@ use RuntimeException;
 
 /**
  * The administrator the Playwright suite signs in as (`make e2e`, tests/e2e/auth.setup.ts), with a
- * known password (no MFA, D-35). Local and the test suite only, and never called by
+ * known password (no MFA, D-84). Local and the test suite only, and never called by
  * DatabaseSeeder: these credentials are public in the repository.
  */
 final class E2eAdminSeeder extends Seeder

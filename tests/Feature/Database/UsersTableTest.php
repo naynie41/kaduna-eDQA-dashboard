@@ -23,7 +23,7 @@ it('has an is_active flag that defaults to active', function (): void {
     expect(DB::table('users')->where('id', $id)->value('is_active'))->toBeTrue();
 });
 
-it('has the lockout columns and no two-factor columns (D-35)', function (): void {
+it('has the lockout columns and no two-factor columns (D-84)', function (): void {
     expect(Schema::hasColumns('users', ['failed_login_count', 'locked_until', 'locked_out_at']))->toBeTrue()
         ->and(Schema::hasColumn('users', 'two_factor_secret'))->toBeFalse();
 });

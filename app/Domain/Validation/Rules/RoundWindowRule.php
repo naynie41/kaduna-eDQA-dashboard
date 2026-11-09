@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Validation\Rules;
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Round\Support\RoundLabel;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\DTOs\RoundSnapshot;
 use App\Domain\Validation\Enums\Severity;
@@ -46,13 +47,13 @@ final class RoundWindowRule implements ValidationRule
             return [$this->fail('detail', ['date' => $date], $field)];
         }
         if (count($rounds) > 1) {
-            $labels = array_map(fn (RoundSnapshot $r): string => $this->roundLabel($r->year, $r->quarter), $rounds);
+            $labels = array_map(fn (RoundSnapshot $r): string => RoundLabel::of($r->year, $r->quarter), $rounds);
 
             return [$this->fail('detail_ambiguous', ['date' => $date, 'rounds' => implode(', ', $labels)], $field)];
         }
 
         $round = $rounds[0];
-        $label = $this->roundLabel($round->year, $round->quarter);
+        $label = RoundLabel::of($round->year, $round->quarter);
         $failures = [];
 
         if (! $round->isOpen()) {
@@ -63,7 +64,7 @@ final class RoundWindowRule implements ValidationRule
         $quarter = $submission->roundQuarter;
         if ($year !== null && $quarter !== null && ($year !== $round->year || $quarter !== $round->quarter)) {
             $failures[] = $this->fail('detail_declared', [
-                'declared' => $this->roundLabel($year, $quarter),
+                'declared' => RoundLabel::of($year, $quarter),
                 'date' => $date,
                 'round' => $label,
             ], 'round');

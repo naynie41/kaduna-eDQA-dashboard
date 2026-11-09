@@ -14,7 +14,6 @@ declare(strict_types=1);
 return [
 
     // How a round is named in any detail.
-    'round_label' => 'Q:quarter :year',
 
     // Not one of the 14: the pipeline's own failure when a rule throws. Quarantines, so a broken
     // rule can never let a submission through.

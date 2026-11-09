@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-// SECURITY.md §2: the tables behind the controls that stand in for MFA (D-35).
+// SECURITY.md §2: the tables behind the controls that stand in for MFA (D-84).
 
 function deviceRow(int $userId, string $fingerprint): array
 {

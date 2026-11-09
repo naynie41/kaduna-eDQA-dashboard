@@ -336,6 +336,7 @@ return [
             'caption' => 'Quarantined records, newest first.',
             'soft_caption' => 'Accepted assessments with a soft flag, newest first.',
             'select' => 'Select :instance',
+            'select_header' => 'Select for a bulk action',
             'instance' => 'Instance ID',
             'source' => 'Source',
             'source_unknown' => 'Unknown source',
@@ -378,7 +379,7 @@ return [
             'overall' => 'Overall it scores',
             'unknown' => 'Not known',
         ],
-        // The Deleted at source tab (D-24).
+        // The Deleted at source tab (D-62).
         'deleted' => [
             'caption' => 'Assessments deleted at their source',
             'none' => 'No assessment has been deleted at its source.',

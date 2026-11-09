@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domain\Ingestion\Aggregators;
 
-use App\Domain\Ingestion\Exceptions\SourceRefused;
 use App\Domain\Ingestion\SourceRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Container\Attributes\Config;
@@ -42,16 +41,23 @@ final class SourceStatusAggregator
      * source, so a healthy one never hides another. A source not configured or switched off is not
      * expected to pull (the status bar says so); a backfill's runs do not count.
      *
+     * Pass the statuses all() already gave, so the pull history is read once a request.
+     *
+     * @param  list<array{key: string, name: string, state: string, lastSuccessAt: ?string}>|null  $statuses
      * @return array{stale: bool, hours: int, round: ?array{year: int, quarter: int}, sources: list<array{key: string, name: string, lastSuccessAt: ?string}>}
      */
-    public function staleIngestion(): array
+    public function staleIngestion(?array $statuses = null): array
     {
         $hours = (int) config('edqa.status.banner_after_hours', 24);
         $round = DB::table('rounds')->where('status', 'open')->orderByDesc('year')->orderByDesc('quarter')->first(['year', 'quarter']);
         $behind = [];
         if ($round !== null) {
-            foreach ($this->sources->enabled() as $key) {
-                $status = $this->source($key);
+            $byKey = array_column($statuses ?? $this->all(), null, 'key');
+            foreach ($this->sources->keys() as $key) {
+                $status = $byKey[$key] ?? null;
+                if ($status === null || in_array($status['state'], ['not_configured', 'disabled'], true)) {
+                    continue; // not expected to pull
+                }
                 $last = $status['lastSuccessAt'] === null ? null : CarbonImmutable::parse($status['lastSuccessAt']);
                 if ($last === null || $last->lessThan(now()->subHours($hours))) {
                     $behind[] = ['key' => $key, 'name' => $status['name'], 'lastSuccessAt' => $status['lastSuccessAt']];
@@ -74,7 +80,8 @@ final class SourceStatusAggregator
      */
     public function all(): array
     {
-        $statuses = array_map($this->source(...), $this->sources->keys());
+        $enabled = $this->sources->enabled();
+        $statuses = array_map(fn (string $key): array => $this->source($key, $enabled), $this->sources->keys());
         $rank = array_flip(self::SEVERITY);
         // usort is stable since PHP 8.0, so equal states keep config order.
         usort($statuses, fn (array $a, array $b): int => $rank[$a['state']] <=> $rank[$b['state']]);
@@ -83,11 +90,13 @@ final class SourceStatusAggregator
     }
 
     /**
+     * @param  list<string>|null  $enabled  the enabled sources, when the caller already has them
      * @return array{key: string, name: string, state: string, lastSuccessAt: ?string, minutesSinceSuccess: ?int, sinceSuccess: ?array{value: int, unit: string}, lastFailedAt: ?string, lastError: ?string, lastErrorClass: ?string, lastErrorHttpStatus: ?int, staleAfterMinutes: int}
      */
-    public function source(string $key): array
+    public function source(string $key, ?array $enabled = null): array
     {
-        $sourceId = $this->sourceId($key);
+        $enabled ??= $this->sources->enabled();
+        $sourceId = $this->sources->idOrNull($key);
         $pulls = fn () => DB::table('pull_runs')->where('source_id', $sourceId ?? 0)->where('trigger_type', '!=', 'backfill');
         $latest = $sourceId === null ? null : $pulls()->whereNotNull('finished_at')->whereIn('outcome', ['succeeded', 'failed'])
             ->orderByDesc('finished_at')->orderByDesc('id')->first(['finished_at', 'outcome', 'error']);
@@ -102,7 +111,7 @@ final class SourceStatusAggregator
 
         $state = match (true) {
             $this->sources->problems($key) !== [] => 'not_configured',
-            ! in_array($key, $this->sources->enabled(), true) => 'disabled',
+            ! in_array($key, $enabled, true) => 'disabled',
             $failed && $errorClass !== null && str_ends_with($errorClass, 'AuthFailed') => 'auth_failed',
             $failed => 'failed',
             $minutes === null => 'not_connected',
@@ -136,7 +145,7 @@ final class SourceStatusAggregator
      */
     public function openRounds(string $key): array
     {
-        $sourceId = $this->sourceId($key);
+        $sourceId = $this->sources->idOrNull($key);
         $rounds = DB::table('rounds')->where('status', 'open')->orderByDesc('year')->orderByDesc('quarter')->get(['id', 'year', 'quarter']);
         $assessments = fn (int $roundId, string $status): int => $sourceId === null ? 0 : DB::table('assessments as a')
             ->join('submissions as s', 's.id', '=', 'a.submission_id')
@@ -152,16 +161,6 @@ final class SourceStatusAggregator
                 ->where('s.source_id', $sourceId)->where('q.round_id', (int) $round->id)->where('q.status', 'open')
                 ->count(),
         ])->all());
-    }
-
-    /** The source's row id, or null while edqa:sources:sync has not created it. */
-    private function sourceId(string $key): ?int
-    {
-        try {
-            return $this->sources->id($key);
-        } catch (SourceRefused) {
-            return null;
-        }
     }
 
     /**

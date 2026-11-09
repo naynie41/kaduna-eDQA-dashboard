@@ -46,13 +46,6 @@ return [
         'invalid' => 'Some fields need attention.',
         'conflict' => 'This could not be done as things stand.',
     ],
-    'nav' => [
-        'label' => 'Main',
-        'dashboard' => 'Dashboard',
-        'administration' => 'Administration',
-        'settings' => 'Settings',
-    ],
-
     // A record's field-collection source, when it cannot be told (SourceTag).
     'sources' => [
         'unknown' => 'Unknown source',

@@ -58,7 +58,7 @@ make artisan c="edqa:reconcile kobo"        # the sweep finds them
 ## The data
 
 `edqa:source-mock:generate {source} {--count=200} {--broken=10} {--edits} {--overlap=0} {--round=} {--form-version=2026.1} {--seed=}`
-writes either mock. `odk` writes what `edqa:odk-mock:generate` writes. `kobo` writes the same mix,
+writes either mock. `odk` is described in the [ODK mock README](../odk-mock/README.md). `kobo` writes the same mix,
 with the same broken, flagged, edited and photo visits, each as a KPI v2 data row:
 
 - `config.json`: the token, account, asset, versions, `base_url` (`KOBO_BASE_URL`, else

@@ -15,7 +15,7 @@ use Tests\Support\ParsedSubmissionBuilder;
 use Tests\Support\ReportingFixture;
 use Tests\Support\Rows;
 
-// A withdrawn assessment (D-24, Phase 5 step 2: its submission was deleted at source and an
+// A withdrawn assessment (D-62, Phase 5 step 2: its submission was deleted at source and an
 // administrator withdrew it) counts nowhere: no aggregator and no row of round_aggregates reads
 // it, and the facility can be assessed again in that round.
 

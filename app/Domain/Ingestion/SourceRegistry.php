@@ -83,6 +83,16 @@ final class SourceRegistry
         return $this->model($key)->id;
     }
 
+    /** The row id, or null for a key not configured or not registered yet (edqa:sources:sync). */
+    public function idOrNull(string $key): ?int
+    {
+        try {
+            return $this->id($key);
+        } catch (SourceRefused) {
+            return null;
+        }
+    }
+
     /** The key of a submission_sources row, or null for a row config no longer knows. */
     public function keyOf(int $sourceId): ?string
     {

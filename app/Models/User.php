@@ -8,7 +8,6 @@ use App\Support\Audit\Audited;
 use App\Support\Auth\PasswordHistory;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,7 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 /**
- * An administrator: the only role (SECURITY.md §3). Signs in with a password alone (D-35).
+ * An administrator: the only role (SECURITY.md §3). Signs in with a password alone (D-84).
  * Created, disabled, unlocked and deleted by artisan commands only. Audited without secrets:
  * never the password or the lockout counters.
  *
@@ -35,7 +34,7 @@ use Illuminate\Notifications\Notifiable;
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-final class User extends Authenticatable implements MustVerifyEmail
+final class User extends Authenticatable
 {
     use Audited;
 

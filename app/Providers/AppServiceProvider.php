@@ -83,7 +83,7 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(AssessmentScored::class, [FlushRoundCache::class, 'onScored']);
         Event::listen(QuarantineResolved::class, [FlushRoundCache::class, 'onResolved']);
         Event::listen(RuleVersionPublished::class, [FlushRoundCache::class, 'onPublished']);
-        // A withdrawn or restored assessment (D-24): the round's cache, view and scores follow.
+        // A withdrawn or restored assessment (D-62): the round's cache, view and scores follow.
         Event::listen(AssessmentStatusChanged::class, [FlushRoundCache::class, 'onStatusChanged']);
         Event::listen(AssessmentStatusChanged::class, RefreshAggregatesAfterStatusChange::class);
         Event::listen(AssessmentStatusChanged::class, RescoreAfterStatusChange::class);

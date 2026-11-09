@@ -27,7 +27,7 @@ it('rejects a second assessment of one facility in one round', function (): void
 
     expectUniqueViolation(
         fn () => Rows::assessment(['round_id' => $roundId, 'facility_id' => $facilityId]),
-        'assessments_round_facility_live_unique', // one live assessment: a withdrawn one (D-24) does not count
+        'assessments_round_facility_live_unique', // one live assessment: a withdrawn one (D-62) does not count
     );
 });
 

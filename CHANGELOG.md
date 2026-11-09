@@ -25,6 +25,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - The footer now reads "Support: LAFIYA" (was HSDF), on the public site and in the admin rail.
+- **Mock data commands:** `edqa:source-mock:generate odk` now takes `--quarters`,
+  `--older-quarters` and `--older-version` (backfill spans), which used to need
+  `edqa:odk-mock:generate`. They apply to the ODK mock only; the Kobo mock refuses `--quarters`.
+- **Code cleanup, no change in behaviour:**
+  - Rounds are named ("Q3 2026") in one place, `RoundLabel`, instead of six.
+  - Both sources read form-version dates with the strict `IsoTime` parser.
+  - `SourceRegistry::idOrNull()` replaces four copies of the same lookup.
+  - The admin facility view's audit trail, flags and corrections moved out of
+    `FacilityDetailAggregator` into `AssessmentAuditQuery`, which the public drawer never calls.
+  - The Data issues page is split into `QuarantineTable`, `FlaggedTable`, `IssueFilters` and
+    `IssueBulkBar` (from 548 lines to 228).
+- **Faster admin pages:** each source's pull history is now read once per admin page instead of
+  twice (the status bar and the stale banner share the result).
+- Code comments now cite D-84 for "no MFA" (was D-35) and D-62 for deletions at source (was D-24).
+
+### Removed
+
+- **Email verification** (D-86): Fortify's feature, its page and its three routes. Accounts are
+  created verified, and no route ever required it.
+- **ODK-only commands** (D-87): `edqa:odk:check` (use `edqa:source:check odk`),
+  `edqa:odk-mock:generate` (use `edqa:source-mock:generate odk`), the `make odk-mock-up` and
+  `make odk-mock-seed` targets (use `sources-mock-up` and `sources-mock-seed`), and the `odk`
+  compose profile. `/admin/odk` no longer redirects to `/admin/sources`.
+- **Pre-go-live trim** (D-88): the one-off `edqa:attachments:relocate` command, the old `odk`
+  disk, and the unused `laravel/pail` dev package.
+- Dead code: `OdkRow`, `PagePlaceholder`, the `common.nav` strings, and the stale Kobo draft
+  configs in `discovery/out/` (the live ones are in `config/`).
+- The starter kit's PHPUnit-style auth tests, rewritten in Pest with the same coverage.
 
 ### Fixed
 
@@ -33,6 +61,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Contrast:** the "No data" score tag (Visuals rankings, LGA tables) and an overridden flag's tag
   used grey text on the wash background at about 4.3:1, under WCAG AA's 4.5:1. They now use the body
   ink colour. Both showed up once a closed round had data.
+- **Data issues, Hard tab:** the checkbox column's header was empty; screen readers now hear
+  "Select for a bulk action" (axe: empty table header).
+- The prototype file is now named `docs/kaduna-edqa-prototype-v4.html`, as the docs call it, and
+  the demo script links to `/` instead of the old `/dashboard/home` redirect.
 
 ## [0.7.0] - 2026-11-07
 

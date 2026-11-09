@@ -54,12 +54,6 @@ test.describe('Data sources page, no source configured', () => {
         expect(errors).toEqual([]);
     });
 
-    test('the old ODK pull address leads here', async ({ page }) => {
-        await page.goto('/admin/odk');
-        await ready(page);
-        await expect(page).toHaveURL(/\/admin\/sources$/);
-    });
-
     test('no serious or critical axe violations', async ({ page }) => {
         await page.goto('/admin/sources');
         await ready(page);

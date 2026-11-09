@@ -40,7 +40,7 @@ final class RoundWindowCheck
         $quarterEnd = $quarterStart->addMonths(3)->subDay();
         $latest = $quarterEnd->addDays($this->graceDays);
         if ($start->lt($quarterStart) || $start->gt($quarterEnd) || $end->gt($latest)) {
-            throw RoundActionRefused::windowOutsideQuarter(self::label($year, $quarter), $quarterStart->toDateString(), $quarterEnd->toDateString(), $latest->toDateString(), $this->graceDays);
+            throw RoundActionRefused::windowOutsideQuarter(RoundLabel::of($year, $quarter), $quarterStart->toDateString(), $quarterEnd->toDateString(), $latest->toDateString(), $this->graceDays);
         }
 
         DB::statement('LOCK TABLE rounds IN SHARE ROW EXCLUSIVE MODE');
@@ -51,7 +51,7 @@ final class RoundWindowCheck
             ->orderBy('window_start')
             ->first();
         if ($overlapping !== null) {
-            throw RoundActionRefused::windowOverlap(self::label($overlapping->year, $overlapping->quarter));
+            throw RoundActionRefused::windowOverlap(RoundLabel::of($overlapping->year, $overlapping->quarter));
         }
 
         if ($end->gt($quarterEnd)) {
@@ -61,10 +61,5 @@ final class RoundWindowCheck
         }
 
         return [];
-    }
-
-    public static function label(int $year, int $quarter): string
-    {
-        return (string) __('reporting.round_label', ['quarter' => (string) $quarter, 'year' => (string) $year]);
     }
 }

@@ -182,6 +182,13 @@ it('is 404 for an unknown facility, and 422 for a round that does not exist', fu
     $this->actingAs($this->admin)->getJson("/admin/api/facilities/{$this->facility}?round=999999")->assertUnprocessable()->assertJsonValidationErrors('round');
 });
 
+it('never reads the audit trail for the public drawer (SECURITY.md §3.1)', function (): void {
+    DB::enableQueryLog();
+    $this->getJson("/api/public/facilities/{$this->facility}")->assertOk();
+
+    expect(collect(DB::getQueryLog())->pluck('query')->filter(fn (string $sql): bool => str_contains($sql, 'activity_log'))->all())->toBe([]);
+});
+
 it('is behind the sign-in', function (): void {
     $this->getJson("/admin/api/facilities/{$this->facility}")->assertUnauthorized();
 });

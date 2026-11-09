@@ -42,6 +42,11 @@ final class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         $adminPage = $user !== null && $request->routeIs('admin.*');
+        // The status bar and the banner read the same statuses: work them out once, when needed.
+        $statuses = null;
+        $sourceStatuses = function () use (&$statuses): array {
+            return $statuses ??= app(SourceStatusAggregator::class)->all();
+        };
 
         return [
             ...parent::share($request),
@@ -57,12 +62,12 @@ final class HandleInertiaRequests extends Middleware
             ...($adminPage ? [
                 'shell' => fn (): array => [
                     'assessments' => app(ShellStatusAggregator::class)->assessments(),
-                    'sources' => app(SourceStatusAggregator::class)->all(),
+                    'sources' => $sourceStatuses(),
                     'quarantined' => app(QuarantineQuery::class)->openCountCached(),
                 ],
                 'admin' => fn (): array => [
                     'openIssueCount' => app(QuarantineQuery::class)->openIssueCountCached(),
-                    'staleIngestion' => app(SourceStatusAggregator::class)->staleIngestion(),
+                    'staleIngestion' => app(SourceStatusAggregator::class)->staleIngestion($sourceStatuses()),
                 ],
             ] : []),
             // UI strings, read in React with t() (CONVENTION.md §7, CLAUDE.md hard rule 10): each page

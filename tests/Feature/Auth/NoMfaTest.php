@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\Features;
 
-// D-35: no multi-factor authentication anywhere. The compensating controls are SECURITY.md §2.
+// D-84: no multi-factor authentication anywhere. The compensating controls are SECURITY.md §2.
 
 it('registers no two-factor route', function (): void {
     $routes = collect(Route::getRoutes()->getRoutes())

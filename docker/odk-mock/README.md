@@ -3,13 +3,13 @@
 A fake ODK Central that answers only what the portal calls (`OdkCentralSource`), so the whole
 ingestion pipeline runs locally with no client credentials. It is PHP's built-in server on the
 dev PHP image (`router.php` → `handler.php`), reading JSON files from `storage/app/odk-mock/`.
-**Never deploy it.** It is in `compose.dev.yml` only, behind the `odk` profile.
+**Never deploy it.** It is in `compose.dev.yml` only, behind the `sources` profile (with the [Kobo mock](../kobo-mock/README.md)).
 
 ## Start it
 
 ```bash
-make odk-mock-up                 # the odk-mock service: odk-mock:8080 inside the stack, 127.0.0.1:8090 on the host
-make odk-mock-seed n=200         # write 200 raw submissions for the seeded facilities
+make sources-mock-up             # odk-mock:8080 inside the stack, 127.0.0.1:8090 on the host (and kobo-mock)
+make artisan c="edqa:source-mock:generate odk --count=200"   # 200 raw submissions for the seeded facilities
 ```
 
 Then point the portal at it in `.env`, and check the connection:
@@ -50,7 +50,7 @@ version. An edit keeps `__id` and `submissionDate`, takes a new `meta.instanceID
 edits in `edits/`. They appear only after:
 
 ```bash
-make artisan c="edqa:odk-mock:generate --apply-edits"
+make artisan c="edqa:source-mock:generate odk --edits"
 ```
 
 This lets one pull see the originals and a later pull see the edits. A pull filtered only on
@@ -58,7 +58,7 @@ This lets one pull see the originals and a later pull see the edits. A pull filt
 
 ## The data
 
-`edqa:odk-mock:generate {--count=200} {--broken=10} {--round=2026Q2} {--form-version=2026.1} {--seed=2026}`
+`edqa:source-mock:generate odk {--count=200} {--broken=10} {--round=2026Q2} {--form-version=2026.1} {--seed=2026}`
 writes:
 
 - `config.json`: the credentials, project, form, versions and `edits_applied`.
@@ -80,3 +80,8 @@ The mix:
 
 The same options and seed give the same data. (`--form-version`, not `--version`: the console
 reserves `--version`.)
+
+**Several quarters, for the backfill (§5.6).** `--quarters=2024Q1-2025Q2` replaces `--round`: the
+counts are shared out over the span, oldest first, and the rounds need not exist yet.
+`--older-quarters=N` submits the first N quarters with `--older-version` (default `2025.2`), so
+the backfill reads an old form version through its own field map. ODK only.

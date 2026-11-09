@@ -24,14 +24,6 @@ trait BuildsFailures
         return new RuleFailure($this->code(), $this->severity(), $detail, $field);
     }
 
-    /** "Q2 2026" */
-    protected function roundLabel(int $year, int $quarter): string
-    {
-        $label = __('validation_rules.round_label', ['quarter' => (string) $quarter, 'year' => (string) $year]);
-
-        return is_string($label) ? $label : "Q{$quarter} {$year}";
-    }
-
     /** A number as typed: 347.66, -4, 100 (no padding, no rounding). */
     protected function number(float $value): string
     {

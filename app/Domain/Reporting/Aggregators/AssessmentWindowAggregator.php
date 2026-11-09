@@ -51,7 +51,7 @@ final class AssessmentWindowAggregator
 
                 return new AssessmentWindow(
                     roundId: $round->id,
-                    label: (string) __('reporting.round_label', ['quarter' => (string) $round->quarter, 'year' => (string) $round->year]),
+                    label: $round->label(),
                     windowStart: $round->window_start->toDateString(),
                     windowEnd: $round->window_end->toDateString(),
                     firstVisit: $row?->first_visit,

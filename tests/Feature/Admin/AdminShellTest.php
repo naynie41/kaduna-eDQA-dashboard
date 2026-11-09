@@ -185,6 +185,24 @@ it('names only the enabled sources that are behind: one healthy source does not 
     $this->actingAs($this->admin)->get('/admin/sources')->assertInertia(fn (Assert $page) => $page->where('admin.staleIngestion.stale', false)->where('admin.staleIngestion.sources', []));
 });
 
+it('reads each source\'s pull history once per admin page, for the status bar and the banner together', function (): void {
+    configureOdk();
+    shellConfigureKobo();
+    Rows::round(['year' => 2026, 'quarter' => 4, 'window_start' => '2026-10-01', 'window_end' => '2026-12-31']);
+    Rows::pullRun(['source_id' => Rows::sourceId('odk'), 'outcome' => 'succeeded', 'started_at' => now()->subDays(2), 'finished_at' => now()->subDays(2)]);
+    $this->actingAs($this->admin);
+
+    DB::enableQueryLog();
+    $this->get('/admin/rounds')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('admin.staleIngestion.sources.0.key', 'odk')
+        ->where('admin.staleIngestion.sources.1.key', 'kobo'));
+    $log = collect(DB::getQueryLog())->pluck('query');
+
+    // Two reads a source (the latest finished run, the last success), two sources.
+    expect($log->filter(fn (string $sql): bool => str_contains($sql, 'pull_runs'))->count())->toBe(4)
+        ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'from "submission_sources"'))->count())->toBeLessThanOrEqual(4);
+});
+
 it('leaves the banner to the status bar while ODK is not configured', function (): void {
     config(['edqa.sources.odk.url' => null]);
     Rows::round(['year' => 2026, 'quarter' => 4, 'window_start' => '2026-10-01', 'window_end' => '2026-12-31']);

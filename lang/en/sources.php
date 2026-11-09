@@ -16,10 +16,6 @@ return [
         'unchanged' => 'Source :key is up to date.',
         'orphan' => 'Source :key is registered but no longer configured. It is kept (its submissions refer to it) and stays as it is.',
     ],
-    'relocate' => [
-        'done' => 'Attachments moved to their source directory: :moved; already there: :already.',
-        'missing' => ':count attachment(s) have no file on either disk (ids :ids); their rows are unchanged.',
-    ],
     'pull' => [
         'name_one' => 'Name a source (:sources) or pass --all, not both.',
         'cross_source' => ':count submission(s) were already stored from another source: counted as cross-source duplicates, not stored again.',
@@ -51,6 +47,11 @@ return [
         'edits_applied' => 'The staged edits are now visible on the :source mock.',
         'overlap' => 'Of them, :count visit(s) also on :other (:copies copied with the same instance ID, :reentered entered again with a new one).',
         'no_overlap' => 'The :other mock has no visits to overlap: generate it first.',
+        'written' => 'Wrote :valid valid, :flagged to be flagged and :broken to be quarantined, plus :edited edits (staged) and :attachments photo(s), to :path.',
+        'bad_round' => 'Give the round as 2026Q2, not ":round".',
+        'no_round' => 'There is no round :round.',
+        'bad_span' => 'Give the quarters as 2024Q1-2025Q2, oldest first, not ":span".',
+        'quarters_odk_only' => '--quarters is for the ODK Central mock only.',
     ],
     'check' => [
         'unknown' => ':key is not a configured source. The sources are: :keys.',
@@ -65,7 +66,6 @@ return [
         'unknown_date' => 'unknown',
         'none' => 'none',
         'unmapped_summary' => ':count published version(s) have no field map: add them to config/edqa_field_maps.php (sources) before the first pull.',
-        'deprecated_alias' => 'edqa:odk:check is now edqa:source:check odk. This alias goes in the next release.',
     ],
 
     // edqa:facilities:source-refs (D-72).
@@ -88,7 +88,7 @@ return [
         ],
     ],
 
-    // Withdrawing and restoring an assessment deleted at source (D-24).
+    // Withdrawing and restoring an assessment deleted at source (D-62).
     'withdrawal' => [
         'errors' => [
             'round_closed' => 'Round :round is closed, so its figures are fixed. Reopen the round on the Rounds page (with a reason) first.',

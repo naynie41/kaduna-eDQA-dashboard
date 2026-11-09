@@ -10,7 +10,7 @@ use App\Domain\Ingestion\Exceptions\AssessmentStatusRefused;
 use App\Domain\Ingestion\Models\Submission;
 use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Round\Models\Round;
-use App\Domain\Round\Support\RoundWindowCheck;
+use App\Domain\Round\Support\RoundLabel;
 use App\Domain\Validation\Enums\Severity;
 use App\Domain\Validation\RuleCatalogue;
 use App\Domain\Validation\Support\Reason;
@@ -19,7 +19,7 @@ use App\Support\Audit\AuditLog;
 use Illuminate\Support\Facades\DB;
 
 /**
- * "Withdraw assessment" and "Restore" on the Data issues page's Deleted at source tab (D-24,
+ * "Withdraw assessment" and "Restore" on the Data issues page's Deleted at source tab (D-62,
  * Phase 5 step 2). Withdrawing an assessment whose submission its source no longer returns sets
  * its status to withdrawn: it counts in no aggregator or round_aggregates, and the facility may be
  * assessed again in the round. The deletion is marked reviewed with it. Restoring puts back what
@@ -58,7 +58,7 @@ final class WithdrawAssessment
                 old: ['status' => $old],
                 new: ['status' => 'withdrawn'],
                 reason: $reason,
-                extra: ['submission_id' => $submission->id, 'instance_id' => $submission->instance_id, 'round' => RoundWindowCheck::label($round->year, $round->quarter)],
+                extra: ['submission_id' => $submission->id, 'instance_id' => $submission->instance_id, 'round' => RoundLabel::of($round->year, $round->quarter)],
             );
 
             return 'withdrawn';
@@ -77,7 +77,7 @@ final class WithdrawAssessment
             $taken = Assessment::query()->where('round_id', $assessment->round_id)->where('facility_id', $assessment->facility_id)
                 ->where('id', '!=', $assessment->id)->where('status', '!=', 'withdrawn')->exists();
             if ($taken) {
-                throw AssessmentStatusRefused::roundTaken(RoundWindowCheck::label($round->year, $round->quarter));
+                throw AssessmentStatusRefused::roundTaken(RoundLabel::of($round->year, $round->quarter));
             }
 
             /** @var list<string> $flags */
@@ -88,7 +88,7 @@ final class WithdrawAssessment
                 old: ['status' => 'withdrawn'],
                 new: ['status' => $status],
                 reason: $reason,
-                extra: ['round' => RoundWindowCheck::label($round->year, $round->quarter)],
+                extra: ['round' => RoundLabel::of($round->year, $round->quarter)],
             );
 
             return $status;
@@ -105,7 +105,7 @@ final class WithdrawAssessment
             $assessment = Assessment::query()->lockForUpdate()->findOrFail($assessmentId);
             $round = Round::query()->findOrFail($assessment->round_id);
             if ($round->status === RoundStatus::Closed) {
-                throw AssessmentStatusRefused::roundClosed(RoundWindowCheck::label($round->year, $round->quarter));
+                throw AssessmentStatusRefused::roundClosed(RoundLabel::of($round->year, $round->quarter));
             }
 
             return ['assessment_id' => $assessment->id, 'status' => $apply($assessment, $round), 'round_id' => $round->id];

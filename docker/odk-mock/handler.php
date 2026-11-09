@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /*
  * A fake ODK Central (docker/odk-mock/README.md): only what OdkCentralSource calls, served from
- * JSON files written by `artisan edqa:odk-mock:generate`. A pure function, so the router serves it
+ * JSON files written by `artisan edqa:source-mock:generate odk`. A pure function, so the router serves it
  * and tests call it directly.
  *
  * Data directory:
@@ -26,7 +26,7 @@ function odk_mock_handle(string $method, string $uri, array $headers, string $bo
 {
     $config = odk_mock_json($dataDir.'/config.json');
     if ($config === null) {
-        return odk_mock_error(503, 'The mock has no data: run `make odk-mock-seed`.');
+        return odk_mock_error(503, 'The mock has no data: run `make sources-mock-seed`.');
     }
     $path = (string) parse_url($uri, PHP_URL_PATH);
     parse_str((string) parse_url($uri, PHP_URL_QUERY), $query);

@@ -15,6 +15,7 @@ use App\Domain\Reporting\Support\FacilityScoresSql;
 use App\Domain\Reporting\Support\RoundSelection;
 use App\Domain\Reporting\Support\Scores;
 use App\Domain\Reporting\Support\Weighting;
+use App\Domain\Round\Support\RoundLabel;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -72,7 +73,7 @@ final class FacilityScoresQuery
                 ward: (string) $row->ward,
                 ownership: Ownership::from((string) $row->ownership),
                 level: FacilityLevel::from((string) $row->level),
-                roundLabel: (string) __('reporting.round_label', ['quarter' => (string) $row->quarter, 'year' => (string) $row->year]),
+                roundLabel: RoundLabel::of((int) $row->year, (int) $row->quarter),
                 assessedOn: (string) $row->assessed_on,
                 m1: Scores::of($row->m1, $rules),
                 m2: Scores::of($row->m2, $rules),

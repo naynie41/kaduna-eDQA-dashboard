@@ -11,7 +11,7 @@ Version 0.4.0, October 2026.
    It prints the four reasons it was held. It runs once: a second run just says the row is
    already held.
 3. Open two browser tabs:
-   - **Home** for 2026 Q2: http://localhost:8080/dashboard/home?year=2026&quarter=2
+   - **Home** for 2026 Q2: http://localhost:8080/?year=2026&quarter=2
    - the **Data issues API**: http://localhost:8080/api/quarantine?group=rule
 4. Make the browser window full width, at 100% zoom.
 

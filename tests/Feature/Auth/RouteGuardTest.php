@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Middleware\ForgetRememberMe;
 use App\Models\User;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 
@@ -14,7 +15,6 @@ use Illuminate\Support\Facades\Route;
 /** Fortify's screens and actions: reachable signed out (or acting on a pending sign-in). */
 const AUTH_URIS = [
     'login', 'logout', 'forgot-password', 'reset-password', 'reset-password/{token}',
-    'email/verify', 'email/verify/{id}/{hash}', 'email/verification-notification',
     'user/confirm-password', 'user/confirmed-password-status',
 ];
 
@@ -212,6 +212,23 @@ it('has no registration routes', function (): void {
 
     $this->get('/register')->assertNotFound();
     $this->post('/register', ['email' => 'x@example.test'])->assertNotFound();
+});
+
+// Accounts are created verified by `edqa:admin:create`, so there is no email-verification flow.
+it('has no email-verification routes', function (): void {
+    foreach (['verification.notice', 'verification.verify', 'verification.send'] as $name) {
+        expect(Route::has($name))->toBeFalse("{$name} is registered");
+    }
+
+    $this->get('/email/verify')->assertNotFound();
+    $this->post('/email/verification-notification')->assertNotFound();
+});
+
+it('lets an administrator whose email was never verified into the admin area', function (): void {
+    $user = User::factory()->create(['email_verified_at' => null]);
+
+    expect($user)->not->toBeInstanceOf(MustVerifyEmail::class);
+    $this->actingAs($user)->get('/admin/sources')->assertOk();
 });
 
 it('keeps the source webhooks switched off (404) while no secret is configured', function (): void {

@@ -36,11 +36,10 @@ use Illuminate\Support\Facades\Route;
 | administrator, password only (D-84). A guest is sent to /login.
 */
 
-// The pages (ARCHITECTURE.md §9.3, D-55): /admin opens Data sources (/admin/odk still leads there).
+// The pages (ARCHITECTURE.md §9.3, D-55): /admin opens Data sources.
 // Rounds, Facility list and Scoring rules are placeholders until their Phase 5 steps build them.
 Route::redirect('/', '/admin/sources')->name('home');
 Route::get('sources', AdminSourcesController::class)->name('sources');
-Route::permanentRedirect('odk', '/admin/sources')->name('odk');
 Route::get('data-issues', DataIssuesPageController::class)->name('data-issues');
 Route::inertia('rounds', 'admin/rounds')->name('rounds');
 Route::inertia('facilities', 'admin/facilities')->name('facilities');

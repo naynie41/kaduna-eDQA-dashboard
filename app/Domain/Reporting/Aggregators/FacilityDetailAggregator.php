@@ -6,6 +6,7 @@ namespace App\Domain\Reporting\Aggregators;
 
 use App\Domain\Assessment\Models\Assessment;
 use App\Domain\Assessment\Models\ItemResponse;
+use App\Domain\Assessment\Queries\AssessmentAuditQuery;
 use App\Domain\Assessment\Support\ItemKey;
 use App\Domain\Facility\Models\Facility;
 use App\Domain\Ingestion\Queries\AssessmentSourceQuery;
@@ -24,10 +25,6 @@ use App\Domain\Scoring\DTOs\ScoreValue;
 use App\Domain\Scoring\Enums\Dimension;
 use App\Domain\Scoring\Exceptions\NoPublishedRuleVersion;
 use App\Domain\Scoring\RuleVersionForRound;
-use App\Domain\Validation\EventFlags;
-use App\Models\User;
-use Carbon\CarbonImmutable;
-use Illuminate\Container\Attributes\Config;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -51,17 +48,13 @@ use Illuminate\Support\Facades\DB;
  */
 final class FacilityDetailAggregator
 {
-    /** Most recent audit entries returned; the full trail stays in activity_log. */
-    public const ACTIVITY_LIMIT = 100;
-
-    /** @param  array<string, string>  $rules  edqa.validation.rules: soft flags are among their codes */
     public function __construct(
         private readonly FacilityScoresSql $sql,
         private readonly RoundSelection $rounds,
         private readonly RuleVersionForRound $versions,
         private readonly FacilityRoundOverallsQuery $overalls,
         private readonly AssessmentSourceQuery $sources,
-        #[Config('edqa.validation.rules')] private readonly array $rules,
+        private readonly AssessmentAuditQuery $audit,
     ) {}
 
     public function forFacility(Facility $facility, ?Round $round = null, ReportFilter $filter = new ReportFilter): FacilityDetail
@@ -84,7 +77,7 @@ final class FacilityDetailAggregator
         $versionId = $round === null ? null : $this->versionId($round);
         $slots = $assessment === null || $versionId === null ? [] : $this->slotScores($assessment->id, $versionId);
         $source = $assessment === null || $public ? null : $this->sources->forSubmission($assessment->submission_id);
-        $activity = $public ? ['entries' => [], 'overrides' => []] : $this->activity($assessments->modelKeys());
+        $activity = $public ? ['entries' => [], 'overrides' => []] : $this->audit->activity($assessments->modelKeys());
 
         return new FacilityDetail(
             facility: [
@@ -101,7 +94,7 @@ final class FacilityDetailAggregator
             ],
             round: $round === null ? null : [
                 'id' => $round->id,
-                'label' => self::roundLabel($round),
+                'label' => $round->label(),
                 'year' => $round->year,
                 'quarter' => $round->quarter,
                 // Corrections are allowed while it is open (D-58; a closed round is pinned, D-32).
@@ -116,12 +109,12 @@ final class FacilityDetailAggregator
                 'ended_at' => $assessment->ended_at->setTimezone((string) config('app.timezone'))->toIso8601String(),
                 // The latest portal correction the source has not since replaced (Q-23): the drawer
                 // says the portal differs from the source, which still shows the old answers.
-                'corrected' => $public ? null : $this->corrected($assessment),
+                'corrected' => $public ? null : $this->audit->corrected($assessment),
             ],
             scores: $this->scoreCard($assessment?->id, $versionId, $rules),
             items: $assessment === null ? [] : $this->items($assessment->id, $round, $slots, $rules),
             history: $this->history($facility->id, $round, $public),
-            flags: $assessment === null || $public ? [] : $this->flags($assessment, $activity['overrides']),
+            flags: $assessment === null || $public ? [] : $this->audit->flags($assessment, $activity['overrides']),
             attachments: $source === null ? [] : $source->attachments,
             activity: $activity['entries'],
             source: ['key' => $source?->sourceKey, 'name' => $source?->sourceName, 'instance_id' => $source?->instanceId, 'url' => $source?->url],
@@ -280,7 +273,7 @@ final class FacilityDetailAggregator
             $points[] = [
                 'sort' => $round->year * 10 + $round->quarter,
                 'round_id' => $round->id,
-                'label' => self::roundLabel($round),
+                'label' => $round->label(),
                 'overall' => ScoreValue::fromNullable($row['overall'], $this->sql->configFor($round)),
                 'selected' => $round->id === $selected?->id,
             ];
@@ -290,166 +283,5 @@ final class FacilityDetailAggregator
         return array_map(fn (array $p): array => [
             'round_id' => $p['round_id'], 'label' => $p['label'], 'overall' => $p['overall'], 'selected' => $p['selected'],
         ], $points);
-    }
-
-    /**
-     * Soft flags on the assessment, then those an administrator overrode (who, when, why).
-     * SLOT_ALL_NA:… entries are scoring notes, not flags, so they are left out.
-     *
-     * @param  array<int, list<array{code: string, by: ?string, at: string, reason: ?string}>>  $overrides  by assessment id, newest first
-     * @return list<array{code: string, label: string, overridden: array{by: ?string, at: string, reason: ?string}|null}>
-     */
-    private function flags(Assessment $assessment, array $overrides): array
-    {
-        /** @var list<string> $codes */
-        $codes = $assessment->flags;
-        $open = array_values(array_filter($codes, fn (string $code): bool => isset($this->rules[$code]) || in_array($code, EventFlags::ALL, true)));
-
-        $flags = array_map(fn (string $code): array => ['code' => $code, 'label' => self::flagLabel($code), 'overridden' => null], $open);
-        $seen = $open;
-        foreach ($overrides[$assessment->id] ?? [] as $override) {
-            if (in_array($override['code'], $seen, true)) {
-                continue;
-            }
-            $seen[] = $override['code'];
-            $flags[] = [
-                'code' => $override['code'],
-                'label' => self::flagLabel($override['code']),
-                'overridden' => ['by' => $override['by'], 'at' => $override['at'], 'reason' => $override['reason']],
-            ];
-        }
-
-        return $flags;
-    }
-
-    /**
-     * The latest portal correction of the assessment (its times or an item) made after the last
-     * source edit that replaced corrections (source_edit_over_correction): who and when, or null.
-     *
-     * @return array{at: string, by: ?string}|null
-     */
-    private function corrected(Assessment $assessment): ?array
-    {
-        $type = $assessment->getMorphClass();
-        $since = (int) DB::table('activity_log')
-            ->where('subject_type', $type)->where('subject_id', $assessment->id)->where('event', 'source_edit_over_correction')
-            ->max('id');
-        $row = DB::table('activity_log as a')
-            ->leftJoin('users as u', fn ($join) => $join->on('u.id', '=', 'a.causer_id')->where('a.causer_type', (new User)->getMorphClass()))
-            ->where('a.event', 'corrected')->where('a.id', '>', $since)
-            ->where(fn ($q) => $q->where(fn ($s) => $s->where('a.subject_type', $type)->where('a.subject_id', $assessment->id))
-                ->orWhereRaw("(a.properties->>'assessment_id')::bigint = ?", [$assessment->id]))
-            ->orderByDesc('a.id')
-            ->first(['a.created_at', 'u.name']);
-
-        return $row === null ? null : [
-            'at' => CarbonImmutable::parse((string) $row->created_at)->toIso8601String(),
-            'by' => $row->name === null ? null : (string) $row->name,
-        ];
-    }
-
-    private static function flagLabel(string $code): string
-    {
-        $label = __("validation_rules.{$code}.name");
-
-        return is_string($label) ? $label : $code;
-    }
-
-    /**
-     * Audit entries on the facility's assessments and their item responses, newest first:
-     * who, when, what changed and why. Score rows are derived, so their entries are left out;
-     * IP and user agent stay in activity_log (SECURITY.md §4), never in the response.
-     *
-     * @param  list<int>  $assessmentIds
-     * @return array{entries: list<array{id: int, at: string, actor: ?string, event: string, subject: string, item_code: ?string, changes: list<array{field: string, old: ?string, new: ?string}>, reason: ?string}>, overrides: array<int, list<array{code: string, by: ?string, at: string, reason: ?string}>>}
-     */
-    private function activity(array $assessmentIds): array
-    {
-        if ($assessmentIds === []) {
-            return ['entries' => [], 'overrides' => []];
-        }
-
-        $ids = '{'.implode(',', $assessmentIds).'}';
-        $assessmentType = (new Assessment)->getMorphClass();
-        $itemType = (new ItemResponse)->getMorphClass();
-        $rows = DB::select(<<<'SQL'
-            SELECT a.id, a.created_at, a.event, a.subject_type, a.subject_id, a.properties, u.name AS actor,
-                COALESCE(a.properties->>'key', ir.item_code) AS item_code
-            FROM activity_log a
-            LEFT JOIN users u ON a.causer_type = ? AND u.id = a.causer_id
-            LEFT JOIN item_responses ir ON a.subject_type = ? AND ir.id = a.subject_id
-            WHERE (a.subject_type = ? AND a.subject_id = ANY(?::bigint[]))
-               OR (a.subject_type = ? AND a.subject_id IN (SELECT id FROM item_responses WHERE assessment_id = ANY(?::bigint[])))
-               OR (a.subject_type = ? AND (a.properties->>'assessment_id')::bigint = ANY(?::bigint[]))
-            ORDER BY a.id DESC
-            LIMIT ?
-            SQL, [(new User)->getMorphClass(), $itemType, $assessmentType, $ids, $itemType, $ids, $itemType, $ids, self::ACTIVITY_LIMIT]);
-
-        $entries = [];
-        $overrides = [];
-        foreach ($rows as $row) {
-            /** @var array<string, mixed> $properties */
-            $properties = json_decode((string) ($row->properties ?? '{}'), true) ?: [];
-            $at = CarbonImmutable::parse((string) $row->created_at)->toIso8601String();
-            $actor = $row->actor === null ? null : (string) $row->actor;
-            $reason = is_string($properties['reason'] ?? null) ? $properties['reason'] : null;
-            $event = (string) ($row->event ?? 'updated');
-
-            $entries[] = [
-                'id' => (int) $row->id,
-                'at' => $at,
-                'actor' => $actor,
-                'event' => $event,
-                'subject' => $row->subject_type === $assessmentType ? 'assessment' : 'item',
-                'item_code' => $row->item_code === null ? null : (string) $row->item_code,
-                'changes' => self::changes($properties),
-                'reason' => $reason,
-            ];
-
-            if ($event === 'flag_overridden' && $row->subject_type === $assessmentType && is_string($properties['code'] ?? null)) {
-                $overrides[(int) $row->subject_id][] = ['code' => $properties['code'], 'by' => $actor, 'at' => $at, 'reason' => $reason];
-            }
-        }
-
-        return ['entries' => $entries, 'overrides' => $overrides];
-    }
-
-    /**
-     * properties.old / properties.attributes as field, old, new; lists read "a, b".
-     *
-     * @param  array<string, mixed>  $properties
-     * @return list<array{field: string, old: ?string, new: ?string}>
-     */
-    private static function changes(array $properties): array
-    {
-        $old = is_array($properties['old'] ?? null) ? $properties['old'] : [];
-        $new = is_array($properties['attributes'] ?? null) ? $properties['attributes'] : [];
-
-        $changes = [];
-        foreach (array_unique([...array_keys($old), ...array_keys($new)]) as $field) {
-            $before = self::text($old[$field] ?? null);
-            $after = self::text($new[$field] ?? null);
-            if ($before !== $after) {
-                $changes[] = ['field' => (string) $field, 'old' => $before, 'new' => $after];
-            }
-        }
-
-        return $changes;
-    }
-
-    private static function text(mixed $value): ?string
-    {
-        return match (true) {
-            $value === null => null,
-            is_bool($value) => $value ? 'true' : 'false',
-            is_scalar($value) => (string) $value,
-            is_array($value) && array_is_list($value) && array_filter($value, 'is_scalar') === $value => implode(', ', array_map('strval', $value)),
-            default => (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-        };
-    }
-
-    private static function roundLabel(Round $round): string
-    {
-        return (string) __('reporting.round_label', ['quarter' => (string) $round->quarter, 'year' => (string) $round->year]);
     }
 }

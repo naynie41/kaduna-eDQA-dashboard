@@ -74,7 +74,7 @@ final class ReportSummary extends Command
 
             $this->newLine();
             $this->info((string) __('reporting.summary.round', [
-                'round' => (string) __('reporting.round_label', ['quarter' => (string) $round->quarter, 'year' => (string) $round->year]),
+                'round' => $round->label(),
                 'status' => $round->status->value,
                 'version' => (string) $version,
             ]));

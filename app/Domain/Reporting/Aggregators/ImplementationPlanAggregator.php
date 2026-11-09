@@ -58,7 +58,7 @@ final class ImplementationPlanAggregator
 
         $band = in_array($this->actionBelow, self::BANDS, true) ? $this->actionBelow : 'acceptable';
         $bound = $rules->bands[$band];
-        $roundLabel = self::roundLabel($round);
+        $roundLabel = $round->label();
         $stored = $this->stored($round->id);
 
         $actions = [];
@@ -166,10 +166,5 @@ final class ImplementationPlanAggregator
         $key = $this->owners[$dimension->value] ?? '';
 
         return (string) __("plan.owners.{$key}");
-    }
-
-    private static function roundLabel(Round $round): string
-    {
-        return (string) __('reporting.round_label', ['quarter' => (string) $round->quarter, 'year' => (string) $round->year]);
     }
 }

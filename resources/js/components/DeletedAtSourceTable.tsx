@@ -1,5 +1,6 @@
 import AdminTable from '@/components/AdminTable';
 import SourceTag from '@/components/SourceTag';
+import { tableMeta, useTableLabels } from '@/lib/dataIssues';
 import { formatDateTime } from '@/lib/format';
 import { useTranslate, useTranslationList } from '@/lib/i18n';
 import type { DeletedAssessmentRow, Paginated } from '@/types/admin';
@@ -14,7 +15,7 @@ export type DeletedAtSourceTableProps = {
 };
 
 /**
- * The Data issues page's Deleted at source tab (D-24): each assessment whose submission its source
+ * The Data issues page's Deleted at source tab (D-62): each assessment whose submission its source
  * no longer returns, with its source, round and what it counts as now. While unreviewed it can be
  * kept (the deletion was a mistake at source) or withdrawn (it then counts nowhere); a withdrawn
  * one can be restored. Every action asks for a reason in the page's dialog. A closed round's
@@ -22,6 +23,7 @@ export type DeletedAtSourceTableProps = {
  */
 export default function DeletedAtSourceTable({ records, onKeep, onWithdraw, onRestore, onPage }: DeletedAtSourceTableProps) {
     const t = useTranslate();
+    const labels = useTableLabels();
     const months = useTranslationList('common.months_short');
     const when = (value: string) => (months.length === 12 ? formatDateTime(value, months) : value);
 
@@ -39,13 +41,9 @@ export default function DeletedAtSourceTable({ records, onKeep, onWithdraw, onRe
                 { key: 'actions', header: t('admin.issues.deleted.actions') },
             ]}
             empty={<p className="px-3 py-6 text-center text-sm text-ink-2">{t('admin.issues.deleted.none')}</p>}
-            meta={{ page: records.current_page, lastPage: records.last_page, from: records.from ?? 0, to: records.to ?? 0, total: records.total }}
+            meta={tableMeta(records)}
             onPage={onPage}
-            labels={{
-                showing: (figures) => t('admin.issues.table.showing', figures),
-                none: t('admin.issues.table.showing_none'),
-                nav: t('admin.issues.table.pages'),
-            }}
+            labels={labels}
         >
             {records.data.map((row) => {
                 const facility = { facility: row.facility.name };

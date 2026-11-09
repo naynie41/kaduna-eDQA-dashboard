@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Validation\Rules;
 
 use App\Domain\Ingestion\DTOs\ParsedSubmission;
+use App\Domain\Round\Support\RoundLabel;
 use App\Domain\Validation\Contracts\ValidationRule;
 use App\Domain\Validation\Enums\Severity;
 use App\Domain\Validation\Rules\Concerns\BuildsFailures;
@@ -54,7 +55,7 @@ final class DuplicateAssessmentRule implements ValidationRule
         }
 
         return [$this->fail('detail', [
-            'round' => $this->roundLabel($round->year, $round->quarter),
+            'round' => RoundLabel::of($round->year, $round->quarter),
             'code' => $facility->code,
             'instance' => $existing,
             'existing_source' => self::sourceName($context->acceptedSource($existing)),

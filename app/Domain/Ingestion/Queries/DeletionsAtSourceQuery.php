@@ -78,7 +78,7 @@ final class DeletionsAtSourceQuery
     }
 
     /**
-     * The Data issues page's Deleted at source tab (D-24, Phase 5 step 2): each assessment whose
+     * The Data issues page's Deleted at source tab (D-62, Phase 5 step 2): each assessment whose
      * submission its source no longer returns, newest deletion first, 50 a page. Open while the
      * deletion is unreviewed; any other status lists the reviewed ones (kept or withdrawn).
      *

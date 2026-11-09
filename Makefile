@@ -11,7 +11,7 @@ APP_DB_USER     := edqa_app
 APP_DB_PASSWORD := edqa_app_dev
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e e2e-sources e2e-issues size lighthouse load odk-mock-up odk-mock-seed sources-mock-up sources-mock-seed
+.PHONY: help up down build sh logs artisan composer npm test test-slow lint check fresh routes prod-build grants-check e2e e2e-sources e2e-issues size lighthouse load sources-mock-up sources-mock-seed
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-13s %s\n", $$1, $$2}'
@@ -93,7 +93,7 @@ e2e-sources: ## Playwright against both mocks: Pull all end to end, the duplicat
 	@# Second pass: the Kobo mock refuses the token (HTTP 401), one Kobo pull fails on it, the page is
 	@# read for the plain-language error, then the token is put back whatever the outcome.
 	@# Third pass: one accepted Kobo visit is taken off the mock, reconcile finds it deleted at source,
-	@# it is withdrawn on Data issues (D-24), then the visit is put back whatever the outcome.
+	@# it is withdrawn on Data issues (D-62), then the visit is put back whatever the outcome.
 	$(COMPOSE) --profile e2e run --rm --no-deps -e E2E_SOURCES=1 playwright tests/e2e/sources.spec.ts $(c); status=$$?; \
 		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php tests/e2e/support/kobo-mock-token.php refuse; \
 		$(COMPOSE) -f compose.e2e-sources.yml exec -T app php artisan edqa:pull kobo > /dev/null 2>&1; \
@@ -110,12 +110,6 @@ e2e-issues: ## Playwright on the Data issues page with known broken records held
 	@# A new batch each run: the earlier run's records are resolved, and their facilities assessed.
 	issues=$$($(EXEC) php artisan edqa:demo:data-issues --batch=e2e-$$(date +%s)) && \
 		$(COMPOSE) --profile e2e run --rm -e E2E_ISSUES="$$issues" playwright tests/e2e/data-issues.spec.ts $(c)
-
-odk-mock-up: ## Start the mock ODK Central (odk-mock:8080 in the stack, 127.0.0.1:8090 on the host)
-	$(COMPOSE) --profile odk up -d odk-mock
-
-odk-mock-seed: ## Write raw submissions for the mock: make odk-mock-seed n=200
-	$(EXEC) php artisan edqa:odk-mock:generate --count=$(or $(n),200)
 
 sources-mock-up: ## Start both source mocks: odk-mock (127.0.0.1:8090) and kobo-mock (127.0.0.1:8091)
 	$(COMPOSE) --profile sources up -d odk-mock kobo-mock

@@ -53,6 +53,14 @@ it('refuses a key that is not configured and a source not registered yet, and gi
         ->and($registry->normaliser('odk'))->toBeInstanceOf(OdkPayloadNormalizer::class);
 });
 
+it('gives a source row id, or null for a key not configured or not registered yet', function (): void {
+    $registry = app(SourceRegistry::class);
+
+    expect($registry->idOrNull('odk'))->toBe(SubmissionSource::query()->where('key', 'odk')->value('id'))
+        ->and($registry->idOrNull('kobo'))->toBeNull()
+        ->and($registry->idOrNull('aggregate'))->toBeNull();
+});
+
 it('lists as configured only the sources whose credentials are all set, never their values', function (): void {
     $registry = app(SourceRegistry::class);
     config(['edqa.sources.odk.url' => null, 'edqa.sources.kobo.url' => null]);

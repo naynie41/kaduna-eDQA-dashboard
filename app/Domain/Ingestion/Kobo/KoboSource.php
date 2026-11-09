@@ -11,8 +11,8 @@ use App\Domain\Ingestion\DTOs\FormVersion;
 use App\Domain\Ingestion\DTOs\SourcePing;
 use App\Domain\Ingestion\DTOs\SubmissionPage;
 use App\Domain\Ingestion\Exceptions\KoboUnexpectedResponse;
+use App\Domain\Ingestion\Support\IsoTime;
 use Carbon\CarbonImmutable;
-use Throwable;
 
 /**
  * KoboToolbox as a SubmissionSource (ARCHITECTURE.md §5.0, §5.3), over the KPI API v2 (what was
@@ -70,7 +70,7 @@ final class KoboSource implements SubmissionSource
                 // date_deployed is false for a version never deployed: only deployed ones carry submissions.
                 $deployed = $entry['date_deployed'] ?? false;
                 if ($deployed !== false) {
-                    $versions[] = new FormVersion($uid, self::time($deployed));
+                    $versions[] = new FormVersion($uid, IsoTime::parse($deployed));
                 }
             }
             if (count($results) < self::VERSIONS_PAGE || ! is_string($page['next'] ?? null)) {
@@ -222,17 +222,5 @@ final class KoboSource implements SubmissionSource
     private static function string(array $entry, string $key): ?string
     {
         return is_string($entry[$key] ?? null) && $entry[$key] !== '' ? $entry[$key] : null;
-    }
-
-    private static function time(mixed $value): ?CarbonImmutable
-    {
-        if (! is_string($value)) {
-            return null;
-        }
-        try {
-            return CarbonImmutable::parse($value);
-        } catch (Throwable) {
-            return null;
-        }
     }
 }

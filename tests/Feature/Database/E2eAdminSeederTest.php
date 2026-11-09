@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Database\Seeders\E2eAdminSeeder;
 
-// The Playwright suite signs in as a fixed administrator with a known password (no MFA, D-35).
+// The Playwright suite signs in as a fixed administrator with a known password (no MFA, D-84).
 // Local (and the test suite) only: a known password must never reach staging or production.
 
 it('creates one active administrator with the known password, unlocked', function (): void {

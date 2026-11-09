@@ -2,34 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Auth;
-
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
-use Tests\TestCase;
 
-final class PasswordConfirmationTest extends TestCase
-{
-    use RefreshDatabase;
+// Fortify's confirm-password screen, for a signed-in administrator only.
 
-    public function test_confirm_password_screen_can_be_rendered()
-    {
-        $user = User::factory()->create();
+it('renders the confirm-password screen to a signed-in administrator', function (): void {
+    $this->actingAs(User::factory()->create())
+        ->get(route('password.confirm'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('auth/confirm-password'));
+});
 
-        $response = $this->actingAs($user)->get(route('password.confirm'));
-
-        $response->assertOk();
-
-        $response->assertInertia(fn (Assert $page) => $page
-            ->component('auth/confirm-password'),
-        );
-    }
-
-    public function test_password_confirmation_requires_authentication()
-    {
-        $response = $this->get(route('password.confirm'));
-
-        $response->assertRedirect(route('login'));
-    }
-}
+it('sends a guest to sign in instead', function (): void {
+    $this->get(route('password.confirm'))->assertRedirect(route('login'));
+});

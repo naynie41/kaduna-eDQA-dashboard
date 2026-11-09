@@ -2,97 +2,64 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Auth;
-
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
-use Laravel\Fortify\Features;
-use Tests\TestCase;
 
-final class PasswordResetTest extends TestCase
-{
-    use RefreshDatabase;
+// Fortify's password reset by email link. The password policy has its own tests.
 
-    protected function setUp(): void
-    {
-        parent::setUp();
+it('renders the forgot-password screen', function (): void {
+    $this->get(route('password.request'))->assertOk();
+});
 
-        $this->skipUnlessFortifyHas(Features::resetPasswords());
-    }
+it('emails a reset link', function (): void {
+    Notification::fake();
+    $user = User::factory()->create();
 
-    public function test_reset_password_link_screen_can_be_rendered()
-    {
-        $response = $this->get(route('password.request'));
+    $this->post(route('password.email'), ['email' => $user->email]);
 
-        $response->assertOk();
-    }
+    Notification::assertSentTo($user, ResetPassword::class);
+});
 
-    public function test_reset_password_link_can_be_requested()
-    {
-        Notification::fake();
+it('renders the reset screen from the emailed link', function (): void {
+    Notification::fake();
+    $user = User::factory()->create();
 
-        $user = User::factory()->create();
+    $this->post(route('password.email'), ['email' => $user->email]);
 
-        $this->post(route('password.email'), ['email' => $user->email]);
+    Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification): bool {
+        $this->get(route('password.reset', $notification->token))->assertOk();
 
-        Notification::assertSentTo($user, ResetPassword::class);
-    }
+        return true;
+    });
+});
 
-    public function test_reset_password_screen_can_be_rendered()
-    {
-        Notification::fake();
+it('resets the password with a valid token, then sends the administrator to sign in', function (): void {
+    Notification::fake();
+    $user = User::factory()->create();
 
-        $user = User::factory()->create();
+    $this->post(route('password.email'), ['email' => $user->email]);
 
-        $this->post(route('password.email'), ['email' => $user->email]);
-
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
-            $response = $this->get(route('password.reset', $notification->token));
-
-            $response->assertOk();
-
-            return true;
-        });
-    }
-
-    public function test_password_can_be_reset_with_valid_token()
-    {
-        Notification::fake();
-
-        $user = User::factory()->create();
-
-        $this->post(route('password.email'), ['email' => $user->email]);
-
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
-            $response = $this->post(route('password.update'), [
-                'token' => $notification->token,
-                'email' => $user->email,
-                // Must meet the SECURITY.md §2 policy: 12+ characters, mixed case, a number.
-                'password' => 'Correct-Horse-12',
-                'password_confirmation' => 'Correct-Horse-12',
-            ]);
-
-            $response
-                ->assertSessionHasNoErrors()
-                ->assertRedirect(route('login'));
-
-            return true;
-        });
-    }
-
-    public function test_password_cannot_be_reset_with_invalid_token(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this->post(route('password.update'), [
-            'token' => 'invalid-token',
+    Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user): bool {
+        $this->post(route('password.update'), [
+            'token' => $notification->token,
             'email' => $user->email,
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
-        ]);
+            // Meets the SECURITY.md §2 policy: 12+ characters, mixed case, a number.
+            'password' => 'Correct-Horse-12',
+            'password_confirmation' => 'Correct-Horse-12',
+        ])->assertSessionHasNoErrors()->assertRedirect(route('login'));
 
-        $response->assertSessionHasErrors('email');
-    }
-}
+        return true;
+    });
+});
+
+it('refuses a reset with an invalid token', function (): void {
+    $user = User::factory()->create();
+
+    $this->post(route('password.update'), [
+        'token' => 'invalid-token',
+        'email' => $user->email,
+        'password' => 'Correct-Horse-12',
+        'password_confirmation' => 'Correct-Horse-12',
+    ])->assertSessionHasErrors('email');
+});

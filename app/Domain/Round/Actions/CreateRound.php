@@ -8,6 +8,7 @@ use App\Domain\Round\DTOs\RoundWindowResult;
 use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Round\Exceptions\RoundActionRefused;
 use App\Domain\Round\Models\Round;
+use App\Domain\Round\Support\RoundLabel;
 use App\Domain\Round\Support\RoundWindowCheck;
 use App\Models\User;
 use App\Support\Audit\AuditLog;
@@ -29,7 +30,7 @@ final class CreateRound
     {
         return DB::transaction(function () use ($year, $quarter, $start, $end, $actor): RoundWindowResult {
             if (Round::query()->where(['year' => $year, 'quarter' => $quarter])->exists()) {
-                throw RoundActionRefused::roundExists(RoundWindowCheck::label($year, $quarter));
+                throw RoundActionRefused::roundExists(RoundLabel::of($year, $quarter));
             }
             $warnings = $this->windows->check($year, $quarter, $start, $end);
 

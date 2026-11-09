@@ -8,7 +8,7 @@ use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
- * An assessment was withdrawn or restored (D-24): it leaves or rejoins every figure, so the round's
+ * An assessment was withdrawn or restored (D-62): it leaves or rejoins every figure, so the round's
  * cache is flushed, round_aggregates refreshed and the round rescored.
  */
 final readonly class AssessmentStatusChanged implements ShouldDispatchAfterCommit

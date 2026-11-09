@@ -8,7 +8,6 @@ use App\Domain\Ingestion\Actions\StartManualPull;
 use App\Domain\Ingestion\Enums\PullOutcome;
 use App\Domain\Ingestion\Enums\PullTrigger;
 use App\Domain\Ingestion\Exceptions\SourceException;
-use App\Domain\Ingestion\Exceptions\SourceRefused;
 use App\Domain\Ingestion\Models\PullRun;
 use App\Domain\Ingestion\Models\SourceSync;
 use App\Domain\Ingestion\SourceRegistry;
@@ -41,7 +40,7 @@ final class SourceStatusQuery
     {
         $problems = $this->sources->problems($source);
         $configured = $problems === [];
-        $sourceId = $this->sourceId($source);
+        $sourceId = $this->sources->idOrNull($source);
         $sync = $configured && $sourceId !== null ? SourceSync::current($sourceId, $this->sources->formRef($source)) : null;
 
         return [
@@ -82,15 +81,6 @@ final class SourceStatusQuery
             'fetched' => $run->fetched, 'parsed' => $run->parsed, 'accepted' => $run->accepted, 'flagged' => $run->flagged,
             'quarantined' => $run->quarantined, 'duplicates' => $run->duplicates, 'cross_source_duplicates' => (int) $run->cross_source_duplicates,
         ];
-    }
-
-    private function sourceId(string $source): ?int
-    {
-        try {
-            return $this->sources->id($source);
-        } catch (SourceRefused) {
-            return null;
-        }
     }
 
     /** @return array{ok: bool, status: string, message: ?string, checked_at: string} */

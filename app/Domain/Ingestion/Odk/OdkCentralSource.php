@@ -11,8 +11,8 @@ use App\Domain\Ingestion\DTOs\FormVersion;
 use App\Domain\Ingestion\DTOs\SourcePing;
 use App\Domain\Ingestion\DTOs\SubmissionPage;
 use App\Domain\Ingestion\Exceptions\OdkUnexpectedResponse;
+use App\Domain\Ingestion\Support\IsoTime;
 use Carbon\CarbonImmutable;
-use Throwable;
 
 /**
  * SubmissionSource over ODK Central's REST and OData API (ARCHITECTURE.md §5.2–5.3), for the one
@@ -48,7 +48,7 @@ final class OdkCentralSource implements SubmissionSource
             if ($version === null) {
                 throw OdkUnexpectedResponse::malformed(200, 'forms/{form}/versions');
             }
-            $versions[] = new FormVersion($version, self::time($entry['publishedAt'] ?? null));
+            $versions[] = new FormVersion($version, IsoTime::parse($entry['publishedAt'] ?? null));
         }
 
         return $versions;
@@ -166,17 +166,5 @@ final class OdkCentralSource implements SubmissionSource
     private static function string(array $entry, string $key): ?string
     {
         return is_string($entry[$key] ?? null) && $entry[$key] !== '' ? $entry[$key] : null;
-    }
-
-    private static function time(mixed $value): ?CarbonImmutable
-    {
-        if (! is_string($value)) {
-            return null;
-        }
-        try {
-            return CarbonImmutable::parse($value);
-        } catch (Throwable) {
-            return null;
-        }
     }
 }

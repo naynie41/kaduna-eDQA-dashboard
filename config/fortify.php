@@ -154,8 +154,8 @@ return [
 
     'features' => [
         Features::resetPasswords(),
-        Features::emailVerification(),
-        // No two-factor authentication (D-35): SECURITY.md §2 lists the compensating controls.
+        // No email verification: `edqa:admin:create` makes accounts verified, and nothing requires it.
+        // No two-factor authentication (D-84): SECURITY.md §2 lists the compensating controls.
     ],
 
 ];

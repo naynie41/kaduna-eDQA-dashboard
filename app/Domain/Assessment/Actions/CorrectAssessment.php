@@ -12,7 +12,7 @@ use App\Domain\Assessment\Models\ItemResponse;
 use App\Domain\Assessment\Support\ItemKey;
 use App\Domain\Round\Enums\RoundStatus;
 use App\Domain\Round\Models\Round;
-use App\Domain\Round\Support\RoundWindowCheck;
+use App\Domain\Round\Support\RoundLabel;
 use App\Domain\Scoring\Actions\RescoreAssessments;
 use App\Domain\Scoring\RuleVersionForRound;
 use App\Domain\Validation\EventFlags;
@@ -82,7 +82,7 @@ final class CorrectAssessment
             $assessment = Assessment::query()->lockForUpdate()->findOrFail($assessment->id);
             $round = Round::query()->findOrFail($assessment->round_id);
             if ($round->status === RoundStatus::Closed) {
-                throw CorrectionRefused::roundClosed(RoundWindowCheck::label($round->year, $round->quarter));
+                throw CorrectionRefused::roundClosed(RoundLabel::of($round->year, $round->quarter));
             }
             if (! in_array($assessment->status, ['accepted', 'flagged'], true)) {
                 throw CorrectionRefused::notAccepted($assessment->status);
@@ -139,7 +139,7 @@ final class CorrectAssessment
                 $first = $round->window_start->toDateString();
                 $last = $round->window_end->toDateString();
                 if ($day < $first || $day > $last) {
-                    throw CorrectionRefused::outsideRound($day, RoundWindowCheck::label($round->year, $round->quarter), $first, $last);
+                    throw CorrectionRefused::outsideRound($day, RoundLabel::of($round->year, $round->quarter), $first, $last);
                 }
             }
 

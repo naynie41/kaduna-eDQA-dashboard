@@ -101,14 +101,10 @@ it('refuses an unknown source and lists the configured ones', function (): void 
         ->assertFailed();
 });
 
-it('keeps edqa:odk:check as an alias of edqa:source:check odk for one release', function (): void {
-    Http::fake();
-
-    $this->artisan('edqa:odk:check')
-        ->expectsOutputToContain('Not configured. Set in .env: ODK_CENTRAL_URL')
-        ->expectsOutputToContain('edqa:odk:check is now edqa:source:check odk')
-        ->assertFailed();
-
-    Artisan::call('edqa:odk:check', ['--json' => true]);
-    expect(json_decode(Artisan::output(), true))->toMatchArray(['source' => 'odk', 'status' => 'not_configured']);
+// Retired after 0.7.0: the ODK-only commands (both sources share one now, D-87) and the one-off
+// Phase 2C attachment move, with its old odk disk.
+it('no longer has the ODK-only commands or the one-off attachment move', function (): void {
+    expect(config('filesystems.disks'))->not->toHaveKey('odk');
+    expect(Artisan::all())->not->toHaveKey('edqa:odk:check')->not->toHaveKey('edqa:odk-mock:generate')->not->toHaveKey('edqa:attachments:relocate')
+        ->toHaveKey('edqa:source:check')->toHaveKey('edqa:source-mock:generate');
 });

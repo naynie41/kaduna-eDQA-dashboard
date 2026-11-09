@@ -14,7 +14,7 @@ use function Laravel\Prompts\text;
 
 /**
  * The only way to create an administrator (SECURITY.md §2): no registration, no user-management
- * page. The account is verified and active, and signs in with its password (no MFA, D-35). The
+ * page. The account is verified and active, and signs in with its password (no MFA, D-84). The
  * password policy applies (SECURITY.md §2, Password::defaults). Audited through the
  * User model (source = console).
  */

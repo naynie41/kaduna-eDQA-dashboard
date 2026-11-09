@@ -54,17 +54,6 @@ return [
             'report' => false,
         ],
 
-        // Before Phase 2C: ODK attachments in storage/app/odk/{instance}/. Read only by
-        // edqa:attachments:relocate, which moves them to the attachments disk.
-        'odk' => [
-            'driver' => 'local',
-            'root' => storage_path('app/odk'),
-            'serve' => false,
-            'visibility' => 'private',
-            'throw' => true,
-            'report' => false,
-        ],
-
         // Reports and exports written for administrators (SECURITY.md §7): storage/app/exports,
         // private, never served by Laravel itself.
         'exports' => [

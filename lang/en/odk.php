@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // ODK Central connection (ARCHITECTURE.md §5): error messages for administrators (never a
-// password, token or payload) and edqa:odk:check.
+// password, token or payload) and edqa:source:check odk.
 
 return [
 
@@ -35,16 +35,6 @@ return [
     'attachments' => [
         'queued' => 'Queued attachment fetches for :count submission(s) on the low queue.',
         'fetched' => 'Fetched attachments for :count submission(s); for :failed of them ODK could not deliver every file, now marked failed.',
-    ],
-
-    // edqa:odk-mock:generate (docker/odk-mock).
-    'mock' => [
-        'local_only' => 'The mock ODK Central is for local development only.',
-        'written' => 'Wrote :valid valid, :flagged to be flagged and :broken to be quarantined, plus :edited edits (staged) and :attachments photo(s), to :path.',
-        'edits_applied' => 'Edits applied: the next pull sees the edited versions.',
-        'bad_round' => 'Give the round as 2026Q2, not ":round".',
-        'no_round' => 'There is no round :round.',
-        'bad_span' => 'Give the quarters as 2024Q1-2025Q2, oldest first, not ":span".',
     ],
 
 ];

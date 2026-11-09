@@ -19,7 +19,7 @@ use Illuminate\Console\Command;
  * per source, whether it is configured (the env keys missing, never their values), whether it
  * answers and accepts the credentials (signing in reads the account and the form), and its form
  * versions, each marked with whether a field map reads it. Sends nothing for a source that is not
- * configured. Replaces edqa:odk:check, which stays as an alias for one release.
+ * configured. Replaced edqa:odk:check (retired after 0.7.0).
  */
 final class SourceCheck extends Command
 {

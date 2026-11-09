@@ -10,7 +10,7 @@ use Illuminate\Testing\TestResponse;
 use Spatie\Activitylog\Models\Activity;
 use Tests\Support\Rows;
 
-// Withdrawing an assessment whose submission was deleted at source (D-24, Phase 5 step 2), and
+// Withdrawing an assessment whose submission was deleted at source (D-62, Phase 5 step 2), and
 // restoring it. Both reasoned and audited; the round is rescored and refreshed (an event the
 // reporting and scoring listeners answer). A withdrawn assessment counts nowhere
 // (WithdrawnAssessmentsTest).

@@ -28,7 +28,7 @@ final class DataIssuesRequest extends FormRequest
 
         return [
             // hard: quarantined records; soft: flagged accepted assessments; deleted: assessments
-            // whose submission was deleted at source (D-24).
+            // whose submission was deleted at source (D-62).
             'tab' => ['nullable', Rule::in(['hard', 'soft', 'deleted'])],
             'state' => ['nullable', Rule::in(QuarantineQuery::STATES)],
             'rule' => ['nullable', Rule::in($codes)],
